@@ -481,10 +481,25 @@ export const chatStyles = css`
     padding: 0.15em 0.4em;
     border-radius: var(--ai-chat-radius);
   }
-  .markdown table { border-collapse: collapse; width: 100%; margin: 0.5em 0; }
+  /* Tables scroll horizontally instead of crushing their columns on narrow
+     screens. display:block + overflow-x makes the <table> itself the scroll
+     container (the markdown pipeline emits a bare <table>, so we can't wrap it);
+     width:max-content lets it stay natural width and scroll, capped at 100% so a
+     small table still fills nicely. */
+  .markdown table {
+    border-collapse: collapse;
+    display: block;
+    max-width: 100%;
+    width: max-content;
+    overflow-x: auto;
+    margin: 0.5em 0;
+    scrollbar-width: thin;
+    scrollbar-color: var(--ai-chat-border) transparent;
+  }
   .markdown th, .markdown td {
     border: var(--ai-chat-table-border-width) solid var(--ai-chat-border);
     padding: 6px 10px;
+    white-space: nowrap;
   }
   .markdown blockquote {
     margin: 0.5em 0; padding-left: 12px;
