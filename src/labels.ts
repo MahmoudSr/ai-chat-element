@@ -37,6 +37,9 @@ export interface ChatLabels {
   clearChat: string;
   /** Label + aria-label for the retry button on a failed message. */
   retry: string;
+  /** Placeholder shown when the assistant returns an empty response (finished
+   *  streaming with no content and no error) — avoids a blank ghost bubble. */
+  emptyResponse: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -55,4 +58,5 @@ export const DEFAULT_LABELS: ChatLabels = {
   headerTitle: 'Chat',
   clearChat: 'New chat',
   retry: 'Retry',
+  emptyResponse: 'No response.',
 };

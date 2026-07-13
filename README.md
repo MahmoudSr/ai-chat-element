@@ -278,6 +278,10 @@ Set via JS only (they hold objects/arrays):
 
 **Events:** `ai-chat:submit`, `ai-chat:message`, `ai-chat:error`, `ai-chat:new-chat`.
 
+`ai-chat:message` fires once per completed assistant turn — but **only when the
+reply has content**. Empty responses and failed turns don't fire it, so if you
+persist on this event you won't save blank/ghost messages.
+
 ```js
 chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
 ```
@@ -483,6 +487,7 @@ chat.labels = {
   headerTitle: 'Chat',
   clearChat: 'Nuevo chat',
   retry: 'Reintentar',
+  emptyResponse: 'Sin respuesta.',
 };
 ```
 
@@ -647,7 +652,8 @@ For styling that a variable can't reach, target the shadow parts with
 `clear-button`, `messages`, `message`, `bubble`, `avatar`, `meta`, `name`,
 `time`, `composer`, `composer-box`, `composer-actions`, `composer-actions-start`,
 `composer-actions-end`, `input`, `send-button`, `stop-button`, `jump-button`,
-`retry-button`, `empty`, `empty-icon`, `empty-heading`, `empty-body`, `error`.
+`retry-button`, `empty`, `empty-icon`, `empty-heading`, `empty-body`, `error`,
+`empty-response`.
 
 ### All slots
 

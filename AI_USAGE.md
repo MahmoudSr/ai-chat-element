@@ -107,9 +107,11 @@ where `StreamChunk` is `{type:'delta',delta} | {type:'done'} | {type:'error',err
 **Methods:** `send(text)`, `stop()`, `clear()`, `retry()`,
 `addMessage(role, content)`.
 
-**Events:** `ai-chat:submit` `{content}`, `ai-chat:message` `{message}`,
-`ai-chat:error` `{error}`, `ai-chat:new-chat` `{messages}` (cancelable — fired by
-the New-chat button; `preventDefault()` keeps the current conversation).
+**Events:** `ai-chat:submit` `{content}`, `ai-chat:message` `{message}` (fires only
+for a completed reply that HAS content — not for empty or failed turns, so
+persisting on it won't save blank messages), `ai-chat:error` `{error}`,
+`ai-chat:new-chat` `{messages}` (cancelable — fired by the New-chat button;
+`preventDefault()` keeps the current conversation).
 
 ```js
 chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
@@ -149,13 +151,13 @@ chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
 - **i18n / all strings:** override any subset via the `.labels` object
   (`userName`, `assistantName`, `emptyHeading`, `emptyBody`, `copy`, `copied`,
   `typing`, `send`, `stop`, `jumpToLatest`, `inputLabel`, `messagesRegion`,
-  `headerTitle`, `clearChat`, `retry`).
+  `headerTitle`, `clearChat`, `retry`, `emptyResponse`).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
   `header`, `header-title`, `clear-button`, `messages`, `message`, `bubble`,
   `avatar`, `meta`, `name`, `time`, `composer`, `composer-box`,
   `composer-actions`, `composer-actions-start`, `composer-actions-end`, `input`,
   `send-button`, `stop-button`, `jump-button`, `retry-button`, `empty`,
-  `empty-icon`, `empty-heading`, `empty-body`, `error`.
+  `empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`.
 
 ## All CSS variables (complete — do not invent names not on this list)
 

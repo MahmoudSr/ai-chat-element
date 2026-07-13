@@ -154,13 +154,18 @@ export class AiChat extends LitElement {
 
   private _abort?: AbortController;
   /**
-   * While true, new content keeps the view pinned to the bottom. Set false the
-   * moment the user scrolls up, restored when they scroll back down. This is
-   * what stops streaming from yanking the user back down mid-read.
+   * While true, new content keeps the view pinned to the bottom. Driven by an
+   * IntersectionObserver watching a sentinel element at the very bottom of the
+   * list: sticky === "the bottom sentinel is currently visible". This is far
+   * more robust than scrollTop/scrollHeight math (no jitter, no sub-pixel or
+   * zoom edge cases) and is how ChatGPT/Claude-style chats avoid fighting the
+   * user's scroll during streaming.
    */
   private _stickToBottom = true;
+  private _bottomObserver?: IntersectionObserver;
 
   @query('.messages') private _scrollEl!: HTMLElement;
+  @query('.scroll-sentinel') private _sentinel!: HTMLElement;
   @query('textarea') private _textarea!: HTMLTextAreaElement;
 
   /** Programmatically append a message without sending it. */
@@ -175,10 +180,16 @@ export class AiChat extends LitElement {
     return msg;
   }
 
-  /** Clear the conversation and cancel any in-flight generation. */
+  /** Clear the conversation and cancel any in-flight generation. Also clears any
+   *  half-typed draft in the composer so a new chat starts truly empty. */
   clear(): void {
     this.stop();
     this.messages = [];
+    this._input = '';
+    if (this._textarea) {
+      this._textarea.style.height = 'auto';
+      this._textarea.style.overflowY = 'hidden';
+    }
   }
 
   /**
@@ -251,8 +262,14 @@ export class AiChat extends LitElement {
     this.messages = [...this.messages, assistant];
 
     this._busy = true;
-    this._abort = new AbortController();
-    const signal = this._abort.signal;
+    // Each send owns its own controller. We keep a local reference so the
+    // cleanup below can tell whether THIS stream is still the current one — if
+    // the user started a new chat / new send mid-stream, a newer controller has
+    // replaced ours in `this._abort`, and our late-arriving cleanup must not
+    // clobber it (that would orphan the new stream and make it unstoppable).
+    const controller = new AbortController();
+    this._abort = controller;
+    const signal = controller.signal;
 
     const outbound: ChatMessage[] = this.systemPrompt
       ? [
@@ -297,18 +314,26 @@ export class AiChat extends LitElement {
         this._emitError(message);
       }
     } finally {
-      this._patch(assistant.id, (m) => ({ ...m, streaming: false }));
-      this._busy = false;
-      this._abort = undefined;
-      const final = this.messages.find((m) => m.id === assistant.id);
-      if (final && !final.error) {
-        this.dispatchEvent(
-          new CustomEvent('ai-chat:message', {
-            detail: { message: final },
-            bubbles: true,
-            composed: true,
-          }),
-        );
+      // Only run cleanup if THIS send still owns the current stream. If a newer
+      // send/clear replaced our controller (e.g. New-chat mid-stream), leave the
+      // shared _busy/_abort alone — they now belong to the newer stream.
+      if (this._abort === controller) {
+        this._patch(assistant.id, (m) => ({ ...m, streaming: false }));
+        this._busy = false;
+        this._abort = undefined;
+        const final = this.messages.find((m) => m.id === assistant.id);
+        // Only announce a completed turn when it actually produced content.
+        // Skipping empties (and errors) keeps consumers who persist on
+        // `ai-chat:message` from saving blank ghost turns to their history.
+        if (final && !final.error && final.content) {
+          this.dispatchEvent(
+            new CustomEvent('ai-chat:message', {
+              detail: { message: final },
+              bubbles: true,
+              composed: true,
+            }),
+          );
+        }
       }
     }
     return true;
@@ -354,8 +379,28 @@ export class AiChat extends LitElement {
     this.addEventListener('keydown', this._onHostKeydown);
   }
 
+  protected override firstUpdated(): void {
+    // Watch a sentinel at the bottom of the scroller. When it's visible the user
+    // is at (or effectively at) the bottom, so we keep following new content;
+    // when it scrolls out of view (user scrolled up, or content grew past it) we
+    // stop pinning. `root: _scrollEl` scopes intersection to the scroll region.
+    if ('IntersectionObserver' in window && this._scrollEl && this._sentinel) {
+      this._bottomObserver = new IntersectionObserver(
+        (entries) => {
+          const atBottom = entries[0]?.isIntersecting ?? true;
+          this._stickToBottom = atBottom;
+          if (this._showJump === atBottom) this._showJump = !atBottom;
+        },
+        { root: this._scrollEl, threshold: 0 },
+      );
+      this._bottomObserver.observe(this._sentinel);
+    }
+  }
+
   override disconnectedCallback(): void {
     this.removeEventListener('keydown', this._onHostKeydown);
+    this._bottomObserver?.disconnect();
+    this._bottomObserver = undefined;
     super.disconnectedCallback();
   }
 
@@ -422,14 +467,26 @@ export class AiChat extends LitElement {
   }
 
   protected override updated(changed: PropertyValues): void {
-    if (changed.has('messages') && this._stickToBottom) {
+    // Auto-follow new content only when pinned. We AND the async observer flag
+    // with a synchronous position check: the IntersectionObserver callback lags
+    // by a frame, so during a slow upward scroll the flag can still read "true"
+    // when a token arrives — scrolling then would yank the user back down (the
+    // classic jitter). The live check closes that race.
+    if (
+      changed.has('messages') &&
+      this._stickToBottom &&
+      this._isNearBottom()
+    ) {
       this._scrollToBottom();
     }
   }
 
-  /** True when the scroll position is at (or within a hair of) the bottom. */
-  private _isAtBottom(el: HTMLElement): boolean {
-    return el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  /** Synchronous "is the viewport essentially at the bottom right now?" guard,
+   *  used only to prevent the auto-scroll/observer timing race (see updated). */
+  private _isNearBottom(): boolean {
+    const el = this._scrollEl;
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 8;
   }
 
   private _scrollToBottom(smooth = false): void {
@@ -443,20 +500,9 @@ export class AiChat extends LitElement {
     });
   }
 
-  /**
-   * Track the user's scroll intent. Scrolling up unpins auto-scroll (so the
-   * stream stops fighting them); returning to the bottom re-pins it.
-   */
-  private _onScroll(e: Event): void {
-    const el = e.currentTarget as HTMLElement;
-    const atBottom = this._isAtBottom(el);
-    this._stickToBottom = atBottom;
-    if (this._showJump === atBottom) this._showJump = !atBottom;
-  }
-
   private _jumpToBottom(): void {
-    this._stickToBottom = true;
-    this._showJump = false;
+    // Scroll to the bottom; the IntersectionObserver will see the sentinel come
+    // back into view and re-pin _stickToBottom / hide the jump button.
     this._scrollToBottom(true);
   }
 
@@ -484,9 +530,12 @@ export class AiChat extends LitElement {
           ${this._renderHeader()}
           <div class="scroll-region">
             <div class="messages" part="messages"
-                 @click=${this._onMessagesClick} @scroll=${this._onScroll}
+                 @click=${this._onMessagesClick}
                  role="log" aria-live="polite" aria-label=${this._labels.messagesRegion}>
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
+              <!-- Bottom sentinel watched by the IntersectionObserver to decide
+                   whether we're pinned to the bottom (see firstUpdated). -->
+              <div class="scroll-sentinel" aria-hidden="true"></div>
             </div>
             ${
               this._showJump
@@ -651,6 +700,13 @@ export class AiChat extends LitElement {
           ${
             m.streaming && !m.content
               ? html`<span class="typing" aria-label=${this._labels.typing}><i></i><i></i><i></i></span>`
+              : nothing
+          }
+          ${
+            // Finished with no content and no error → show a placeholder instead
+            // of a blank ghost bubble (e.g. an empty upstream response).
+            isAssistant && !m.streaming && !m.content && !m.error
+              ? html`<div class="empty-response" part="empty-response">${this._labels.emptyResponse}</div>`
               : nothing
           }
           ${

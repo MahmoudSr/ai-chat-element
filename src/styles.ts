@@ -416,6 +416,16 @@ export const chatStyles = css`
   }
   .plain { white-space: pre-wrap; }
 
+  /* Invisible marker at the very bottom of the message list. An
+     IntersectionObserver watches it to know if the user is at the bottom (so we
+     keep auto-following the stream) vs. scrolled up (so we don't). The small
+     height gives a tiny grace zone so "at bottom" trips naturally. */
+  .scroll-sentinel { height: 1px; width: 100%; flex: 0 0 auto; }
+
+  /* Placeholder for an empty assistant response (finished, no content, no
+     error) — muted so it reads as a system note, not real reply text. */
+  .empty-response { color: var(--ai-chat-muted); font-style: italic; }
+
   .message__error {
     margin-top: 8px;
     display: flex;
