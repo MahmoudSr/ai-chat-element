@@ -5,12 +5,7 @@
 import './ai-chat.js';
 
 export { AiChat } from './ai-chat.js';
-export type {
-  ChatMessage,
-  ChatTransport,
-  StreamChunk,
-  Role,
-} from './types.js';
+export type { ChatMessage, ChatTransport, StreamChunk, Role } from './types.js';
 
 // Adapters are also available from the dedicated `./adapters` entry point,
 // but re-exported here for convenience.

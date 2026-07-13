@@ -62,7 +62,7 @@ chat.transport = functionAdapter(async function* (messages, signal) {
 > 🔒 **Security: never ship a raw API key in browser code.** Anything in the
 > browser is visible to end users — a key placed there can be stolen and abused
 > at your expense. Always keep the key on a server you control and have the
-> browser talk to *that*. See [Custom backend](#custom-backend) for a complete
+> browser talk to _that_. See [Custom backend](#custom-backend) for a complete
 > server example.
 
 The built-in `openAIAdapter` / `anthropicAdapter` take an `apiKey` directly. That
@@ -247,32 +247,32 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 
 ## Attributes & properties
 
-| Attribute          | Type                        | Default | Description                                   |
-| ------------------ | --------------------------- | ------- | --------------------------------------------- |
-| `theme`            | `auto` \| `light` \| `dark` | `auto`  | Color mode; `auto` follows the OS.            |
-| `placeholder`      | string                      | —       | Input placeholder text.                       |
-| `empty-heading`    | string                      | —       | Heading shown when there are no messages.     |
-| `empty-body`       | string                      | —       | Secondary line under the empty heading.       |
-| `show-names`       | boolean                     | `true`  | Show the sender name above each message.      |
-| `show-timestamps`  | boolean                     | `true`  | Show a time (e.g. "3:45 PM") next to the name.|
+| Attribute          | Type                        | Default | Description                                                                       |
+| ------------------ | --------------------------- | ------- | --------------------------------------------------------------------------------- |
+| `theme`            | `auto` \| `light` \| `dark` | `auto`  | Color mode; `auto` follows the OS.                                                |
+| `placeholder`      | string                      | —       | Input placeholder text.                                                           |
+| `empty-heading`    | string                      | —       | Heading shown when there are no messages.                                         |
+| `empty-body`       | string                      | —       | Secondary line under the empty heading.                                           |
+| `show-names`       | boolean                     | `true`  | Show the sender name above each message.                                          |
+| `show-timestamps`  | boolean                     | `true`  | Show a time (e.g. "3:45 PM") next to the name.                                    |
 | `assistant-bubble` | boolean                     | `false` | Wrap AI messages in a bubble. Off = borderless plain text (ChatGPT/Claude style). |
-| `show-header`      | boolean                     | `false` | Show the built-in header bar (title + new-chat button). |
-| `show-clear`       | boolean                     | `false` | Show the New/Clear-chat button (in the header, or floating top-right). |
-| `show-retry`       | boolean                     | `true`  | Show a Retry button on a failed message that re-sends the last user turn. |
-| `show-aside`       | boolean                     | `false` | Show the sidebar column (fill the `aside` slot with your history list). |
-| `aside-side`       | `left` \| `right`           | `left`  | Which side the sidebar sits on.               |
-| `system-prompt`    | string                      | —       | Prepended to every request (not shown in UI). |
-| `disabled`         | boolean                     | `false` | Disables the input.                           |
+| `show-header`      | boolean                     | `false` | Show the built-in header bar (title + new-chat button).                           |
+| `show-clear`       | boolean                     | `false` | Show the New/Clear-chat button (in the header, or floating top-right).            |
+| `show-retry`       | boolean                     | `true`  | Show a Retry button on a failed message that re-sends the last user turn.         |
+| `show-aside`       | boolean                     | `false` | Show the sidebar column (fill the `aside` slot with your history list).           |
+| `aside-side`       | `left` \| `right`           | `left`  | Which side the sidebar sits on.                                                   |
+| `system-prompt`    | string                      | —       | Prepended to every request (not shown in UI).                                     |
+| `disabled`         | boolean                     | `false` | Disables the input.                                                               |
 
 To turn a boolean attribute off, set it to `"false"` (e.g. `show-timestamps="false"`).
 
 Set via JS only (they hold objects/arrays):
 
-| Property     | Type                   | Description                                     |
-| ------------ | ---------------------- | ----------------------------------------------- |
-| `.transport` | `ChatTransport`        | **Required.** The backend to talk to.           |
-| `.messages`  | `ChatMessage[]`        | The conversation (read or seed it).             |
-| `.labels`    | `Partial<ChatLabels>`  | Override any UI/accessibility strings (see below).|
+| Property     | Type                  | Description                                        |
+| ------------ | --------------------- | -------------------------------------------------- |
+| `.transport` | `ChatTransport`       | **Required.** The backend to talk to.              |
+| `.messages`  | `ChatMessage[]`       | The conversation (read or seed it).                |
+| `.labels`    | `Partial<ChatLabels>` | Override any UI/accessibility strings (see below). |
 
 **Methods:** `send(text)`, `stop()`, `clear()`, `retry()`, `addMessage(role, content)`.
 
@@ -541,7 +541,7 @@ ai-chat {
 
 > **Corner radius:** every rounded corner derives from `--ai-chat-radius` (8px),
 > so changing that one value restyles the whole component consistently. The
-> component's *outer* frame is square by default (`--ai-chat-outer-radius: 0`) —
+> component's _outer_ frame is square by default (`--ai-chat-outer-radius: 0`) —
 > your surrounding container usually rounds it; set it to a value to round the
 > widget itself.
 
@@ -556,21 +556,21 @@ usually set just a few.
 
 **Colors**
 
-| Variable | Default (light) | Controls |
-| --- | --- | --- |
-| `--ai-chat-bg` | `#ffffff` | Widget background |
-| `--ai-chat-fg` | `#1a1a1a` | Main text |
-| `--ai-chat-muted` | `#6b7280` | Secondary text (timestamps, meta) |
-| `--ai-chat-border` | `#e5e7eb` | All borders / dividers |
-| `--ai-chat-accent` | `#4f46e5` | Buttons, focus ring, links, user bubble |
-| `--ai-chat-accent-fg` | `#ffffff` | Text/icon on the accent |
-| `--ai-chat-user-bg` | `= accent` | User bubble background |
-| `--ai-chat-user-fg` | `= accent-fg` | User bubble text |
-| `--ai-chat-assistant-bg` | `#f3f4f6` | Assistant bubble bg (with `assistant-bubble`) |
-| `--ai-chat-assistant-fg` | `#1a1a1a` | Assistant text |
-| `--ai-chat-code-bg` | `#0d1117` | Code block background |
-| `--ai-chat-code-fg` | `#e6edf3` | Code block text |
-| `--ai-chat-error` | `#dc2626` | Error text + retry button |
+| Variable                 | Default (light) | Controls                                      |
+| ------------------------ | --------------- | --------------------------------------------- |
+| `--ai-chat-bg`           | `#ffffff`       | Widget background                             |
+| `--ai-chat-fg`           | `#1a1a1a`       | Main text                                     |
+| `--ai-chat-muted`        | `#6b7280`       | Secondary text (timestamps, meta)             |
+| `--ai-chat-border`       | `#e5e7eb`       | All borders / dividers                        |
+| `--ai-chat-accent`       | `#4f46e5`       | Buttons, focus ring, links, user bubble       |
+| `--ai-chat-accent-fg`    | `#ffffff`       | Text/icon on the accent                       |
+| `--ai-chat-user-bg`      | `= accent`      | User bubble background                        |
+| `--ai-chat-user-fg`      | `= accent-fg`   | User bubble text                              |
+| `--ai-chat-assistant-bg` | `#f3f4f6`       | Assistant bubble bg (with `assistant-bubble`) |
+| `--ai-chat-assistant-fg` | `#1a1a1a`       | Assistant text                                |
+| `--ai-chat-code-bg`      | `#0d1117`       | Code block background                         |
+| `--ai-chat-code-fg`      | `#e6edf3`       | Code block text                               |
+| `--ai-chat-error`        | `#dc2626`       | Error text + retry button                     |
 
 Dark mode swaps `bg`, `fg`, `muted`, `border`, `assistant-bg`, `assistant-fg`
 automatically (via `theme` / the OS). Override those same vars under
@@ -578,65 +578,65 @@ automatically (via `theme` / the OS). Override those same vars under
 
 **Borders** (set any to `0` to remove)
 
-| Variable | Default | Controls |
-| --- | --- | --- |
-| `--ai-chat-border-width` | `1px` | Base width; the others inherit it |
-| `--ai-chat-input-border-width` | `= border-width` | Composer box border |
-| `--ai-chat-composer-border-width` | `0` | Divider above the composer |
-| `--ai-chat-header-border-width` | `= border-width` | Divider under the header |
-| `--ai-chat-code-border-width` | `= border-width` | Code block border |
-| `--ai-chat-table-border-width` | `= border-width` | Markdown table borders |
+| Variable                          | Default          | Controls                          |
+| --------------------------------- | ---------------- | --------------------------------- |
+| `--ai-chat-border-width`          | `1px`            | Base width; the others inherit it |
+| `--ai-chat-input-border-width`    | `= border-width` | Composer box border               |
+| `--ai-chat-composer-border-width` | `0`              | Divider above the composer        |
+| `--ai-chat-header-border-width`   | `= border-width` | Divider under the header          |
+| `--ai-chat-code-border-width`     | `= border-width` | Code block border                 |
+| `--ai-chat-table-border-width`    | `= border-width` | Markdown table borders            |
 
 **Corner radius** (all inherit `--ai-chat-radius`)
 
-| Variable | Default | Controls |
-| --- | --- | --- |
-| `--ai-chat-radius` | `8px` | Master radius — everything derives from this |
-| `--ai-chat-outer-radius` | `0` | The widget's own outer frame |
-| `--ai-chat-bubble-radius` | `= radius` | Message bubbles |
-| `--ai-chat-input-radius` | `= radius` | Composer box |
-| `--ai-chat-button-radius` | `= radius` | Buttons (e.g. `50%` = circular) |
-| `--ai-chat-send-radius` | `= button-radius` | Send/stop button |
-| `--ai-chat-jump-radius` | `50%` | Jump-to-latest button (circular by default) |
-| `--ai-chat-code-radius` | `= radius` | Code blocks |
-| `--ai-chat-avatar-radius` | `= radius` | Avatars |
-| `--ai-chat-radius-sm` | `= radius` | Small inner corners |
+| Variable                  | Default           | Controls                                     |
+| ------------------------- | ----------------- | -------------------------------------------- |
+| `--ai-chat-radius`        | `8px`             | Master radius — everything derives from this |
+| `--ai-chat-outer-radius`  | `0`               | The widget's own outer frame                 |
+| `--ai-chat-bubble-radius` | `= radius`        | Message bubbles                              |
+| `--ai-chat-input-radius`  | `= radius`        | Composer box                                 |
+| `--ai-chat-button-radius` | `= radius`        | Buttons (e.g. `50%` = circular)              |
+| `--ai-chat-send-radius`   | `= button-radius` | Send/stop button                             |
+| `--ai-chat-jump-radius`   | `50%`             | Jump-to-latest button (circular by default)  |
+| `--ai-chat-code-radius`   | `= radius`        | Code blocks                                  |
+| `--ai-chat-avatar-radius` | `= radius`        | Avatars                                      |
+| `--ai-chat-radius-sm`     | `= radius`        | Small inner corners                          |
 
 **Fonts & sizing**
 
-| Variable | Default | Controls |
-| --- | --- | --- |
-| `--ai-chat-font` | system UI stack | Main font family |
-| `--ai-chat-font-mono` | system mono stack | Code font family |
-| `--ai-chat-font-size` | `15px` | Base font size |
-| `--ai-chat-line-height` | `1.55` | Message line height |
-| `--ai-chat-max-width` | `760px` | Max width of messages + composer |
-| `--ai-chat-gap` | `16px` | Vertical space between messages |
-| `--ai-chat-avatar-size` | `32px` | Avatar width/height |
-| `--ai-chat-button-size` | `42px` | Header/floating icon buttons |
-| `--ai-chat-send-size` | `34px` | Send/stop button inside the composer |
-| `--ai-chat-clear-size` | `32px` | Compact New-chat icon button (header/floating) |
-| `--ai-chat-jump-size` | `36px` | Jump-to-latest floating button |
-| `--ai-chat-input-max-height` | `200px` | Input grows to here, then scrolls |
-| `--ai-chat-show-avatars` | `grid` | `none` force-hides avatars even if slotted |
+| Variable                     | Default           | Controls                                       |
+| ---------------------------- | ----------------- | ---------------------------------------------- |
+| `--ai-chat-font`             | system UI stack   | Main font family                               |
+| `--ai-chat-font-mono`        | system mono stack | Code font family                               |
+| `--ai-chat-font-size`        | `15px`            | Base font size                                 |
+| `--ai-chat-line-height`      | `1.55`            | Message line height                            |
+| `--ai-chat-max-width`        | `760px`           | Max width of messages + composer               |
+| `--ai-chat-gap`              | `16px`            | Vertical space between messages                |
+| `--ai-chat-avatar-size`      | `32px`            | Avatar width/height                            |
+| `--ai-chat-button-size`      | `42px`            | Header/floating icon buttons                   |
+| `--ai-chat-send-size`        | `34px`            | Send/stop button inside the composer           |
+| `--ai-chat-clear-size`       | `32px`            | Compact New-chat icon button (header/floating) |
+| `--ai-chat-jump-size`        | `36px`            | Jump-to-latest floating button                 |
+| `--ai-chat-input-max-height` | `200px`           | Input grows to here, then scrolls              |
+| `--ai-chat-show-avatars`     | `grid`            | `none` force-hides avatars even if slotted     |
 
 **Spacing (padding)**
 
-| Variable | Default | Controls |
-| --- | --- | --- |
-| `--ai-chat-bubble-padding` | `10px 14px` | Inside message bubbles |
-| `--ai-chat-input-padding` | `8px 14px 2px` | Inside the textarea |
-| `--ai-chat-messages-padding` | `20px 16px` | Around the message list |
-| `--ai-chat-composer-padding` | `12px 16px 16px` | Around the composer |
-| `--ai-chat-header-padding` | `10px 16px` | Inside the header bar |
+| Variable                     | Default          | Controls                |
+| ---------------------------- | ---------------- | ----------------------- |
+| `--ai-chat-bubble-padding`   | `10px 14px`      | Inside message bubbles  |
+| `--ai-chat-input-padding`    | `8px 14px 2px`   | Inside the textarea     |
+| `--ai-chat-messages-padding` | `20px 16px`      | Around the message list |
+| `--ai-chat-composer-padding` | `12px 16px 16px` | Around the composer     |
+| `--ai-chat-header-padding`   | `10px 16px`      | Inside the header bar   |
 
 **Sidebar** (only shown with `show-aside`)
 
-| Variable | Default | Controls |
-| --- | --- | --- |
-| `--ai-chat-aside-width` | `260px` | Sidebar column width |
-| `--ai-chat-aside-bg` | `transparent` | Sidebar background |
-| `--ai-chat-aside-padding` | `12px` | Inside the sidebar |
+| Variable                  | Default       | Controls             |
+| ------------------------- | ------------- | -------------------- |
+| `--ai-chat-aside-width`   | `260px`       | Sidebar column width |
+| `--ai-chat-aside-bg`      | `transparent` | Sidebar background   |
+| `--ai-chat-aside-padding` | `12px`        | Inside the sidebar   |
 
 ### All `::part()` hooks
 
@@ -653,18 +653,18 @@ For styling that a variable can't reach, target the shadow parts with
 
 Put your own markup in any of these (`<x slot="name">`):
 
-| Slot | Replaces / adds |
-| --- | --- |
-| `assistant-avatar` / `user-avatar` | Avatar for each side (opt-in; column hides if empty) |
-| `header` | The entire top bar |
-| `aside` | Your conversation-history list (the sidebar body) |
-| `empty` | The whole empty state |
-| `empty-icon` | The empty-state icon (defaults to a chat-bubble SVG; slot to replace) |
-| `composer-actions-start` | Buttons at the left of the input's action row |
-| `composer-actions-end` | Buttons at the right, before send |
-| `send-icon` / `stop-icon` | Send / stop button icons |
-| `clear-icon` / `retry-icon` | New-chat / retry button icons |
-| `jump-icon` / `error-icon` | Jump-to-latest / error icons |
+| Slot                               | Replaces / adds                                                       |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| `assistant-avatar` / `user-avatar` | Avatar for each side (opt-in; column hides if empty)                  |
+| `header`                           | The entire top bar                                                    |
+| `aside`                            | Your conversation-history list (the sidebar body)                     |
+| `empty`                            | The whole empty state                                                 |
+| `empty-icon`                       | The empty-state icon (defaults to a chat-bubble SVG; slot to replace) |
+| `composer-actions-start`           | Buttons at the left of the input's action row                         |
+| `composer-actions-end`             | Buttons at the right, before send                                     |
+| `send-icon` / `stop-icon`          | Send / stop button icons                                              |
+| `clear-icon` / `retry-icon`        | New-chat / retry button icons                                         |
+| `jump-icon` / `error-icon`         | Jump-to-latest / error icons                                          |
 
 ---
 

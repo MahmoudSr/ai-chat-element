@@ -19,10 +19,7 @@ import type { ChatMessage, ChatTransport, StreamChunk } from '../types.js';
  * });
  */
 export function functionAdapter(
-  fn: (
-    messages: ChatMessage[],
-    signal: AbortSignal,
-  ) => AsyncIterable<string>,
+  fn: (messages: ChatMessage[], signal: AbortSignal) => AsyncIterable<string>,
 ): ChatTransport {
   return {
     async *send(

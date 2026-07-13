@@ -32,33 +32,37 @@ knocked out in a single pass afterwards.
 ## Tier 1 — High impact, can't be done from outside
 
 ### 1.1 Header slot + optional built-in header
+
 - **What:** Add `<slot name="header">` above the message list (and a matching
   `part="header"`). Optionally a lightweight built-in header row that shows a
   title + a "New chat" button when enabled via attribute (`show-header`).
 - **Why:** Consumers currently can't add a title bar, model picker, or clear
   button without wrapping the element and breaking shadow-DOM theming.
-- **Impact:** ★★★★★  **Effort:** M
+- **Impact:** ★★★★★ **Effort:** M
 
 ### 1.2 New / Clear conversation button
+
 - **What:** Optional built-in button (attribute `show-clear`) that calls the
   existing `clear()`. Slot `clear-icon`, label `clearChat`, `part="clear-button"`.
 - **Why:** `clear()` exists as a method but there's no UI. Nearly every chat has
   this. Pairs with 1.1.
-- **Impact:** ★★★★☆  **Effort:** S
+- **Impact:** ★★★★☆ **Effort:** S
 
 ### 1.3 Retry on a failed message
+
 - **What:** On a message with `error`, render a "Retry" button that removes the
   failed assistant turn and re-sends the last user turn. New label `retry`,
   `part="retry-button"`, slot `retry-icon`.
 - **Why:** Biggest UX quality bump in the whole list; impossible to add from
   outside because the failed turn lives in shadow DOM.
-- **Impact:** ★★★★★  **Effort:** S–M
+- **Impact:** ★★★★★ **Effort:** S–M
 
 ### 1.4 Overridable error icon (consistency fix)
+
 - **What:** The `⚠` on [ai-chat.ts:409](src/ai-chat.ts#L409) is a hardcoded
   emoji — violates the project's "no emoji, SVG icons" rule and isn't
   overridable. Replace with an SVG + `error-icon` slot.
-- **Impact:** ★★☆☆☆  **Effort:** XS  _(do it alongside 1.3)_
+- **Impact:** ★★☆☆☆ **Effort:** XS _(do it alongside 1.3)_
 
 ---
 
@@ -68,54 +72,62 @@ These are all one-liners that honor the guiding principle: _prefer a knob over a
 hardcoded value_.
 
 ### 2.1 Input max-height → CSS var
+
 - `MAX_INPUT_HEIGHT = 200` is hardcoded in JS ([ai-chat.ts:242](src/ai-chat.ts#L242))
   **and** as `max-height: 200px` in CSS. Unify into `--ai-chat-input-max-height`
   and read it in `_autosize`.
-- **Impact:** ★★★☆☆  **Effort:** S
+- **Impact:** ★★★☆☆ **Effort:** S
 
 ### 2.2 Configurable Enter-to-send
+
 - Enter-sends / Shift+Enter-newline is hardcoded
   ([ai-chat.ts:234](src/ai-chat.ts#L234)). Add `send-on="enter" | "mod-enter"`
   so forms/mobile can require Cmd/Ctrl+Enter.
-- **Impact:** ★★★☆☆  **Effort:** S
+- **Impact:** ★★★☆☆ **Effort:** S
 
 ### 2.3 Input `maxlength` + optional counter
+
 - No character limit today. Add `maxlength` attribute (passthrough) and an
   optional counter shown near the composer.
-- **Impact:** ★★☆☆☆  **Effort:** S
+- **Impact:** ★★☆☆☆ **Effort:** S
 
 ### 2.4 `autofocus` the input
+
 - Add an `autofocus` attribute so the box is focused on mount.
-- **Impact:** ★★☆☆☆  **Effort:** XS
+- **Impact:** ★★☆☆☆ **Effort:** XS
 
 ### 2.5 Custom timestamp formatting
+
 - Format is hardcoded to local `h:mm A`
   ([ai-chat.ts:418](src/ai-chat.ts#L418)). Add a `.timeFormatter?: (ts:number)
-  => string` property so consumers can do relative times ("2m ago") or their
+=> string` property so consumers can do relative times ("2m ago") or their
   own locale format.
-- **Impact:** ★★★☆☆  **Effort:** S
+- **Impact:** ★★★☆☆ **Effort:** S
 
 ---
 
 ## Tier 3 — Rendering & integration hooks
 
 ### 3.1 Markdown control
+
 - **Disable markdown** for assistant messages (`markdown="off"`) — some
   consumers want plain text.
 - **Link handling:** add `target="_blank" rel="noopener"` option, or a hook to
   intercept link clicks. Currently links render bare.
-- **Impact:** ★★★☆☆  **Effort:** M
+- **Impact:** ★★★☆☆ **Effort:** M
 
 ### 3.2 `regenerate()` / `editMessage()` methods
+
 - Expose programmatic regenerate-last-turn and edit-a-message even before there's
   UI for them, so framework wrappers can build their own buttons.
-- **Impact:** ★★★☆☆  **Effort:** M
+- **Impact:** ★★★☆☆ **Effort:** M
 
 ### 3.3 Inject/stream into an assistant message
+
 - `send()` always appends a **user** turn. Add a way to push a pre-authored
   assistant message or resend the last turn programmatically (partly overlaps
   with 1.3 Retry).
-- **Impact:** ★★☆☆☆  **Effort:** M
+- **Impact:** ★★☆☆☆ **Effort:** M
 
 ---
 

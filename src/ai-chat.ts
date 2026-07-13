@@ -9,11 +9,17 @@ import { chatStyles } from './styles.js';
 import { hljsTheme } from './hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
 import {
-  chevronDownIcon, sendIcon, newChatIcon, retryIcon, alertIcon, emptyChatIcon,
+  chevronDownIcon,
+  sendIcon,
+  newChatIcon,
+  retryIcon,
+  alertIcon,
+  emptyChatIcon,
 } from './icons.js';
 
 let idCounter = 0;
-const nextId = () => `msg-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
+const nextId = () =>
+  `msg-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
 
 /**
  * `<ai-chat>` — a reusable, themeable chat interface.
@@ -159,7 +165,12 @@ export class AiChat extends LitElement {
 
   /** Programmatically append a message without sending it. */
   addMessage(role: Role, content: string): ChatMessage {
-    const msg: ChatMessage = { id: nextId(), role, content, createdAt: Date.now() };
+    const msg: ChatMessage = {
+      id: nextId(),
+      role,
+      content,
+      createdAt: Date.now(),
+    };
     this.messages = [...this.messages, msg];
     return msg;
   }
@@ -182,7 +193,10 @@ export class AiChat extends LitElement {
     // is discarded before we resend.
     let lastUser = -1;
     for (let i = this.messages.length - 1; i >= 0; i--) {
-      if (this.messages[i].role === 'user') { lastUser = i; break; }
+      if (this.messages[i].role === 'user') {
+        lastUser = i;
+        break;
+      }
     }
     if (lastUser === -1) return false;
     const content = this.messages[lastUser].content;
@@ -209,7 +223,9 @@ export class AiChat extends LitElement {
     const text = content.trim();
     if (!text || this._busy) return false;
     if (!this.transport) {
-      this._emitError('No transport configured. Set the `.transport` property.');
+      this._emitError(
+        'No transport configured. Set the `.transport` property.',
+      );
       return false;
     }
 
@@ -218,11 +234,19 @@ export class AiChat extends LitElement {
     this._showJump = false;
     this.addMessage('user', text);
     this.dispatchEvent(
-      new CustomEvent('ai-chat:submit', { detail: { content: text }, bubbles: true, composed: true }),
+      new CustomEvent('ai-chat:submit', {
+        detail: { content: text },
+        bubbles: true,
+        composed: true,
+      }),
     );
 
     const assistant: ChatMessage = {
-      id: nextId(), role: 'assistant', content: '', createdAt: Date.now(), streaming: true,
+      id: nextId(),
+      role: 'assistant',
+      content: '',
+      createdAt: Date.now(),
+      streaming: true,
     };
     this.messages = [...this.messages, assistant];
 
@@ -231,17 +255,31 @@ export class AiChat extends LitElement {
     const signal = this._abort.signal;
 
     const outbound: ChatMessage[] = this.systemPrompt
-      ? [{ id: 'system', role: 'system', content: this.systemPrompt, createdAt: 0 },
-         ...this.messages.filter((m) => m.id !== assistant.id)]
+      ? [
+          {
+            id: 'system',
+            role: 'system',
+            content: this.systemPrompt,
+            createdAt: 0,
+          },
+          ...this.messages.filter((m) => m.id !== assistant.id),
+        ]
       : this.messages.filter((m) => m.id !== assistant.id);
 
     try {
       for await (const chunk of this.transport.send(outbound, signal)) {
         if (signal.aborted) break;
         if (chunk.type === 'delta') {
-          this._patch(assistant.id, (m) => ({ ...m, content: m.content + chunk.delta }));
+          this._patch(assistant.id, (m) => ({
+            ...m,
+            content: m.content + chunk.delta,
+          }));
         } else if (chunk.type === 'error') {
-          this._patch(assistant.id, (m) => ({ ...m, streaming: false, error: chunk.error }));
+          this._patch(assistant.id, (m) => ({
+            ...m,
+            streaming: false,
+            error: chunk.error,
+          }));
           this._emitError(chunk.error);
           break;
         } else if (chunk.type === 'done') {
@@ -251,7 +289,11 @@ export class AiChat extends LitElement {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (!signal.aborted) {
-        this._patch(assistant.id, (m) => ({ ...m, streaming: false, error: message }));
+        this._patch(assistant.id, (m) => ({
+          ...m,
+          streaming: false,
+          error: message,
+        }));
         this._emitError(message);
       }
     } finally {
@@ -261,7 +303,11 @@ export class AiChat extends LitElement {
       const final = this.messages.find((m) => m.id === assistant.id);
       if (final && !final.error) {
         this.dispatchEvent(
-          new CustomEvent('ai-chat:message', { detail: { message: final }, bubbles: true, composed: true }),
+          new CustomEvent('ai-chat:message', {
+            detail: { message: final },
+            bubbles: true,
+            composed: true,
+          }),
         );
       }
     }
@@ -274,7 +320,11 @@ export class AiChat extends LitElement {
 
   private _emitError(error: string): void {
     this.dispatchEvent(
-      new CustomEvent('ai-chat:error', { detail: { error }, bubbles: true, composed: true }),
+      new CustomEvent('ai-chat:error', {
+        detail: { error },
+        bubbles: true,
+        composed: true,
+      }),
     );
   }
 
@@ -338,7 +388,9 @@ export class AiChat extends LitElement {
   /** Read --ai-chat-input-max-height (px) so JS and CSS stay in sync; the
    *  consumer can raise/lower the cap with one CSS variable. */
   private _maxInputHeight(): number {
-    const raw = getComputedStyle(this).getPropertyValue('--ai-chat-input-max-height');
+    const raw = getComputedStyle(this).getPropertyValue(
+      '--ai-chat-input-max-height',
+    );
     const px = parseInt(raw, 10);
     return Number.isFinite(px) && px > 0 ? px : AiChat.MAX_INPUT_HEIGHT;
   }
@@ -358,11 +410,14 @@ export class AiChat extends LitElement {
     const target = e.target as HTMLElement;
     const btn = target.closest('.code-block__copy') as HTMLButtonElement | null;
     if (!btn) return;
-    const code = btn.closest('.code-block')?.querySelector('code')?.textContent ?? '';
+    const code =
+      btn.closest('.code-block')?.querySelector('code')?.textContent ?? '';
     const { copy, copied } = this._labels;
     void navigator.clipboard?.writeText(code).then(() => {
       btn.textContent = copied;
-      window.setTimeout(() => { btn.textContent = copy; }, 1200);
+      window.setTimeout(() => {
+        btn.textContent = copy;
+      }, 1200);
     });
   }
 
@@ -381,7 +436,10 @@ export class AiChat extends LitElement {
     const el = this._scrollEl;
     if (!el) return;
     requestAnimationFrame(() => {
-      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+      el.scrollTo({
+        top: el.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      });
     });
   }
 
@@ -411,9 +469,11 @@ export class AiChat extends LitElement {
     // list in the `aside` slot (see the `new-chat` event + README history pattern).
     const aside = this.showAside
       ? html`<aside class="aside" part="aside">
-          ${this.showClear
-            ? html`<div class="aside__top">${this._renderNewChatButton('block')}</div>`
-            : nothing}
+          ${
+            this.showClear
+              ? html`<div class="aside__top">${this._renderNewChatButton('block')}</div>`
+              : nothing
+          }
           <div class="aside__list" part="aside-list"><slot name="aside"></slot></div>
         </aside>`
       : nothing;
@@ -428,12 +488,14 @@ export class AiChat extends LitElement {
                  role="log" aria-live="polite" aria-label=${this._labels.messagesRegion}>
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
             </div>
-            ${this._showJump
-              ? html`<button class="jump" part="jump-button" type="button"
+            ${
+              this._showJump
+                ? html`<button class="jump" part="jump-button" type="button"
                        @click=${this._jumpToBottom} aria-label=${this._labels.jumpToLatest}>
                        <slot name="jump-icon">${chevronDownIcon}</slot>
                      </button>`
-              : nothing}
+                : nothing
+            }
           </div>
           ${this._renderComposer()}
         </div>
@@ -460,9 +522,11 @@ export class AiChat extends LitElement {
         </div>`
       : nothing;
     return html`<div class="header-slot" part="header-slot"><slot name="header">${builtIn}</slot></div>
-      ${clearInHeader && !this.showHeader
-        ? html`<div class="clear-float">${this._renderNewChatButton('icon')}</div>`
-        : nothing}`;
+      ${
+        clearInHeader && !this.showHeader
+          ? html`<div class="clear-float">${this._renderNewChatButton('icon')}</div>`
+          : nothing
+      }`;
   }
 
   /**
@@ -494,7 +558,9 @@ export class AiChat extends LitElement {
   private _onNewChat = (): void => {
     const ev = new CustomEvent('ai-chat:new-chat', {
       detail: { messages: this.messages },
-      bubbles: true, composed: true, cancelable: true,
+      bubbles: true,
+      composed: true,
+      cancelable: true,
     });
     const proceed = this.dispatchEvent(ev);
     if (proceed) this.clear();
@@ -512,12 +578,16 @@ export class AiChat extends LitElement {
             <div class="empty__icon" part="empty-icon" aria-hidden="true">
               <slot name="empty-icon">${emptyChatIcon}</slot>
             </div>
-            ${emptyHeading
-              ? html`<p class="empty__heading" part="empty-heading">${emptyHeading}</p>`
-              : nothing}
-            ${emptyBody
-              ? html`<p class="empty__body" part="empty-body">${emptyBody}</p>`
-              : nothing}
+            ${
+              emptyHeading
+                ? html`<p class="empty__heading" part="empty-heading">${emptyHeading}</p>`
+                : nothing
+            }
+            ${
+              emptyBody
+                ? html`<p class="empty__body" part="empty-body">${emptyBody}</p>`
+                : nothing
+            }
           </div>
         </slot>
       </div>
@@ -543,7 +613,9 @@ export class AiChat extends LitElement {
     // show one (an SVG, <img>, initial, emoji — anything). With no slot the
     // avatar column collapses (see the :not(:has(...)) rule in styles).
     const avatarSlot = isAssistant ? 'assistant-avatar' : 'user-avatar';
-    const name = isAssistant ? this._labels.assistantName : this._labels.userName;
+    const name = isAssistant
+      ? this._labels.assistantName
+      : this._labels.userName;
     const showMeta = this.showNames || this.showTimestamps;
     return html`
       <div class=${classes} part="message message-${m.role}" data-role=${m.role}>
@@ -551,41 +623,55 @@ export class AiChat extends LitElement {
           <slot name=${avatarSlot}></slot>
         </div>
         <div class="message__col">
-          ${showMeta
-            ? html`<div class="message__meta" part="meta">
-                ${this.showNames
-                  ? html`<span class="message__name" part="name">${name}</span>`
-                  : nothing}
-                ${this.showTimestamps
-                  ? html`<time class="message__time" part="time"
+          ${
+            showMeta
+              ? html`<div class="message__meta" part="meta">
+                ${
+                  this.showNames
+                    ? html`<span class="message__name" part="name">${name}</span>`
+                    : nothing
+                }
+                ${
+                  this.showTimestamps
+                    ? html`<time class="message__time" part="time"
                            datetime=${new Date(m.createdAt).toISOString()}>
                            ${this._formatTime(m.createdAt)}
                          </time>`
-                  : nothing}
+                    : nothing
+                }
               </div>`
-            : nothing}
+              : nothing
+          }
         <div class="message__body" part="bubble">
-          ${isAssistant
-            ? html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`
-            : html`<div class="plain">${m.content}</div>`}
-          ${m.streaming && !m.content
-            ? html`<span class="typing" aria-label=${this._labels.typing}><i></i><i></i><i></i></span>`
-            : nothing}
-          ${m.error
-            ? html`<div class="message__error" part="error" role="alert">
+          ${
+            isAssistant
+              ? html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`
+              : html`<div class="plain">${m.content}</div>`
+          }
+          ${
+            m.streaming && !m.content
+              ? html`<span class="typing" aria-label=${this._labels.typing}><i></i><i></i><i></i></span>`
+              : nothing
+          }
+          ${
+            m.error
+              ? html`<div class="message__error" part="error" role="alert">
                 <span class="message__error-icon" aria-hidden="true">
                   <slot name="error-icon">${alertIcon}</slot>
                 </span>
                 <span class="message__error-text">${m.error}</span>
-                ${this.showRetry && !this._busy
-                  ? html`<button class="retry-btn" part="retry-button" type="button"
+                ${
+                  this.showRetry && !this._busy
+                    ? html`<button class="retry-btn" part="retry-button" type="button"
                            @click=${() => this.retry()} aria-label=${this._labels.retry}>
                            <slot name="retry-icon">${retryIcon}</slot>
                            <span>${this._labels.retry}</span>
                          </button>`
-                  : nothing}
+                    : nothing
+                }
               </div>`
-            : nothing}
+              : nothing
+          }
         </div>
         </div>
       </div>
@@ -629,15 +715,17 @@ export class AiChat extends LitElement {
             </div>
             <div class="composer__actions-end" part="composer-actions-end">
               <slot name="composer-actions-end"></slot>
-              ${this._busy
-                ? html`<button type="button" part="stop-button" class="btn btn--stop"
+              ${
+                this._busy
+                  ? html`<button type="button" part="stop-button" class="btn btn--stop"
                           @click=${() => this.stop()} aria-label=${this._labels.stop}>
                           <slot name="stop-icon"><span class="btn__square"></span></slot>
                         </button>`
-                : html`<button type="submit" part="send-button" class="btn btn--send"
+                  : html`<button type="submit" part="send-button" class="btn btn--send"
                           ?disabled=${this.disabled || !this._input.trim()} aria-label=${this._labels.send}>
                           <slot name="send-icon">${sendIcon}</slot>
-                        </button>`}
+                        </button>`
+              }
             </div>
           </div>
         </div>

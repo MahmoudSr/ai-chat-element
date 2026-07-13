@@ -190,6 +190,7 @@ Padding: `--ai-chat-bubble-padding`, `--ai-chat-input-padding`,
 
 Sidebar (with show-aside): `--ai-chat-aside-width` (260px), `--ai-chat-aside-bg`
 (transparent), `--ai-chat-aside-padding` (12px).
+
 - **Icon slots:** `send-icon`, `stop-icon`, `jump-icon`, `clear-icon`,
   `retry-icon`, `error-icon`, `empty-icon`.
 - **Composer action slots:** `composer-actions-start`, `composer-actions-end`.
@@ -205,6 +206,7 @@ declare namespace JSX {
 ## Minimal working examples
 
 ### Plain HTML
+
 ```html
 <ai-chat theme="auto" placeholder="Ask me anything…"></ai-chat>
 <script type="module">
@@ -216,6 +218,7 @@ declare namespace JSX {
 ```
 
 ### React
+
 ```tsx
 import 'ai-chat-element';
 import { openAIAdapter } from 'ai-chat-element';
