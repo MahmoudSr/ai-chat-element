@@ -1,0 +1,58 @@
+import { svg } from 'lit';
+
+/**
+ * Default inline SVG icons, kept out of `ai-chat.ts` so the component stays
+ * focused on behavior. Every icon is also overridable via a named slot, so
+ * these are just the fallbacks. All use `currentColor` and inherit sizing.
+ */
+
+const base = {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+} as const;
+
+/** Downward chevron — jump-to-latest. */
+export const chevronDownIcon = svg`
+  <svg class="icon" viewBox=${base.viewBox} width="18" height="18"
+       fill=${base.fill} stroke=${base.stroke} stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="6 9 12 15 18 9"></polyline>
+  </svg>`;
+
+/** Upward arrow — send. */
+export const sendIcon = svg`
+  <svg class="icon" viewBox=${base.viewBox} width="18" height="18"
+       fill=${base.fill} stroke=${base.stroke} stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <line x1="12" y1="19" x2="12" y2="5"></line>
+    <polyline points="5 12 12 5 19 12"></polyline>
+  </svg>`;
+
+/** Pencil-on-square — new/clear chat. */
+export const newChatIcon = svg`
+  <svg class="icon" viewBox=${base.viewBox} width="18" height="18"
+       fill=${base.fill} stroke=${base.stroke} stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 20h9"></path>
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+  </svg>`;
+
+/** Circular arrow — retry. */
+export const retryIcon = svg`
+  <svg class="icon" viewBox=${base.viewBox} width="16" height="16"
+       fill=${base.fill} stroke=${base.stroke} stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <polyline points="23 4 23 10 17 10"></polyline>
+    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+  </svg>`;
+
+/** Triangle-with-bang — error. Replaces the old hardcoded ⚠ emoji. */
+export const alertIcon = svg`
+  <svg class="icon" viewBox=${base.viewBox} width="15" height="15"
+       fill=${base.fill} stroke=${base.stroke} stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"></path>
+    <line x1="12" y1="9" x2="12" y2="13"></line>
+    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+  </svg>`;

@@ -1,0 +1,58 @@
+{
+  "name": "ai-chat-element",
+  "version": "0.1.0",
+  "description": "A reusable, framework-agnostic AI chat UI as a Web Component. Works in React, Angular, Vue, and vanilla JS. Pluggable transport with built-in adapters for OpenAI-compatible and Anthropic APIs.",
+  "type": "module",
+  "main": "./dist/ai-chat-element.js",
+  "module": "./dist/ai-chat-element.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/ai-chat-element.js"
+    },
+    "./adapters": {
+      "types": "./dist/adapters/index.d.ts",
+      "import": "./dist/adapters/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "**/register.js",
+    "**/register.ts"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "ai",
+    "chat",
+    "chatbot",
+    "web-component",
+    "custom-element",
+    "lit",
+    "openai",
+    "anthropic",
+    "llm",
+    "streaming",
+    "react",
+    "angular",
+    "vue"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "lit": "^3.2.1",
+    "marked": "^14.1.4",
+    "dompurify": "^3.2.4",
+    "highlight.js": "^11.11.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11"
+  }
+}

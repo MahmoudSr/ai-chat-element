@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ai-chat-element — examples</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0; min-height: 100vh; box-sizing: border-box;
+        font-family: system-ui, sans-serif;
+        background: #f5f6f8; color: #1a1a1a;
+        display: grid; place-items: center; padding: 24px;
+      }
+      @media (prefers-color-scheme: dark) { body { background: #0a0b0f; color: #e6e6e6; } }
+      .wrap { width: 100%; max-width: 560px; }
+      h1 { font-size: 22px; margin: 0 0 4px; }
+      p.sub { margin: 0 0 24px; color: #888; }
+      a.card {
+        display: block; text-decoration: none; color: inherit;
+        padding: 18px 20px; margin-bottom: 12px;
+        border: 1px solid #8884; border-radius: 14px;
+        transition: border-color .12s ease, transform .12s ease;
+      }
+      a.card:hover { border-color: #4f46e5; transform: translateY(-1px); }
+      a.card h2 { margin: 0 0 4px; font-size: 16px; }
+      a.card p { margin: 0; font-size: 13px; color: #888; }
+      .badge {
+        font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+        background: #4f46e5; color: #fff; margin-left: 8px; vertical-align: middle;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>ai-chat-element</h1>
+      <p class="sub">Reusable AI chat Web Component — pick an example to try.</p>
+
+      <a class="card" href="./examples/playground.html">
+        <h2>Playground <span class="badge">start here</span></h2>
+        <p>Full control panel — toggle every customizable option live: theme, accent color, names, timestamps, avatars, corner radius, borders, and text.</p>
+      </a>
+
+      <a class="card" href="./examples/ollama.html">
+        <h2>Free local AI <span class="badge">no API key</span></h2>
+        <p>Talk to a real model running on your own computer via Ollama — zero cost, no key. Requires a one-time Ollama install.</p>
+      </a>
+    </div>
+  </body>
+</html>
