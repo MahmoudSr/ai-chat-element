@@ -2,6 +2,15 @@
   "name": "ai-chat-element",
   "version": "0.1.0",
   "description": "A reusable, framework-agnostic AI chat UI as a Web Component. Works in React, Angular, Vue, and vanilla JS. Pluggable transport with built-in adapters for OpenAI-compatible and Anthropic APIs.",
+  "author": "Mahmoud Srouji <srouji.mahmoud@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MahmoudSr/ai-chat-element.git"
+  },
+  "homepage": "https://github.com/MahmoudSr/ai-chat-element#readme",
+  "bugs": {
+    "url": "https://github.com/MahmoudSr/ai-chat-element/issues"
+  },
   "type": "module",
   "main": "./dist/ai-chat-element.js",
   "module": "./dist/ai-chat-element.js",
