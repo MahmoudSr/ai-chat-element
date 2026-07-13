@@ -71,6 +71,12 @@ export const chatStyles = css`
        smaller than the old outside button. Derives from the base button knobs. */
     --ai-chat-send-size: 34px;
     --ai-chat-send-radius: var(--ai-chat-button-radius);
+    /* Compact icon button (header / floating New-chat). */
+    --ai-chat-clear-size: 32px;
+    /* Jump-to-latest floating button. Circular by default, but still derives
+       from a var so it can be squared off with the rest via --ai-chat-radius. */
+    --ai-chat-jump-size: 36px;
+    --ai-chat-jump-radius: 50%;
     --ai-chat-messages-padding: 20px 16px;
     --ai-chat-composer-padding: 12px 16px 16px;
     --ai-chat-header-padding: 10px 16px;
@@ -224,7 +230,7 @@ export const chatStyles = css`
   /* Clear button — shared look whether it sits in the header or floats. */
   .clear-btn {
     display: grid; place-items: center;
-    width: 32px; height: 32px;
+    width: var(--ai-chat-clear-size); height: var(--ai-chat-clear-size);
     border: var(--ai-chat-border-width) solid var(--ai-chat-border);
     border-radius: var(--ai-chat-button-radius);
     background: var(--ai-chat-bg);
@@ -286,10 +292,10 @@ export const chatStyles = css`
     left: 50%;
     bottom: 16px;
     transform: translateX(-50%);
-    width: 36px; height: 36px;
+    width: var(--ai-chat-jump-size); height: var(--ai-chat-jump-size);
     display: grid; place-items: center;
     border: var(--ai-chat-border-width) solid var(--ai-chat-border);
-    border-radius: 50%;
+    border-radius: var(--ai-chat-jump-radius);
     background: var(--ai-chat-bg);
     color: var(--ai-chat-fg);
     font-size: 18px; line-height: 1;
@@ -314,10 +320,22 @@ export const chatStyles = css`
     place-items: center;
     color: var(--ai-chat-muted);
   }
-  .empty__inner { text-align: center; }
-  /* Icon slot: collapses to nothing unless the user provides an empty-icon. */
-  .empty__icon { font-size: 40px; line-height: 1; }
-  .empty__icon:has(slot > *) { margin-bottom: 8px; }
+  .empty__inner {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  /* Icon slot. Shows a default chat-bubble SVG (muted, so it reads as a quiet
+     placeholder); a slotted empty-icon replaces it. The margin applies in both
+     cases so the heading always sits below the icon. */
+  .empty__icon {
+    font-size: 40px;
+    line-height: 1;
+    margin-bottom: 12px;
+    color: var(--ai-chat-muted);
+    opacity: 0.7;
+  }
   .empty__heading { font-size: 18px; font-weight: 600; color: var(--ai-chat-fg); margin: 0; }
   .empty__body { margin: 6px 0 0; font-size: 14px; color: var(--ai-chat-muted); }
 
@@ -408,6 +426,8 @@ export const chatStyles = css`
   }
   .message__error-icon { display: inline-flex; flex: 0 0 auto; }
   .message__error-text { min-width: 0; overflow-wrap: anywhere; }
+  /* Retry is a recovery action, not a destructive one, so it uses the neutral
+     foreground/border colors rather than the alarming error red beside it. */
   .retry-btn {
     display: inline-flex;
     align-items: center;
@@ -415,14 +435,18 @@ export const chatStyles = css`
     margin-left: 4px;
     flex: 0 0 auto;
     padding: 3px 9px;
-    border: 1px solid currentColor;
+    border: var(--ai-chat-border-width) solid var(--ai-chat-border);
     border-radius: var(--ai-chat-button-radius);
     background: transparent;
-    color: var(--ai-chat-error);
+    color: var(--ai-chat-fg);
     font: inherit; font-size: 12px;
     cursor: pointer;
+    transition: border-color 0.1s ease, background 0.1s ease;
   }
-  .retry-btn:hover { background: color-mix(in srgb, var(--ai-chat-error) 12%, transparent); }
+  .retry-btn:hover {
+    border-color: var(--ai-chat-accent);
+    background: color-mix(in srgb, var(--ai-chat-accent) 8%, transparent);
+  }
 
   /* ---- Typing indicator ---- */
   .typing { display: inline-flex; gap: 4px; padding: 4px 0; }

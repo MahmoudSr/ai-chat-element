@@ -9,7 +9,7 @@ import { chatStyles } from './styles.js';
 import { hljsTheme } from './hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
 import {
-  chevronDownIcon, sendIcon, newChatIcon, retryIcon, alertIcon,
+  chevronDownIcon, sendIcon, newChatIcon, retryIcon, alertIcon, emptyChatIcon,
 } from './icons.js';
 
 let idCounter = 0;
@@ -510,7 +510,7 @@ export class AiChat extends LitElement {
         <slot name="empty">
           <div class="empty__inner">
             <div class="empty__icon" part="empty-icon" aria-hidden="true">
-              <slot name="empty-icon"></slot>
+              <slot name="empty-icon">${emptyChatIcon}</slot>
             </div>
             ${emptyHeading
               ? html`<p class="empty__heading" part="empty-heading">${emptyHeading}</p>`

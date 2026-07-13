@@ -29,14 +29,29 @@ Every use comes down to **two steps**:
 1. **Import the package** — this registers the `<ai-chat>` element.
 2. **Set a `.transport`** — this tells it which AI to talk to.
 
+The transport is where your app talks to an AI. **The recommended, production-safe
+pattern is to point at your own server endpoint**, which holds the API key and
+streams text back. The browser never sees the key:
+
 ```js
 import 'ai-chat-element';                    // 1. register <ai-chat>
-import { openAIAdapter } from 'ai-chat-element';
+import { functionAdapter } from 'ai-chat-element';
 
 const chat = document.querySelector('ai-chat');
-chat.transport = openAIAdapter({             // 2. wire up a backend
-  apiKey: 'sk-...',
-  model: 'gpt-4o-mini',
+chat.transport = functionAdapter(async function* (messages, signal) {
+  // Your server holds the API key and streams text back — see "Custom backend".
+  const res = await fetch('/api/chat', {
+    method: 'POST',
+    signal,
+    body: JSON.stringify(messages),
+  });
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    yield decoder.decode(value);             // yield each text chunk
+  }
 });
 ```
 
@@ -44,12 +59,25 @@ chat.transport = openAIAdapter({             // 2. wire up a backend
 <ai-chat></ai-chat>
 ```
 
-> ⚠️ **Never ship API keys in the browser.** For production, point an adapter's
-> `baseURL` at your own server, which holds the key. See [Custom backend](#custom-backend).
+> 🔒 **Security: never ship a raw API key in browser code.** Anything in the
+> browser is visible to end users — a key placed there can be stolen and abused
+> at your expense. Always keep the key on a server you control and have the
+> browser talk to *that*. See [Custom backend](#custom-backend) for a complete
+> server example.
+
+The built-in `openAIAdapter` / `anthropicAdapter` take an `apiKey` directly. That
+is convenient for **local development, internal tools, and talking to a keyless
+local server like Ollama** — but for anything users can reach, use the
+server-backed pattern above. See [Transports](#transports).
 
 ---
 
 ## Framework examples
+
+> The examples below set an `apiKey` in the browser to stay short. That's fine for
+> **local dev / keyless local servers**, but for anything users can reach, swap
+> the adapter for the server-backed `functionAdapter` shown in
+> [Quick start](#quick-start) / [Custom backend](#custom-backend). 🔒
 
 ### Plain HTML
 
@@ -62,7 +90,12 @@ chat.transport = openAIAdapter({             // 2. wire up a backend
   import { openAIAdapter } from 'https://esm.sh/ai-chat-element';
 
   const chat = document.querySelector('ai-chat');
-  chat.transport = openAIAdapter({ apiKey: 'sk-...', model: 'gpt-4o-mini' });
+  // Local, keyless example: talk to Ollama running on your machine.
+  // For a hosted app, point at your own server instead (see Custom backend).
+  chat.transport = openAIAdapter({
+    model: 'llama3.2',
+    baseURL: 'http://localhost:11434/v1/chat/completions',
+  });
 </script>
 ```
 
@@ -70,16 +103,23 @@ chat.transport = openAIAdapter({             // 2. wire up a backend
 
 ```tsx
 import 'ai-chat-element';
-import { anthropicAdapter } from 'ai-chat-element';
+import { functionAdapter } from 'ai-chat-element';
 import { useEffect, useRef } from 'react';
 
 export function Chat() {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     // Properties (transport) must be set in JS, not as attributes.
-    (ref.current as any).transport = anthropicAdapter({
-      apiKey: import.meta.env.VITE_KEY,
-      model: 'claude-sonnet-5',
+    // Talk to your own /api/chat route so the API key stays on the server.
+    (ref.current as any).transport = functionAdapter(async function* (messages, signal) {
+      const res = await fetch('/api/chat', { method: 'POST', signal, body: JSON.stringify(messages) });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        yield decoder.decode(value);
+      }
     });
   }, []);
   return <ai-chat ref={ref} theme="dark" />;
@@ -131,6 +171,11 @@ export class ChatComponent implements AfterViewInit {
 
 A **transport** is anything that turns messages into a stream of tokens. Pick a built-in adapter or write your own.
 
+> These two adapters accept an `apiKey` in the browser. Only pass a real key
+> here for **local dev, internal tools, or a keyless local server** (Ollama,
+> LM Studio). For a hosted app, use the server-backed [Custom backend](#custom-backend)
+> pattern so the key never leaves your server. 🔒
+
 ### OpenAI-compatible (OpenAI, Ollama, LM Studio, Groq, OpenRouter, vLLM…)
 
 ```js
@@ -138,7 +183,7 @@ import { openAIAdapter } from 'ai-chat-element';
 
 chat.transport = openAIAdapter({
   model: 'gpt-4o-mini',
-  apiKey: '…',
+  apiKey: '…',                                           // dev/local only — see note above
   baseURL: 'http://localhost:11434/v1/chat/completions', // e.g. local Ollama
   params: { temperature: 0.7 },                          // passed to the API
 });
@@ -151,15 +196,16 @@ import { anthropicAdapter } from 'ai-chat-element';
 
 chat.transport = anthropicAdapter({
   model: 'claude-sonnet-5',
-  apiKey: '…',
+  apiKey: '…',                // dev/local only — see note above
   maxTokens: 1024,
 });
 ```
 
-### Custom backend
+### Custom backend (recommended for production) 🔒
 
-The recommended production pattern: your server holds the key and streams plain
-text; the component just renders it.
+**The safe pattern: your server holds the API key** and streams plain text back;
+the component just renders it. The browser never sees the key, so it can't be
+stolen from your shipped JavaScript.
 
 ```js
 import { functionAdapter } from 'ai-chat-element';
@@ -178,6 +224,23 @@ chat.transport = functionAdapter(async function* (messages, signal) {
     yield decoder.decode(value); // yield each text chunk
   }
 });
+```
+
+Your `/api/chat` route is where the real provider call happens. It reads the key
+from a server-side environment variable (never bundled into the browser), calls
+OpenAI/Anthropic/etc., and streams the text back — for example:
+
+```js
+// server-side only (e.g. Next.js route, Express handler) — the key stays here
+const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
+  method: 'POST',
+  headers: {
+    'content-type': 'application/json',
+    authorization: `Bearer ${process.env.OPENAI_API_KEY}`, // from the server env, not the client
+  },
+  body: JSON.stringify({ model: 'gpt-4o-mini', stream: true, messages }),
+});
+// …forward the streamed text down to the browser.
 ```
 
 ---
@@ -534,6 +597,7 @@ automatically (via `theme` / the OS). Override those same vars under
 | `--ai-chat-input-radius` | `= radius` | Composer box |
 | `--ai-chat-button-radius` | `= radius` | Buttons (e.g. `50%` = circular) |
 | `--ai-chat-send-radius` | `= button-radius` | Send/stop button |
+| `--ai-chat-jump-radius` | `50%` | Jump-to-latest button (circular by default) |
 | `--ai-chat-code-radius` | `= radius` | Code blocks |
 | `--ai-chat-avatar-radius` | `= radius` | Avatars |
 | `--ai-chat-radius-sm` | `= radius` | Small inner corners |
@@ -551,6 +615,8 @@ automatically (via `theme` / the OS). Override those same vars under
 | `--ai-chat-avatar-size` | `32px` | Avatar width/height |
 | `--ai-chat-button-size` | `42px` | Header/floating icon buttons |
 | `--ai-chat-send-size` | `34px` | Send/stop button inside the composer |
+| `--ai-chat-clear-size` | `32px` | Compact New-chat icon button (header/floating) |
+| `--ai-chat-jump-size` | `36px` | Jump-to-latest floating button |
 | `--ai-chat-input-max-height` | `200px` | Input grows to here, then scrolls |
 | `--ai-chat-show-avatars` | `grid` | `none` force-hides avatars even if slotted |
 
@@ -593,7 +659,7 @@ Put your own markup in any of these (`<x slot="name">`):
 | `header` | The entire top bar |
 | `aside` | Your conversation-history list (the sidebar body) |
 | `empty` | The whole empty state |
-| `empty-icon` | Just the empty-state icon |
+| `empty-icon` | The empty-state icon (defaults to a chat-bubble SVG; slot to replace) |
 | `composer-actions-start` | Buttons at the left of the input's action row |
 | `composer-actions-end` | Buttons at the right, before send |
 | `send-icon` / `stop-icon` | Send / stop button icons |

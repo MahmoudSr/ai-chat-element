@@ -29,10 +29,21 @@ plain HTML because it is a standard custom element. It ships its own styles
 
 ```js
 import 'ai-chat-element';
-import { openAIAdapter } from 'ai-chat-element';
+import { functionAdapter } from 'ai-chat-element';
 
 const chat = document.querySelector('ai-chat');
-chat.transport = openAIAdapter({ apiKey: '…', model: 'gpt-4o-mini' });
+// Production-safe: talk to your own server, which holds the API key (see below).
+// A raw-apiKey adapter is dev/local-only — see CRITICAL rule 4.
+chat.transport = functionAdapter(async function* (messages, signal) {
+  const res = await fetch('/api/chat', { method: 'POST', signal, body: JSON.stringify(messages) });
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    yield dec.decode(value);
+  }
+});
 ```
 
 ## CRITICAL rules for AI assistants
@@ -164,13 +175,14 @@ Borders (0 removes): `--ai-chat-border-width` (1px), `--ai-chat-input-border-wid
 
 Radius (all = --ai-chat-radius): `--ai-chat-radius` (8px), `--ai-chat-outer-radius`
 (0), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,
-`--ai-chat-send-radius`, `--ai-chat-code-radius`, `--ai-chat-avatar-radius`,
-`--ai-chat-radius-sm`.
+`--ai-chat-send-radius`, `--ai-chat-jump-radius` (50%), `--ai-chat-code-radius`,
+`--ai-chat-avatar-radius`, `--ai-chat-radius-sm`.
 
 Fonts/size: `--ai-chat-font`, `--ai-chat-font-mono`, `--ai-chat-font-size` (15px),
 `--ai-chat-line-height` (1.55), `--ai-chat-max-width` (760px), `--ai-chat-gap`
 (16px), `--ai-chat-avatar-size` (32px), `--ai-chat-button-size` (42px),
-`--ai-chat-send-size` (34px), `--ai-chat-input-max-height` (200px),
+`--ai-chat-send-size` (34px), `--ai-chat-clear-size` (32px), `--ai-chat-jump-size`
+(36px), `--ai-chat-input-max-height` (200px),
 `--ai-chat-show-avatars` (grid; `none` hides).
 
 Padding: `--ai-chat-bubble-padding`, `--ai-chat-input-padding`,

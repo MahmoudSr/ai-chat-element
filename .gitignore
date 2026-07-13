@@ -1,6 +1,25 @@
+# Dependencies
 node_modules
+
+# Build output (published to npm, never committed to git)
 dist
+
+# Secrets & local env — NEVER commit these
+.env
+.env.*
 *.local
+
+# Logs & caches
+*.log
+npm-debug.log*
+.vite
+.cache
+
+# Local project notes (personal machine/setup details — keep out of the repo)
+CLAUDE.md
+
+# OS / editor junk
 .DS_Store
+Thumbs.db
 .vscode/*
 !.vscode/extensions.json
