@@ -709,4 +709,7 @@ correctly without guessing.
 
 ## License
 
-MIT
+[MPL-2.0](LICENSE) (Mozilla Public License 2.0) — a copyleft license: if you
+modify the files in this package you must share those changes under the same
+license, but you can freely use the component inside your own (including
+proprietary) applications.
