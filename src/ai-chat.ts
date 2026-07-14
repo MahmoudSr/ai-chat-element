@@ -374,9 +374,12 @@ export class AiChat extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    // Esc stops an in-flight generation from anywhere inside the widget, not
-    // just when the textarea is focused (e.g. after clicking into the messages).
-    this.addEventListener('keydown', this._onHostKeydown);
+    // Esc stops an in-flight generation. We listen on `document` (not just the
+    // host) so it works no matter where focus is — including after the user
+    // clicks the non-focusable message area, which otherwise moves focus out of
+    // the widget and the host-level keydown would never fire. The `_busy` guard
+    // means only a widget that's actually streaming reacts.
+    document.addEventListener('keydown', this._onHostKeydown);
   }
 
   protected override firstUpdated(): void {
@@ -398,7 +401,7 @@ export class AiChat extends LitElement {
   }
 
   override disconnectedCallback(): void {
-    this.removeEventListener('keydown', this._onHostKeydown);
+    document.removeEventListener('keydown', this._onHostKeydown);
     this._bottomObserver?.disconnect();
     this._bottomObserver = undefined;
     super.disconnectedCallback();
@@ -467,26 +470,29 @@ export class AiChat extends LitElement {
   }
 
   protected override updated(changed: PropertyValues): void {
-    // Auto-follow new content only when pinned. We AND the async observer flag
-    // with a synchronous position check: the IntersectionObserver callback lags
-    // by a frame, so during a slow upward scroll the flag can still read "true"
-    // when a token arrives — scrolling then would yank the user back down (the
-    // classic jitter). The live check closes that race.
-    if (
-      changed.has('messages') &&
-      this._stickToBottom &&
-      this._isNearBottom()
-    ) {
+    // Auto-follow new content only while pinned. `_stickToBottom` is maintained
+    // by the IntersectionObserver (bottom visible) AND cleared immediately by a
+    // real upward scroll (see _onScroll) — we must NOT re-derive "near bottom"
+    // from post-append geometry here, because appended content grows scrollHeight
+    // before scrollTop catches up, which would read as "not at bottom" and stop
+    // following mid-stream.
+    if (changed.has('messages') && this._stickToBottom) {
       this._scrollToBottom();
     }
   }
 
-  /** Synchronous "is the viewport essentially at the bottom right now?" guard,
-   *  used only to prevent the auto-scroll/observer timing race (see updated). */
-  private _isNearBottom(): boolean {
-    const el = this._scrollEl;
-    if (!el) return true;
-    return el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+  /**
+   * A real scroll event. Detects an upward scroll and unpins immediately — this
+   * beats the async IntersectionObserver to the punch, killing the slow-scroll
+   * jitter without the post-append geometry problems of measuring in updated().
+   * (The observer still handles re-pinning and the jump button.)
+   */
+  private _lastScrollTop = 0;
+  private _onScroll(e: Event): void {
+    const el = e.currentTarget as HTMLElement;
+    const top = el.scrollTop;
+    if (top < this._lastScrollTop - 1) this._stickToBottom = false; // scrolled up
+    this._lastScrollTop = top;
   }
 
   private _scrollToBottom(smooth = false): void {
@@ -497,6 +503,9 @@ export class AiChat extends LitElement {
         top: el.scrollHeight,
         behavior: smooth ? 'smooth' : 'auto',
       });
+      // Sync the baseline so our own downward scroll isn't later misread as the
+      // user scrolling up.
+      this._lastScrollTop = el.scrollTop;
     });
   }
 
@@ -530,7 +539,7 @@ export class AiChat extends LitElement {
           ${this._renderHeader()}
           <div class="scroll-region">
             <div class="messages" part="messages"
-                 @click=${this._onMessagesClick}
+                 @click=${this._onMessagesClick} @scroll=${this._onScroll}
                  role="log" aria-live="polite" aria-label=${this._labels.messagesRegion}>
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
               <!-- Bottom sentinel watched by the IntersectionObserver to decide
