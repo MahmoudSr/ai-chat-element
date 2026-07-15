@@ -2,13 +2,18 @@
 
 A reusable, framework-agnostic **AI chat UI** as a Web Component. Drop `<ai-chat>` into **React, Angular, Vue, Svelte, or plain HTML** — it's a standard custom element, so it works everywhere.
 
+### ▶︎ [Try it in the playground](https://mahmoudsr.github.io/ai-chat-element/examples/playground.html)
+
+Every attribute, all 51 CSS variables, every label and slot — live. Pick a preset,
+tweak it, and copy the generated code straight into your app.
+
+- 🎨 **Customizable to the corner** — **51 CSS variables, every one documented**; nothing is hardcoded. One line rebrands it (`--ai-chat-accent`); one knob rounds it (`--ai-chat-radius`); every surface has its own override when you need it.
 - 🔌 **Pluggable transport** — built-in adapters for OpenAI-compatible & Anthropic APIs, or bring your own backend
 - 🌊 **Streaming** token-by-token with a stop button and jump-to-latest
 - 📝 **Markdown + syntax-highlighted code** with copy buttons
-- 🎨 **Themeable** with CSS variables — rebrand with one line; `theme="dark|light|auto"`
-- 🧩 **Fully customizable** — sender names, timestamps, avatars, and every label (i18n-ready). No emoji by default.
+- 🧩 **Yours to shape** — 14 slots, 30 `::part()` hooks, sender names, timestamps, avatars, and every string (i18n-ready). No emoji by default.
 - ♿ **Accessible** — ARIA live region, keyboard support, respects reduced-motion
-- 📦 **~78 KB gzipped**, zero peer dependencies
+- 📦 **~80 KB gzipped**, zero peer dependencies
 
 ---
 
