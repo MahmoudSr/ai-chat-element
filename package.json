@@ -1,6 +1,6 @@
 {
   "name": "ai-chat-element",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A reusable, framework-agnostic AI chat UI as a Web Component. Works in React, Angular, Vue, and vanilla JS. Pluggable transport with built-in adapters for OpenAI-compatible and Anthropic APIs.",
   "author": "Mahmoud Srouji <srouji.mahmoud@gmail.com>",
   "repository": {
@@ -40,7 +40,9 @@
     "build": "npm run clean && tsc && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run typecheck && npm test && npm run build",
+    "test": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest --config vitest.config.ts"
   },
   "keywords": [
     "ai",
@@ -59,13 +61,16 @@
   ],
   "license": "MPL-2.0",
   "dependencies": {
-    "lit": "^3.2.1",
-    "marked": "^14.1.4",
     "dompurify": "^3.2.4",
-    "highlight.js": "^11.11.1"
+    "highlight.js": "^11.11.1",
+    "lit": "^3.2.1",
+    "marked": "^14.1.4"
   },
   "devDependencies": {
+    "@vitest/browser": "^2.1.9",
+    "playwright": "^1.61.1",
     "typescript": "^5.7.3",
-    "vite": "^6.0.11"
+    "vite": "^6.0.11",
+    "vitest": "^2.1.9"
   }
 }
