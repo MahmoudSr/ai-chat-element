@@ -390,36 +390,61 @@
         yield* fn(messages, signal);
       });
 
+      /**
+       * Transport status lives in state, NOT written straight to the DOM.
+       * Selecting a transport rebuilds the control panel, which destroys the
+       * status element — an async probe that captured it would then write into
+       * an orphaned node and the user would see nothing. The panel renders from
+       * `transportStatus` instead, so a late result still shows up.
+       */
+      let transportStatus = { text: '', kind: '' };
+      function setStatus(text, kind = '') {
+        transportStatus = { text, kind };
+        const el = $('transportStatus');   // re-query: may be a fresh element
+        if (el) { el.textContent = text; el.className = 'status ' + kind; }
+      }
+
+      // Browsers block an HTTPS page from reaching http://localhost (mixed
+      // content + private-network protection). Nothing the page or Ollama can
+      // do about it, so say so plainly rather than "try starting the server".
+      const isHttps = location.protocol === 'https:';
+
       function setTransport() {
         const kind = get('transport');
-        const st = $('transportStatus');
         if (kind === 'ollama') {
           chat.transport = openAIAdapter({
             model: get('ollamaModel') || 'llama3.2',
             baseURL: 'http://localhost:11434/v1/chat/completions',
             params: { temperature: 0.4 },
           });
+          if (isHttps) {
+            setStatus(
+              'This page is served over HTTPS, and browsers block HTTPS pages from ' +
+              'reaching http://localhost — so Ollama can\'t be used here even if it\'s running. ' +
+              'Clone the repo and run `npm run dev` to try a real local model.',
+              'err',
+            );
+            return;
+          }
           probeOllama();
         } else {
           chat.transport = mock;
-          if (st) { st.textContent = 'Mock transport — no setup needed.'; st.className = 'status ok'; }
+          setStatus('Mock transport — no setup needed.', 'ok');
         }
       }
 
       async function probeOllama() {
-        const st = $('transportStatus');
-        if (!st) return;
-        st.textContent = 'Checking Ollama…';
-        st.className = 'status';
+        setStatus('Checking Ollama…');
         try {
           const r = await fetch('http://localhost:11434/api/tags');
           const { models } = await r.json();
           const names = models.map((m) => m.model);
-          st.textContent = names.length ? `Online — ${names.join(', ')}` : 'Online, but no models pulled.';
-          st.className = 'status ok';
+          setStatus(names.length ? `Online — ${names.join(', ')}` : 'Online, but no models pulled.', 'ok');
         } catch {
-          st.innerHTML = 'Not reachable. Start it with:<br><span class="mono">$env:OLLAMA_ORIGINS="*"; ollama serve</span>';
-          st.className = 'status err';
+          setStatus(
+            'Not reachable. Start it with:  $env:OLLAMA_ORIGINS="*"; ollama serve',
+            'err',
+          );
         }
       }
 
@@ -574,6 +599,7 @@
         },
         onScenario: (v) => { scenario = v; },
         onTransport: setTransport,
+        getStatus: () => transportStatus,
       });
       const PANEL_CTX = {
         state, get, set, isSet, DEFAULTS,
@@ -586,6 +612,7 @@
         },
         onScenario: (v) => { scenario = v; },
         onTransport: setTransport,
+        getStatus: () => transportStatus,
       };
 
       const ACTIONS = {

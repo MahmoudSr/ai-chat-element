@@ -261,6 +261,11 @@ export function buildPanel(root, ctx) {
       if (gname === 'Transport') {
         const st = el('p', 'status');
         st.id = 'transportStatus';
+        // Re-render the current status: this panel gets rebuilt when the
+        // transport changes, and a fresh empty <p> would silently swallow a
+        // message that was already set (or one from an in-flight probe).
+        const s = ctx.getStatus?.();
+        if (s?.text) { st.textContent = s.text; st.className = 'status ' + (s.kind || ''); }
         body.appendChild(st);
       }
     }, openState));
