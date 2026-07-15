@@ -75,6 +75,24 @@ chat.transport = functionAdapter(async function* (messages, signal) {
 | `anthropicAdapter` | Anthropic Messages API.                                        |
 | `functionAdapter`  | Any custom backend — wrap an async generator of text chunks.   |
 
+**Adapter options.** `openAIAdapter({ model, apiKey?, baseURL?, headers?, params? })`
+and `anthropicAdapter({ model, apiKey?, baseURL?, headers?, maxTokens?, params?,
+browserAccess? })`. `model` is the only required one. Notes:
+
+- `params` is merged into the request body — sampling options go here.
+- `headers` adds request headers, e.g. for a proxy that injects auth server-side.
+- `maxTokens` (Anthropic only) defaults to 1024; the API requires it.
+- `browserAccess` (Anthropic only, default `true`) opts in to the CORS header
+  needed to call Anthropic straight from a browser. Ignored behind your own proxy.
+
+```js
+chat.transport = openAIAdapter({
+  model: 'llama3.2',
+  baseURL: 'http://localhost:11434/v1/chat/completions',  // keyless local server
+  params: { temperature: 0.4, top_p: 0.9 },
+});
+```
+
 ```js
 // Custom backend (recommended for production — key stays on the server)
 import { functionAdapter } from 'ai-chat-element';
@@ -154,11 +172,13 @@ chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
   `typing`, `send`, `stop`, `jumpToLatest`, `inputLabel`, `messagesRegion`,
   `headerTitle`, `clearChat`, `retry`, `emptyResponse`).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
-  `header`, `header-title`, `clear-button`, `messages`, `message`, `bubble`,
-  `avatar`, `meta`, `name`, `time`, `composer`, `composer-box`,
+  `header`, `header-slot`, `header-title`, `clear-button`, `messages`, `message`,
+  `bubble`, `avatar`, `meta`, `name`, `time`, `composer`, `composer-box`,
   `composer-actions`, `composer-actions-start`, `composer-actions-end`, `input`,
   `send-button`, `stop-button`, `jump-button`, `retry-button`, `empty`,
   `empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`.
+  (`header` = the built-in bar; `header-slot` = the wrapper that also holds your
+  `header` slot content and keeps the bar's padding/divider when you fill it.)
 
 ## All CSS variables (complete — do not invent names not on this list)
 
@@ -178,8 +198,12 @@ Borders (0 removes): `--ai-chat-border-width` (1px), `--ai-chat-input-border-wid
 
 Radius (all = --ai-chat-radius): `--ai-chat-radius` (8px), `--ai-chat-outer-radius`
 (= radius; 0 for square), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,
-`--ai-chat-send-radius`, `--ai-chat-jump-radius` (50%), `--ai-chat-code-radius`,
+`--ai-chat-send-radius`, `--ai-chat-new-chat-radius` (= button-radius),
+`--ai-chat-jump-radius` (50%), `--ai-chat-code-radius`,
 `--ai-chat-avatar-radius`, `--ai-chat-radius-sm`.
+Note: `--ai-chat-button-radius: 50%` gives circular icon buttons but turns the
+sidebar's full-width New-chat button into a pill — set `--ai-chat-new-chat-radius`
+(e.g. to the master radius) to keep that button rectangular.
 
 Fonts/size: `--ai-chat-font`, `--ai-chat-font-mono`, `--ai-chat-font-size` (15px),
 `--ai-chat-line-height` (1.55), `--ai-chat-max-width` (760px), `--ai-chat-gap`

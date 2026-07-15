@@ -6,12 +6,45 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-15
+
+Bug-fix release. Found by building a real consumer app against the published
+0.1.1 package. No behaviour was removed; the one new API is additive.
+
+### Added
+
+- `--ai-chat-new-chat-radius` (defaults to `--ai-chat-button-radius`) — the
+  sidebar's full-width New-chat button now has its own radius knob. Setting
+  `--ai-chat-button-radius: 50%` for circular icon buttons used to turn that
+  button into a pill, with no way to opt out short of `::part(clear-button)`.
+
 ### Fixed
 
+- **A slotted `header` landed in an unstyled wrapper.** The `header` slot's
+  container had no CSS at all — no padding, no divider, no layout — because the
+  bar's styling lived only on the built-in header the slot replaces. Consumers
+  had to re-derive the padding/border by eye, and content could wrap. Slotted
+  header content now keeps the bar's frame (padding + bottom divider, centered
+  row). The `header-slot` `::part()` is now documented in both docs.
+- **Avatars only rendered on the first message of each role.** A slotted node is
+  a single live DOM node, so it can only be projected into one `<slot>` — but a
+  `<slot name="assistant-avatar">` was rendered inside *every* message, leaving
+  all but the first empty. The slots now live in one hidden container per role
+  and each message renders a clone. The authoring API is unchanged
+  (`<span slot="user-avatar">`). This affected every consumer using avatars with
+  more than one message per role since 0.1.0; 0.1.1 fixed the *detection* of
+  slotted avatars but not this underlying projection problem.
+- Slotted avatar content could overflow its round frame and be clipped square by
+  the container's `overflow: hidden`, rendering as a squircle instead of a circle.
 - **`ChatLabels` was not exported** from the package entry point, so TypeScript
   consumers couldn't import it to type their `labels` / i18n object — even though
   it was documented as a public type. It is now exported alongside the other
   types (runtime behaviour is unchanged).
+
+### Docs
+
+- Documented the adapter options that were missing from the reference lists:
+  `params` (both adapters), `headers`, and Anthropic's `browserAccess`.
 
 ## [0.1.1] - 2026-07-14
 

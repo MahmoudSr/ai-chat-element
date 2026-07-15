@@ -546,6 +546,7 @@ export class AiChat extends LitElement {
         </aside>`
       : nothing;
     return html`
+      ${this._renderAvatarSources()}
       <div class="layout" part="layout">
         ${aside}
         <div class="root" part="root">
@@ -595,7 +596,12 @@ export class AiChat extends LitElement {
           ${clearInHeader ? this._renderNewChatButton('icon') : nothing}
         </div>`
       : nothing;
-    return html`<div class="header-slot" part="header-slot"><slot name="header">${builtIn}</slot></div>
+    // A slotted header replaces the built-in bar's content — but it should keep
+    // the bar's frame (padding + divider), not land in a bare div. CSS can't see
+    // slot occupancy, so the class is set here.
+    const slottedHeader = this._hasSlotted('header');
+    return html`<div class="header-slot ${slottedHeader ? 'header-slot--filled' : ''}"
+        part="header-slot"><slot name="header" @slotchange=${this._onSlotChange}>${builtIn}</slot></div>
       ${
         clearInHeader && !this.showHeader
           ? html`<div class="clear-float">${this._renderNewChatButton('icon')}</div>`
@@ -686,6 +692,46 @@ export class AiChat extends LitElement {
     return !!this.querySelector(`[slot="${name}"]`);
   }
 
+  /**
+   * A copy of the avatar the consumer slotted, for one message.
+   *
+   * Avatars appear once per message, but a slotted node is a single live DOM
+   * node: it can only ever be projected into ONE <slot>, so rendering
+   * `<slot name="user-avatar">` in every message leaves all but the first
+   * empty. Instead the real projection lives in one hidden slot per role
+   * (see `_renderAvatarSources`) and each message renders a clone.
+   *
+   * Clones are inert copies — a consumer's listeners/framework bindings stay on
+   * the original only. That's an accepted trade: avatars are decorative and
+   * `aria-hidden`, so nothing interactive belongs here.
+   */
+  private _avatarClone(name: string) {
+    void this._slotVersion;
+    const sources = this.querySelectorAll(`[slot="${name}"]`);
+    if (!sources.length) return nothing;
+    const frag = document.createDocumentFragment();
+    for (const el of sources) {
+      const copy = el.cloneNode(true) as HTMLElement;
+      copy.removeAttribute('slot');
+      frag.appendChild(copy);
+    }
+    return frag;
+  }
+
+  /**
+   * The real projection points for avatar slots, kept out of view. These exist
+   * so `<span slot="user-avatar">` stays the authoring API and `slotchange`
+   * still fires; the visible avatars are clones of what lands here.
+   */
+  private _renderAvatarSources() {
+    return html`
+      <div class="avatar-sources" aria-hidden="true">
+        <slot name="assistant-avatar" @slotchange=${this._onSlotChange}></slot>
+        <slot name="user-avatar" @slotchange=${this._onSlotChange}></slot>
+      </div>
+    `;
+  }
+
   private _renderMessages() {
     return repeat(
       this.messages,
@@ -708,6 +754,8 @@ export class AiChat extends LitElement {
     // `:has(slot > *)` rule never matches — hence the JS check below.
     const avatarSlot = isAssistant ? 'assistant-avatar' : 'user-avatar';
     const hasAvatar = this._hasSlotted(avatarSlot);
+    // A clone, not a <slot>: one slotted node can't project into every message.
+    const avatar = this._avatarClone(avatarSlot);
     const name = isAssistant
       ? this._labels.assistantName
       : this._labels.userName;
@@ -716,7 +764,7 @@ export class AiChat extends LitElement {
       <div class=${classes} part="message message-${m.role}" data-role=${m.role}>
         <div class="message__avatar ${hasAvatar ? 'message__avatar--filled' : ''}"
              part="avatar" aria-hidden="true">
-          <slot name=${avatarSlot} @slotchange=${this._onSlotChange}></slot>
+          ${avatar}
         </div>
         <div class="message__col">
           ${

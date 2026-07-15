@@ -197,7 +197,12 @@ import { anthropicAdapter } from 'ai-chat-element';
 chat.transport = anthropicAdapter({
   model: 'claude-sonnet-5',
   apiKey: '…',                // dev/local only — see note above
-  maxTokens: 1024,
+  maxTokens: 1024,            // Anthropic requires it; defaults to 1024
+  params: { temperature: 0.7 },
+  headers: {},                // extra request headers, e.g. for a proxy
+  browserAccess: true,        // default; opts in to the CORS header needed to
+                              // call Anthropic direct from a browser. Ignored
+                              // when you route through your own proxy.
 });
 ```
 
@@ -354,7 +359,8 @@ layout, matching ChatGPT/Claude:
 
 The **header spans the chat column only** — never across the sidebar. Replace it
 wholesale with the `header` slot (still inside the shadow DOM, so your theming
-applies):
+applies). Your content keeps the bar's frame — same padding, same bottom divider,
+vertically centered — so you only lay out what's inside it:
 
 ```html
 <ai-chat show-header>
@@ -602,10 +608,15 @@ automatically (via `theme` / the OS). Override those same vars under
 | `--ai-chat-input-radius`  | `= radius`        | Composer box                                 |
 | `--ai-chat-button-radius` | `= radius`        | Buttons (e.g. `50%` = circular)              |
 | `--ai-chat-send-radius`   | `= button-radius` | Send/stop button                             |
+| `--ai-chat-new-chat-radius` | `= button-radius` | Full-width New-chat button in the sidebar  |
 | `--ai-chat-jump-radius`   | `50%`             | Jump-to-latest button (circular by default)  |
 | `--ai-chat-code-radius`   | `= radius`        | Code blocks                                  |
 | `--ai-chat-avatar-radius` | `= radius`        | Avatars                                      |
 | `--ai-chat-radius-sm`     | `= radius`        | Small inner corners                          |
+
+> Setting `--ai-chat-button-radius: 50%` for circular icon buttons also reaches
+> the sidebar's full-width New-chat button, where `50%` resolves per-axis and
+> renders a pill. Set `--ai-chat-new-chat-radius` to keep that one rectangular.
 
 **Fonts & sizing**
 
@@ -648,12 +659,17 @@ automatically (via `theme` / the OS). Override those same vars under
 For styling that a variable can't reach, target the shadow parts with
 `ai-chat::part(name) { … }`:
 
-`layout`, `root`, `aside`, `aside-list`, `header`, `header-title`,
+`layout`, `root`, `aside`, `aside-list`, `header`, `header-slot`, `header-title`,
 `clear-button`, `messages`, `message`, `bubble`, `avatar`, `meta`, `name`,
 `time`, `composer`, `composer-box`, `composer-actions`, `composer-actions-start`,
 `composer-actions-end`, `input`, `send-button`, `stop-button`, `jump-button`,
 `retry-button`, `empty`, `empty-icon`, `empty-heading`, `empty-body`, `error`,
 `empty-response`.
+
+`header` is the built-in bar; `header-slot` is the wrapper around it that also
+holds your `header` slot content. When you fill that slot, the wrapper keeps the
+bar's frame (padding + bottom divider) so your content lines up with the
+built-in — style the frame via `header-slot`, the built-in's own row via `header`.
 
 ### All slots
 
@@ -716,9 +732,26 @@ npm run build     # build the package into dist/
 npm run typecheck
 ```
 
-`npm run dev` opens a landing page linking to two examples:
+`npm run dev` opens a landing page linking to the playground:
 
-- [`examples/playground.html`](examples/playground.html) — a full control panel to toggle **every** customizable option live (theme, all colors, corner radius, borders, sizing, names, timestamps, avatars, chrome, labels, and a working history sidebar). Runs against a built-in **mock transport** by default, or switch the **Transport** dropdown to **Ollama** to chat with a **real model running locally** ([Ollama](https://ollama.com), free, no API key).
+[`examples/playground.html`](examples/playground.html) — every attribute, all 51
+CSS variables, every label and slot, live. It's built to be a real testing
+surface, not just a demo:
+
+- **Presets** (ChatGPT-ish, Terminal, Soft/pastel) — one click to a complete look.
+- **Generated code** — a drawer showing only what you changed from the defaults,
+  as CSS + HTML + JS you can paste straight into your app.
+- **Scenarios** for the cases that actually break a chat UI: long streams
+  (scroll-follow), a slow first token (typing indicator + stop), empty replies,
+  a markdown torture test (wide tables, long tokens, unknown code fences), and
+  an XSS/sanitization check.
+- **Event log** — see exactly what `ai-chat:submit` / `message` / `error` /
+  `new-chat` deliver to your app.
+- A working, consumer-owned **history sidebar**.
+
+Runs on a built-in **mock transport** by default; switch **Transport** to
+**Ollama** to chat with a **real model running locally**
+([Ollama](https://ollama.com), free, no API key).
 
 ---
 

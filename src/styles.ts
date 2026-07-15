@@ -48,6 +48,7 @@ export const chatStyles = css`
     --ai-chat-input-radius: var(--ai-chat-radius);
     --ai-chat-code-radius: var(--ai-chat-radius);
     --ai-chat-button-radius: var(--ai-chat-radius);
+    --ai-chat-new-chat-radius: var(--ai-chat-button-radius);
     --ai-chat-avatar-radius: var(--ai-chat-radius);
     /* The component's own outer corners. Rounded by default (follows the master
        radius) so the widget looks finished on its own. Set to 0 for a square
@@ -188,7 +189,10 @@ export const chatStyles = css`
     width: 100%;
     padding: 9px 12px;
     border: var(--ai-chat-border-width) solid var(--ai-chat-border);
-    border-radius: var(--ai-chat-button-radius);
+    /* Own knob, defaulting to the shared one: this button is full-width, so a
+       --ai-chat-button-radius of 50% (fine for the square icon buttons) would
+       resolve per-axis here and render a pill. Override just this surface. */
+    border-radius: var(--ai-chat-new-chat-radius);
     background: var(--ai-chat-bg);
     color: var(--ai-chat-fg);
     font: inherit; font-size: 14px; font-weight: 500;
@@ -218,6 +222,9 @@ export const chatStyles = css`
      wrapper carries no padding/border of its own, so an empty slot (default,
      chrome-free) takes zero visible space. All header chrome lives on .header,
      which only renders when show-header is set (or the consumer slots their own). */
+  /* The header bar. Padding + divider live here — NOT on the inner content —
+     so a consumer's slotted header lands in the same frame as the built-in one
+     (see .header-slot:has(...) below) instead of having to recreate it. */
   .header {
     display: flex;
     align-items: center;
@@ -227,6 +234,23 @@ export const chatStyles = css`
     border-bottom: var(--ai-chat-header-border-width) solid var(--ai-chat-border);
   }
   .header__title { font-weight: 600; font-size: 15px; }
+
+  /* When the consumer fills the header slot, their content replaces the
+     built-in bar's CONTENT but should keep its frame: same padding, same
+     divider, same centered row. Without this the slot is a bare div and every
+     consumer has to re-derive the padding/border by eye.
+     The --filled class is set in JS: CSS cannot detect slot occupancy, because
+     projected light-DOM nodes never become children of a slot element, so a
+     :has() rule would never match. Same reason as .message__avatar. */
+  .header-slot--filled {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: var(--ai-chat-header-padding);
+    border-bottom: var(--ai-chat-header-border-width) solid var(--ai-chat-border);
+  }
+  /* Slotted content spans the bar so the consumer's own flex/grid can lay out. */
+  .header-slot--filled ::slotted(*) { flex: 1; min-width: 0; }
 
   /* Clear button — shared look whether it sits in the header or floats. */
   .clear-btn {
@@ -654,7 +678,20 @@ export const chatStyles = css`
   .icon { display: block; }
   /* Slotted custom icons/avatars fill their box nicely. */
   ::slotted(svg), ::slotted(img) { display: block; max-width: 100%; }
-  .message__avatar ::slotted(img) { width: 100%; height: 100%; object-fit: cover; }
+  /* Avatars are clones of the slotted node, not projected content, so these are
+     real shadow-DOM children — plain descendant selectors, not ::slotted().
+     The clone must not outgrow the round frame: anything larger than the box
+     gets clipped to the container's square corners and reads as a squircle. */
+  .message__avatar > * {
+    max-width: 100%; max-height: 100%;
+    border-radius: inherit;
+  }
+  .message__avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* The live projection points for the avatar slots. Kept out of layout: the
+     consumer's node lands here (so slotchange fires and authoring stays
+     <span slot="user-avatar">), while each message renders a clone of it. */
+  .avatar-sources { display: none; }
 
   @keyframes fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
   @keyframes blink { 0%, 60%, 100% { opacity: 0.3; } 30% { opacity: 1; } }
