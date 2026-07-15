@@ -387,7 +387,9 @@ export class AiChat extends LitElement {
     // is at (or effectively at) the bottom, so we keep following new content;
     // when it scrolls out of view (user scrolled up, or content grew past it) we
     // stop pinning. `root: _scrollEl` scopes intersection to the scroll region.
-    if ('IntersectionObserver' in window && this._scrollEl && this._sentinel) {
+    // The sentinel only exists while there are messages, so observation is
+    // (re)wired in updated() as it appears/disappears.
+    if ('IntersectionObserver' in window && this._scrollEl) {
       this._bottomObserver = new IntersectionObserver(
         (entries) => {
           const atBottom = entries[0]?.isIntersecting ?? true;
@@ -396,7 +398,7 @@ export class AiChat extends LitElement {
         },
         { root: this._scrollEl, threshold: 0 },
       );
-      this._bottomObserver.observe(this._sentinel);
+      if (this._sentinel) this._bottomObserver.observe(this._sentinel);
     }
   }
 
@@ -469,7 +471,18 @@ export class AiChat extends LitElement {
     });
   }
 
+  private _observedSentinel?: Element;
+
   protected override updated(changed: PropertyValues): void {
+    // The sentinel only exists while there are messages; (re)observe it as it
+    // appears or disappears so the bottom-detection observer stays wired up.
+    if (this._bottomObserver && this._sentinel !== this._observedSentinel) {
+      if (this._observedSentinel)
+        this._bottomObserver.unobserve(this._observedSentinel);
+      if (this._sentinel) this._bottomObserver.observe(this._sentinel);
+      this._observedSentinel = this._sentinel;
+    }
+
     // Auto-follow new content only while pinned. `_stickToBottom` is maintained
     // by the IntersectionObserver (bottom visible) AND cleared immediately by a
     // real upward scroll (see _onScroll) — we must NOT re-derive "near bottom"
@@ -543,8 +556,11 @@ export class AiChat extends LitElement {
                  role="log" aria-live="polite" aria-label=${this._labels.messagesRegion}>
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
               <!-- Bottom sentinel watched by the IntersectionObserver to decide
-                   whether we're pinned to the bottom (see firstUpdated). -->
-              <div class="scroll-sentinel" aria-hidden="true"></div>
+                   whether we're pinned to the bottom (see firstUpdated). Only
+                   rendered when there are messages — the full-height empty state
+                   plus a trailing sentinel would otherwise overflow and show a
+                   scrollbar on an empty chat. -->
+              ${hasMessages ? html`<div class="scroll-sentinel" aria-hidden="true"></div>` : nothing}
             </div>
             ${
               this._showJump
@@ -652,6 +668,24 @@ export class AiChat extends LitElement {
     `;
   }
 
+  /** Bumped on slotchange to re-render slot-dependent bits (e.g. avatars). */
+  @state() private _slotVersion = 0;
+
+  private _onSlotChange = (): void => {
+    this._slotVersion++;
+  };
+
+  /**
+   * True when the consumer has put content in the given named slot. CSS can't
+   * answer this (projected nodes aren't children of <slot>), so we look for a
+   * light-DOM child carrying the slot name. Referencing `_slotVersion` keeps
+   * callers re-evaluating whenever slotted content changes.
+   */
+  private _hasSlotted(name: string): boolean {
+    void this._slotVersion;
+    return !!this.querySelector(`[slot="${name}"]`);
+  }
+
   private _renderMessages() {
     return repeat(
       this.messages,
@@ -669,16 +703,20 @@ export class AiChat extends LitElement {
     const isAssistant = m.role === 'assistant';
     // Avatars are opt-in: provide an `assistant-avatar` / `user-avatar` slot to
     // show one (an SVG, <img>, initial, emoji — anything). With no slot the
-    // avatar column collapses (see the :not(:has(...)) rule in styles).
+    // avatar column collapses. Slot occupancy can't be detected in CSS —
+    // projected light-DOM nodes never become children of <slot>, so a
+    // `:has(slot > *)` rule never matches — hence the JS check below.
     const avatarSlot = isAssistant ? 'assistant-avatar' : 'user-avatar';
+    const hasAvatar = this._hasSlotted(avatarSlot);
     const name = isAssistant
       ? this._labels.assistantName
       : this._labels.userName;
     const showMeta = this.showNames || this.showTimestamps;
     return html`
       <div class=${classes} part="message message-${m.role}" data-role=${m.role}>
-        <div class="message__avatar" part="avatar" aria-hidden="true">
-          <slot name=${avatarSlot}></slot>
+        <div class="message__avatar ${hasAvatar ? 'message__avatar--filled' : ''}"
+             part="avatar" aria-hidden="true">
+          <slot name=${avatarSlot} @slotchange=${this._onSlotChange}></slot>
         </div>
         <div class="message__col">
           ${

@@ -49,10 +49,11 @@ export const chatStyles = css`
     --ai-chat-code-radius: var(--ai-chat-radius);
     --ai-chat-button-radius: var(--ai-chat-radius);
     --ai-chat-avatar-radius: var(--ai-chat-radius);
-    /* The component's own outer corners. Off by default — the surrounding
-       container (a card, panel, etc.) usually rounds/clips the widget. Set to
-       var(--ai-chat-radius) or any value to round the whole widget itself. */
-    --ai-chat-outer-radius: 0;
+    /* The component's own outer corners. Rounded by default (follows the master
+       radius) so the widget looks finished on its own. Set to 0 for a square
+       frame when your surrounding container (a card, panel, etc.) already
+       rounds/clips the widget. */
+    --ai-chat-outer-radius: var(--ai-chat-radius);
     --ai-chat-font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
     --ai-chat-font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
     --ai-chat-font-size: 15px;
@@ -62,7 +63,7 @@ export const chatStyles = css`
 
     /* ---- Sizing knobs ---- */
     --ai-chat-avatar-size: 32px;
-    --ai-chat-bubble-padding: 10px 14px;
+    --ai-chat-bubble-padding: 4px 14px;
     --ai-chat-input-padding: 8px 14px 2px;
     /* How tall the input grows before it starts scrolling internally. */
     --ai-chat-input-max-height: 200px;
@@ -362,7 +363,9 @@ export const chatStyles = css`
     font-size: 16px;
     user-select: none;
   }
-  .message__avatar:has(slot > *) { display: var(--ai-chat-show-avatars); }
+  /* Shown only when the consumer actually slotted an avatar (the component sets
+     --filled in JS; CSS can't detect projected slot content). */
+  .message__avatar--filled { display: var(--ai-chat-show-avatars); }
 
   /* Column holding the name/time meta row above the bubble. */
   .message__col {
@@ -377,7 +380,7 @@ export const chatStyles = css`
     display: flex;
     align-items: baseline;
     gap: 8px;
-    margin: 0 4px 3px;
+    margin: 0 4px 5px;
     font-size: 12px;
     line-height: 1.2;
   }

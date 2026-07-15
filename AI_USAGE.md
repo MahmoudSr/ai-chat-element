@@ -123,7 +123,8 @@ chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
 - **One-color rebrand:** CSS `--ai-chat-accent` cascades to buttons, user
   bubble, focus ring, and links.
 - **Corner radius:** `--ai-chat-radius` (default 8px) rounds every inner element
-  together. `--ai-chat-outer-radius` (default 0) rounds the whole widget frame.
+  together, including `--ai-chat-outer-radius` (the whole widget frame; set to 0
+  for a square frame).
 - **Names/timestamps:** on by default; rename via
   `chat.labels = { userName, assistantName }`; toggle with `show-names`,
   `show-timestamps`.
@@ -176,7 +177,7 @@ Borders (0 removes): `--ai-chat-border-width` (1px), `--ai-chat-input-border-wid
 `--ai-chat-code-border-width`, `--ai-chat-table-border-width`.
 
 Radius (all = --ai-chat-radius): `--ai-chat-radius` (8px), `--ai-chat-outer-radius`
-(0), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,
+(= radius; 0 for square), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,
 `--ai-chat-send-radius`, `--ai-chat-jump-radius` (50%), `--ai-chat-code-radius`,
 `--ai-chat-avatar-radius`, `--ai-chat-radius-sm`.
 

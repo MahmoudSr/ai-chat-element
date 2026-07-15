@@ -14,6 +14,18 @@ introduced (see **Added**).
 
 - `emptyResponse` label and matching `empty-response` `::part()` — an empty
   assistant reply now renders a muted placeholder instead of a blank bubble.
+- The empty state now shows a default chat-bubble icon (still replaceable via the
+  `empty-icon` slot).
+
+### Changed
+
+- **`--ai-chat-outer-radius` now defaults to `var(--ai-chat-radius)`** (8px)
+  instead of `0`, so the widget is rounded out of the box. Set it to `0` for the
+  previous square frame — e.g. when your own container already rounds and clips
+  the widget. (Note: a wrapper with `overflow: hidden` and square corners will
+  clip the widget's rounding.)
+- **`--ai-chat-bubble-padding` default tightened** from `10px 14px` to
+  `4px 14px`; slightly more space below the name/timestamp row.
 
 ### Fixed
 
@@ -37,6 +49,12 @@ introduced (see **Added**).
 - **Esc didn't stop a stream after clicking the message area.** The stop-on-Esc
   listener now lives on `document`, so it works regardless of focus (still only
   acting on a widget that is actively streaming).
+- **Avatars never appeared, even when slotted.** The column's visibility was
+  driven by a CSS `:has(slot > *)` rule, which can never match — content assigned
+  to a slot is projected, not parented into it. Slot occupancy is now detected
+  properly, so `assistant-avatar` / `user-avatar` work as documented.
+- **An empty chat showed a phantom scrollbar**, caused by the full-height empty
+  state plus the bottom scroll sentinel overflowing the container.
 
 ## [0.1.0] - 2026-07-13
 

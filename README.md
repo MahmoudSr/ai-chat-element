@@ -516,7 +516,7 @@ ai-chat {
   /* Corners — ONE knob (--ai-chat-radius, default 8px) rounds every inner
      element together: bubbles, input, code blocks, buttons, avatars. */
   --ai-chat-radius: 8px;          /* 0 = sharp corners everywhere */
-  --ai-chat-outer-radius: 0;      /* the whole widget's own frame (off by default) */
+  --ai-chat-outer-radius: var(--ai-chat-radius); /* the whole widget's own frame; 0 = square */
   /* Per-surface overrides, each defaulting to --ai-chat-radius: */
   --ai-chat-bubble-radius: var(--ai-chat-radius);
   --ai-chat-input-radius: var(--ai-chat-radius);
@@ -546,9 +546,9 @@ ai-chat {
 
 > **Corner radius:** every rounded corner derives from `--ai-chat-radius` (8px),
 > so changing that one value restyles the whole component consistently. The
-> component's _outer_ frame is square by default (`--ai-chat-outer-radius: 0`) —
-> your surrounding container usually rounds it; set it to a value to round the
-> widget itself.
+> component's _outer_ frame is rounded by default too (`--ai-chat-outer-radius`
+> follows `--ai-chat-radius`); set it to `0` for a square frame when your own
+> surrounding container already rounds/clips the widget.
 
 > Avatars only appear when you provide a `*-avatar` slot; the column collapses
 > otherwise. `--ai-chat-show-avatars: none` force-hides them even when slotted.
@@ -597,7 +597,7 @@ automatically (via `theme` / the OS). Override those same vars under
 | Variable                  | Default           | Controls                                     |
 | ------------------------- | ----------------- | -------------------------------------------- |
 | `--ai-chat-radius`        | `8px`             | Master radius — everything derives from this |
-| `--ai-chat-outer-radius`  | `0`               | The widget's own outer frame                 |
+| `--ai-chat-outer-radius`  | `= radius`        | The widget's own outer frame (`0` = square)  |
 | `--ai-chat-bubble-radius` | `= radius`        | Message bubbles                              |
 | `--ai-chat-input-radius`  | `= radius`        | Composer box                                 |
 | `--ai-chat-button-radius` | `= radius`        | Buttons (e.g. `50%` = circular)              |
@@ -629,7 +629,7 @@ automatically (via `theme` / the OS). Override those same vars under
 
 | Variable                     | Default          | Controls                |
 | ---------------------------- | ---------------- | ----------------------- |
-| `--ai-chat-bubble-padding`   | `10px 14px`      | Inside message bubbles  |
+| `--ai-chat-bubble-padding`   | `4px 14px`       | Inside message bubbles  |
 | `--ai-chat-input-padding`    | `8px 14px 2px`   | Inside the textarea     |
 | `--ai-chat-messages-padding` | `20px 16px`      | Around the message list |
 | `--ai-chat-composer-padding` | `12px 16px 16px` | Around the composer     |
@@ -699,8 +699,7 @@ npm run typecheck
 
 `npm run dev` opens a landing page linking to two examples:
 
-- [`examples/playground.html`](examples/playground.html) — a full control panel to toggle **every** customizable option live (theme, accent, names, timestamps, avatars, radius, borders, text, header, new-chat, retry, and a working history sidebar). Runs against a built-in **mock transport**, so it works with no API key.
-- [`examples/ollama.html`](examples/ollama.html) — talk to a **real model running locally** via [Ollama](https://ollama.com), free and no API key.
+- [`examples/playground.html`](examples/playground.html) — a full control panel to toggle **every** customizable option live (theme, all colors, corner radius, borders, sizing, names, timestamps, avatars, chrome, labels, and a working history sidebar). Runs against a built-in **mock transport** by default, or switch the **Transport** dropdown to **Ollama** to chat with a **real model running locally** ([Ollama](https://ollama.com), free, no API key).
 
 ---
 
