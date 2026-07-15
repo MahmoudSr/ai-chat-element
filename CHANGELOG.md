@@ -6,6 +6,37 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-15
+
+**Critical fix. Every earlier version (0.1.0, 0.1.1, 0.1.2) is broken for any
+consumer who bundles the package — please upgrade.**
+
+### Fixed
+
+- **The component was silently deleted from consumers' production builds.**
+  `package.json` declared `"sideEffects": ["**/register.js", "**/register.ts"]`
+  — files that have never existed in this project. That tells every bundler
+  nothing else here has side effects, so it may drop what looks unused. But
+  importing the entry point IS the side effect: it registers `<ai-chat>` via
+  Lit's `@customElement` decorator, and no export is referenced. Rollup/webpack
+  therefore tree-shook the entire component away: `import 'ai-chat-element'`
+  (the first line of the README's quick start) produced an ~0.8 kB bundle with
+  no element in it, `customElements.get('ai-chat')` returned undefined, and
+  `<ai-chat>` rendered as an inert unknown tag.
+
+  Dev servers don't tree-shake, so this worked in development and failed only in
+  a production build — with no error or warning. Now `"sideEffects": true`,
+  which is correct: importing this package's entry is a side effect by design.
+
+### Added
+
+- `npm run verify:bundling` — builds a throwaway consumer app against the real
+  packaged `dist/`, resolved through `node_modules` as a bare specifier, and
+  fails if the element registration doesn't survive production tree-shaking. It
+  now gates `prepublishOnly`, alongside the typecheck, tests and build. No
+  existing test could catch this class of bug: our own tests import symbols
+  directly (nothing to shake) and never bundle the package as a consumer would.
+
 ## [0.1.2] - 2026-07-15
 
 Bug-fix release. Found by building a real consumer app against the published
