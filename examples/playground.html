@@ -1,671 +1,569 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ai-chat — customization playground</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ai-chat-element — playground</title>
     <style>
-      :root { color-scheme: light dark; }
+      :root {
+        --pg-bg: #f6f7f9;
+        --pg-panel: #fff;
+        --pg-ink: #16181d;
+        --pg-soft: #6b7280;
+        --pg-line: #e5e7eb;
+        --pg-brand: #4f46e5;
+        --pg-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --pg-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      [data-pg="dark"] {
+        --pg-bg: #0a0c10;
+        --pg-panel: #12151b;
+        --pg-ink: #e6e8ec;
+        --pg-soft: #9099a8;
+        --pg-line: #232830;
+      }
       * { box-sizing: border-box; }
+      html, body { height: 100%; }
       body {
         margin: 0;
-        font-family: system-ui, sans-serif;
-        background: #eceef2;
-        color: #1a1a1a;
-        display: grid;
-        grid-template-columns: 340px 1fr;
-        height: 100vh;
+        font-family: var(--pg-font);
+        background: var(--pg-bg);
+        color: var(--pg-ink);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
       }
-      body.page-dark { background: #0a0b0f; color: #e6e6e6; }
 
-      .panel { padding: 20px; overflow-y: auto; border-right: 1px solid #8883; }
-      .panel h1 { font-size: 17px; margin: 0 0 4px; }
-      .panel p.sub { margin: 0 0 16px; font-size: 12px; color: #888; }
-      .group { margin-bottom: 16px; border-top: 1px solid #8882; padding-top: 12px; }
-      .group > h2 {
-        font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
-        color: #888; margin: 0 0 10px; cursor: pointer; user-select: none;
-        display: flex; justify-content: space-between; align-items: center;
+      /* ---------- top bar ---------- */
+      .bar {
+        flex: none;
+        display: flex; align-items: center; gap: 12px;
+        padding: 0 14px; height: 50px;
+        background: var(--pg-panel);
+        border-bottom: 1px solid var(--pg-line);
       }
-      .group > h2::after { content: '▾'; font-size: 10px; opacity: .6; }
-      .group.collapsed > h2::after { content: '▸'; }
-      .group.collapsed .body { display: none; }
+      .bar h1 {
+        margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -0.01em;
+        display: flex; align-items: center; gap: 8px;
+      }
+      .bar h1 code {
+        font-family: var(--pg-mono); font-size: 12px; font-weight: 500;
+        background: var(--pg-bg); border: 1px solid var(--pg-line);
+        padding: 2px 6px; border-radius: 5px; color: var(--pg-soft);
+      }
+      .bar__spacer { flex: 1; }
+      .bar__note { font-size: 11.5px; color: var(--pg-soft); }
 
-      label.row {
-        display: flex; align-items: center; justify-content: space-between;
-        gap: 10px; margin: 8px 0; font-size: 13px;
+      /* ---------- layout ---------- */
+      .wrap { flex: 1; display: flex; min-height: 0; }
+      .panel {
+        flex: none; width: 320px;
+        background: var(--pg-panel);
+        border-right: 1px solid var(--pg-line);
+        overflow-y: auto;
+        padding-bottom: 40px;
       }
-      label.row input[type="text"], label.row select {
-        flex: 1 1 auto; min-width: 0; max-width: 160px;
-        padding: 6px 8px; border: 1px solid #8886; border-radius: 8px;
-        background: transparent; color: inherit; font: inherit;
+      .stage {
+        flex: 1; min-width: 0;
+        display: flex; flex-direction: column;
+        padding: 16px; gap: 10px;
       }
-      label.stack { display: block; margin: 8px 0; font-size: 13px; }
-      label.stack input[type="text"] {
-        width: 100%; margin-top: 4px;
-        padding: 6px 8px; border: 1px solid #8886; border-radius: 8px;
-        background: transparent; color: inherit; font: inherit;
-      }
-      input[type="range"] { width: 110px; vertical-align: middle; }
-      input[type="color"] { width: 40px; height: 26px; padding: 0; border: 1px solid #8886; border-radius: 6px; background: transparent; }
-      .val { font-variant-numeric: tabular-nums; color: #888; font-size: 12px; min-width: 42px; text-align: right; }
-      button.btn {
-        width: 100%; margin-top: 8px; padding: 8px; cursor: pointer;
-        border: 1px solid #8886; border-radius: 8px; background: transparent;
-        color: inherit; font: inherit;
-      }
-      button.btn:hover { border-color: #4f46e5; }
-      .hint { font-size: 11px; color: #888; margin: 2px 0 0; }
-      .status { font-size: 12px; padding: 4px 0; }
-      .status.ok { color: #16a34a; } .status.err { color: #dc2626; }
-
-      .stage { display: grid; place-items: center; padding: 24px; overflow: auto; }
       .frame {
-        width: 100%; max-width: 860px; height: min(84vh, 800px);
-        overflow: hidden; background: var(--card, #fff);
-        border-radius: var(--frame-radius, 0);
-        box-shadow: var(--frame-shadow, none);
+        flex: 1; min-height: 0;
+        display: flex;
+        background: var(--pg-panel);
+        border: 1px solid var(--pg-line);
       }
-      body.page-dark .frame { --card: #0f1117; }
+      ai-chat { flex: 1; min-height: 0; }
 
-      /* History sidebar demo styling (consumer-owned markup) */
-      .hist { display: flex; flex-direction: column; gap: 5px; }
-      .hist button {
-        display: block; width: 100%;
-        text-align: left; padding: 8px 10px; border: none; border-radius: 8px;
-        background: transparent; color: inherit; font: inherit; font-size: 13px;
-        cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      /* ---------- panel widgets ---------- */
+      details.group { border-bottom: 1px solid var(--pg-line); }
+      details.group > summary {
+        cursor: pointer; user-select: none;
+        padding: 11px 14px;
+        font-size: 12px; font-weight: 650; letter-spacing: 0.04em;
+        text-transform: uppercase; color: var(--pg-soft);
+        display: flex; align-items: center; gap: 7px;
+        list-style: none;
       }
-      .hist button:hover { background: #8882; }
-      .hist button.active { background: #8883; font-weight: 600; }
-      .hist .hist__label {
-        font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
-        color: #888; padding: 4px 10px; margin-top: 4px;
+      details.group > summary::-webkit-details-marker { display: none; }
+      details.group > summary::before {
+        content: "▸"; font-size: 9px; transition: transform 0.12s ease;
       }
-      .tool-btn {
-        display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
-        border: none; border-radius: 8px; background: transparent; color: #888; cursor: pointer;
+      details.group[open] > summary::before { transform: rotate(90deg); }
+      details.group > summary:hover { color: var(--pg-ink); }
+      .group__body { padding: 2px 14px 14px; display: grid; gap: 9px; }
+
+      .row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; }
+      .row > label { font-size: 12.5px; color: var(--pg-ink); }
+      .row--stack { grid-template-columns: 1fr; gap: 4px; }
+      .hint { font-size: 11px; color: var(--pg-soft); line-height: 1.4; margin: -3px 0 2px; }
+      .mono { font-family: var(--pg-mono); font-size: 10.5px; color: var(--pg-soft); }
+
+      input[type="text"], select, textarea {
+        font: inherit; font-size: 12.5px;
+        padding: 5px 7px; width: 100%;
+        border: 1px solid var(--pg-line); border-radius: 6px;
+        background: var(--pg-bg); color: var(--pg-ink);
       }
-      .tool-btn:hover { background: #8882; color: inherit; }
+      textarea { resize: vertical; min-height: 54px; font-family: var(--pg-mono); font-size: 11.5px; }
+      input[type="range"] { width: 118px; accent-color: var(--pg-brand); }
+      input[type="color"] {
+        width: 30px; height: 24px; padding: 0; border: 1px solid var(--pg-line);
+        border-radius: 5px; background: none; cursor: pointer;
+      }
+      input[type="checkbox"] { accent-color: var(--pg-brand); width: 15px; height: 15px; cursor: pointer; }
+      .val { font-family: var(--pg-mono); font-size: 10.5px; color: var(--pg-soft); min-width: 42px; text-align: right; }
+      .num { display: flex; align-items: center; gap: 7px; }
+
+      button.act {
+        font: inherit; font-size: 12px;
+        padding: 6px 9px; cursor: pointer;
+        border: 1px solid var(--pg-line); border-radius: 6px;
+        background: var(--pg-bg); color: var(--pg-ink);
+        text-align: left;
+      }
+      button.act:hover { border-color: var(--pg-brand); color: var(--pg-brand); }
+      .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .btn-grid--3 { grid-template-columns: 1fr 1fr 1fr; }
+
+      .status { font-size: 11px; margin-top: 2px; min-height: 14px; }
+      .status.ok { color: #0d9488; }
+      .status.err { color: #dc2626; }
+
+      .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+      .preset {
+        cursor: pointer; text-align: left;
+        border: 1px solid var(--pg-line); border-radius: 7px;
+        padding: 7px 8px; background: var(--pg-bg);
+        font: inherit; font-size: 11.5px; color: var(--pg-ink);
+      }
+      .preset:hover { border-color: var(--pg-brand); }
+      .preset b { display: block; font-size: 12px; font-weight: 600; margin-bottom: 1px; }
+      .preset span { color: var(--pg-soft); font-size: 10.5px; }
+      .swatches { display: flex; gap: 3px; margin-top: 5px; }
+      .swatches i { width: 11px; height: 11px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
+
+      /* ---------- the code export drawer ---------- */
+      .drawer {
+        flex: none; background: var(--pg-panel);
+        border: 1px solid var(--pg-line); border-radius: 8px;
+        overflow: hidden;
+      }
+      .drawer > summary {
+        cursor: pointer; user-select: none; list-style: none;
+        padding: 8px 12px; font-size: 12px; font-weight: 600;
+        display: flex; align-items: center; gap: 8px; color: var(--pg-soft);
+      }
+      .drawer > summary::-webkit-details-marker { display: none; }
+      .drawer > summary::before { content: "▸"; font-size: 9px; }
+      .drawer[open] > summary::before { content: "▾"; }
+      .drawer[open] > summary { border-bottom: 1px solid var(--pg-line); color: var(--pg-ink); }
+      .drawer__body { padding: 10px 12px; }
+      .drawer pre {
+        margin: 0; max-height: 190px; overflow: auto;
+        font-family: var(--pg-mono); font-size: 11px; line-height: 1.55;
+        color: var(--pg-ink); background: var(--pg-bg);
+        border: 1px solid var(--pg-line); border-radius: 6px; padding: 9px 11px;
+        white-space: pre; tab-size: 2;
+      }
+      .drawer__foot { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+      .drawer__hint { font-size: 11px; color: var(--pg-soft); flex: 1; }
+
+      /* ---------- slot demo content ---------- */
+      .demo-avatar {
+        width: 100%; height: 100%; border-radius: inherit;
+        display: grid; place-items: center;
+        font-size: 10.5px; font-weight: 700; letter-spacing: .02em;
+        background: var(--ai-chat-accent); color: var(--ai-chat-accent-fg);
+      }
+      .demo-avatar--user { background: #475569; }
+      .demo-head { display: flex; align-items: center; gap: 8px; width: 100%; }
+      .demo-head b { font-size: 13px; }
+      .demo-head span { font-size: 11px; color: var(--ai-chat-muted); }
+      .demo-head__sp { flex: 1; }
+      .demo-cbtn {
+        display: inline-grid; place-items: center; width: 28px; height: 28px;
+        border: none; background: transparent; cursor: pointer;
+        color: var(--ai-chat-muted); border-radius: 50%;
+      }
+      .demo-cbtn:hover { background: var(--ai-chat-assistant-bg); color: var(--ai-chat-fg); }
+
+      /* consumer-owned history list */
+      .h-item { display: flex; align-items: center; border-radius: 7px; margin-bottom: 2px; }
+      .h-item:hover { background: color-mix(in srgb, var(--ai-chat-fg) 6%, transparent); }
+      .h-item[aria-current="true"] { background: color-mix(in srgb, var(--ai-chat-accent) 15%, transparent); }
+      .h-open {
+        flex: 1; min-width: 0; text-align: left;
+        padding: 7px 4px 7px 9px; border: none; background: none; cursor: pointer;
+        color: var(--ai-chat-fg); font: inherit; font-size: 12.5px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 7px;
+      }
+      .h-del {
+        flex: none; border: none; background: none; cursor: pointer;
+        color: var(--ai-chat-muted); padding: 4px; margin-right: 4px;
+        border-radius: 4px; opacity: 0; display: grid; place-items: center;
+      }
+      .h-item:hover .h-del, .h-del:focus-visible { opacity: 1; }
+      .h-del:hover { color: #dc2626; }
+      .h-empty { font-size: 11.5px; color: var(--ai-chat-muted); padding: 10px 9px; line-height: 1.45; margin: 0; }
+
+      @media (max-width: 900px) {
+        .wrap { flex-direction: column; }
+        .panel { width: 100%; max-height: 44vh; border-right: none; border-bottom: 1px solid var(--pg-line); }
+      }
     </style>
   </head>
   <body>
-    <div class="panel">
-      <h1>Customization playground</h1>
-      <p class="sub">
-        Every control maps to something a developer using the component can set.
-        Toggle away.
-      </p>
-
-      <!-- ============ TRANSPORT (mock vs. real local model) ============ -->
-      <div class="group">
-        <h2>Transport</h2>
-        <div class="body">
-          <label class="row"
-            >Source
-            <select id="transport">
-              <option value="mock" selected>Mock (no setup)</option>
-              <option value="ollama">Ollama (real local model)</option>
-            </select>
-          </label>
-          <label class="stack" id="ollamaRow" style="display:none"
-            >Model
-            <input type="text" id="ollamaModel" value="llama3.2" />
-          </label>
-          <p class="hint" id="ollamaHint" style="display:none">
-            Needs Ollama running with browser access:<br />
-            <code>OLLAMA_ORIGINS=* ollama serve</code>
-          </p>
-          <div class="status" id="transportStatus"></div>
-        </div>
-      </div>
-
-      <!-- ============ THEME & COLORS ============ -->
-      <div class="group">
-        <h2>Theme &amp; colors</h2>
-        <div class="body">
-          <label class="row"
-            >Theme
-            <select id="theme">
-              <option value="auto">auto (follows OS)</option>
-              <option value="light" selected>light</option>
-              <option value="dark">dark</option>
-            </select>
-          </label>
-          <label class="row"
-            >Accent <input type="color" id="accent" value="#4f46e5"
-          /></label>
-          <label class="row"
-            >Background <input type="color" id="bg" value="#ffffff"
-          /></label>
-          <label class="row"
-            >Text <input type="color" id="fg" value="#1a1a1a"
-          /></label>
-          <label class="row"
-            >Muted text <input type="color" id="muted" value="#6b7280"
-          /></label>
-          <label class="row"
-            >Border <input type="color" id="borderColor" value="#e5e7eb"
-          /></label>
-          <label class="row"
-            >User bubble <input type="color" id="userBg" value="#4f46e5"
-          /></label>
-          <label class="row"
-            >Assistant bubble
-            <input type="color" id="assistantBg" value="#f3f4f6"
-          /></label>
-          <label class="row"
-            >Code background <input type="color" id="codeBg" value="#0d1117"
-          /></label>
-          <label class="row"
-            >Error color <input type="color" id="errorColor" value="#dc2626"
-          /></label>
-        </div>
-      </div>
-
-      <!-- ============ SHAPE & SIZE ============ -->
-      <div class="group">
-        <h2>Shape &amp; size</h2>
-        <div class="body">
-          <label class="row"
-            >Corner radius
-            <span
-              ><input
-                type="range"
-                id="radius"
-                min="0"
-                max="28"
-                value="8"
-              /><span class="val" id="radiusVal">8px</span></span
-            ></label
-          >
-          <label class="row"
-            >Outer radius
-            <span
-              ><input
-                type="range"
-                id="outerRadius"
-                min="0"
-                max="40"
-                value="8"
-              /><span class="val" id="outerRadiusVal">8px</span></span
-            ></label
-          >
-          <label class="row"
-            >Button radius
-            <span
-              ><input
-                type="range"
-                id="buttonRadius"
-                min="0"
-                max="50"
-                value="8"
-              /><span class="val" id="buttonRadiusVal">8px</span></span
-            ></label
-          >
-          <label class="row"
-            >Border width
-            <span
-              ><input type="range" id="border" min="0" max="4" value="1" /><span
-                class="val"
-                id="borderVal"
-                >1px</span
-              ></span
-            ></label
-          >
-          <label class="row"
-            >Font size
-            <span
-              ><input
-                type="range"
-                id="font"
-                min="12"
-                max="22"
-                value="15"
-              /><span class="val" id="fontVal">15px</span></span
-            ></label
-          >
-          <label class="row"
-            >Line height
-            <span
-              ><input
-                type="range"
-                id="lineHeight"
-                min="12"
-                max="22"
-                value="16"
-              /><span class="val" id="lineHeightVal">1.55</span></span
-            ></label
-          >
-          <label class="row"
-            >Max width
-            <span
-              ><input
-                type="range"
-                id="maxWidth"
-                min="400"
-                max="1000"
-                value="760"
-              /><span class="val" id="maxWidthVal">760px</span></span
-            ></label
-          >
-          <label class="row"
-            >Message gap
-            <span
-              ><input type="range" id="gap" min="4" max="40" value="16" /><span
-                class="val"
-                id="gapVal"
-                >16px</span
-              ></span
-            ></label
-          >
-          <label class="row"
-            >Send button
-            <span
-              ><input
-                type="range"
-                id="sendSize"
-                min="26"
-                max="52"
-                value="34"
-              /><span class="val" id="sendSizeVal">34px</span></span
-            ></label
-          >
-          <label class="row"
-            >Input max-height
-            <span
-              ><input
-                type="range"
-                id="inputMax"
-                min="80"
-                max="400"
-                value="200"
-              /><span class="val" id="inputMaxVal">200px</span></span
-            ></label
-          >
-        </div>
-      </div>
-
-      <!-- ============ NAMES, TIMESTAMPS, AVATARS ============ -->
-      <div class="group">
-        <h2>Names, timestamps &amp; avatars</h2>
-        <div class="body">
-          <label class="row"
-            >Show names <input type="checkbox" id="showNames" checked
-          /></label>
-          <label class="row"
-            >Show timestamps <input type="checkbox" id="showTimestamps" checked
-          /></label>
-          <label class="row"
-            >AI message in a bubble <input type="checkbox" id="assistantBubble"
-          /></label>
-          <label class="row"
-            >Show avatars <input type="checkbox" id="showAvatars"
-          /></label>
-          <label class="row"
-            >Round avatars <input type="checkbox" id="roundAvatars"
-          /></label>
-          <label class="stack"
-            >Your name <input type="text" id="userName" value="You"
-          /></label>
-          <label class="stack"
-            >AI name <input type="text" id="assistantName" value="AI bot"
-          /></label>
-          <p class="hint">
-            Avatars here use text initials. Real apps drop in an &lt;img&gt; or
-            SVG via a slot.
-          </p>
-        </div>
-      </div>
-
-      <!-- ============ CHROME ============ -->
-      <div class="group">
-        <h2>Chrome &amp; layout</h2>
-        <div class="body">
-          <label class="row"
-            >Show header <input type="checkbox" id="showHeader"
-          /></label>
-          <label class="row"
-            >Show new-chat button <input type="checkbox" id="showClear" checked
-          /></label>
-          <label class="row"
-            >Retry on error <input type="checkbox" id="showRetry" checked
-          /></label>
-          <label class="row"
-            >History sidebar <input type="checkbox" id="showAside" checked
-          /></label>
-          <label class="row"
-            >Sidebar side
-            <select id="asideSide">
-              <option value="left" selected>left</option>
-              <option value="right">right</option>
-            </select>
-          </label>
-          <label class="row"
-            >Composer divider <input type="checkbox" id="composerBorder"
-          /></label>
-          <label class="row"
-            >Disable input <input type="checkbox" id="disabled"
-          /></label>
-          <label class="stack"
-            >Header title <input type="text" id="headerTitle" value="Chat"
-          /></label>
-          <button class="btn" id="triggerError">Simulate a failed reply</button>
-        </div>
-      </div>
-
-      <!-- ============ TEXT / LABELS ============ -->
-      <div class="group">
-        <h2>Text &amp; labels (i18n)</h2>
-        <div class="body">
-          <label class="stack"
-            >Placeholder
-            <input type="text" id="placeholder" value="Send a message…"
-          /></label>
-          <label class="stack"
-            >Empty heading
-            <input type="text" id="emptyHeading" value="How can I help?"
-          /></label>
-          <label class="stack"
-            >Empty body
-            <input
-              type="text"
-              id="emptyBody"
-              value="Ask me anything to get started."
-          /></label>
-          <label class="stack"
-            >New-chat label <input type="text" id="clearChat" value="New chat"
-          /></label>
-          <label class="stack"
-            >Retry label <input type="text" id="retry" value="Retry"
-          /></label>
-          <label class="stack"
-            >Copy label <input type="text" id="copy" value="Copy"
-          /></label>
-        </div>
-      </div>
-
-      <!-- ============ THE FRAME (consumer's container) ============ -->
-      <div class="group">
-        <h2>Your container (not the component)</h2>
-        <div class="body">
-          <label class="row"
-            >Frame radius
-            <span
-              ><input
-                type="range"
-                id="frameRadius"
-                min="0"
-                max="40"
-                value="8"
-              /><span class="val" id="frameRadiusVal">8px</span></span
-            ></label
-          >
-          <label class="row"
-            >Frame shadow <input type="checkbox" id="frameShadow"
-          /></label>
-          <p class="hint">
-            The component is square by default; your surrounding container
-            usually rounds/shadows it.
-          </p>
-        </div>
-      </div>
-
-      <button class="btn" id="reset">Reset all</button>
+    <div class="bar">
+      <h1><code>&lt;ai-chat&gt;</code> playground</h1>
+      <span class="bar__note" id="pkgNote">every attribute, CSS variable, label &amp; slot — live</span>
+      <div class="bar__spacer"></div>
+      <button class="act" id="pgTheme" title="Toggle the page theme (not the component's)">Page theme</button>
     </div>
 
-    <div class="stage">
-      <div class="frame" id="frame">
-        <ai-chat id="chat" show-aside>
-          <div slot="aside" class="hist">
-            <div class="hist__label">Conversations</div>
-            <div id="histList"></div>
+    <div class="wrap">
+      <aside class="panel" id="panel"><!-- controls injected --></aside>
+
+      <main class="stage">
+        <div class="frame" id="frame">
+          <ai-chat id="chat" theme="light" placeholder="Ask me anything…">
+            <div slot="aside" id="histList"></div>
+          </ai-chat>
+        </div>
+
+        <details class="drawer" id="drawer">
+          <summary>Generated code — copy this into your app</summary>
+          <div class="drawer__body">
+            <pre id="codeOut"></pre>
+            <div class="drawer__foot">
+              <span class="drawer__hint">Only what you changed from the defaults.</span>
+              <button class="act" id="copyCode">Copy</button>
+            </div>
           </div>
-          <button
-            slot="composer-actions-start"
-            class="tool-btn"
-            type="button"
-            title="Attach (demo placeholder)"
-            aria-label="Attach"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              width="18"
-              height="18"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"
-              ></path>
-            </svg>
-          </button>
-        </ai-chat>
-      </div>
+        </details>
+      </main>
     </div>
 
     <script type="module">
-      import { functionAdapter, openAIAdapter } from '../dist/ai-chat-element.js';
+      import '../src/index.ts';
+      import { openAIAdapter, functionAdapter } from '../src/adapters/index.ts';
+      import { SCENARIOS } from './scenarios.js';
+      import { CONTROLS, PRESETS, buildPanel } from './controls.js';
 
       const chat = document.getElementById('chat');
       const frame = document.getElementById('frame');
       const $ = (id) => document.getElementById(id);
 
-      // ---- Transports -----------------------------------------------------------
-      let failNext = false;
-      const mockTransport = functionAdapter(async function* (messages) {
-        if (failNext) { failNext = false; throw new Error('Simulated network error — hit Retry to resend.'); }
-        const q = messages[messages.length - 1]?.content ?? '';
-        const reply =
-          `You said: **${q}**\n\n` +
-          `Here's a code block to test rendering and the copy button:\n\n` +
-          '```js\n' +
-          "const chat = document.querySelector('ai-chat');\n" +
-          "chat.transport = openAIAdapter({ apiKey, model: 'gpt-4o-mini' });\n" +
-          '```\n\n' +
-          '| Feature | Works |\n|---|---|\n| streaming | ✅ |\n| markdown | ✅ |\n\n' +
-          '- names & timestamps appear above';
-        for (const w of reply.split(/(\s+)/)) { await new Promise((r) => setTimeout(r, 16)); yield w; }
+      /* =====================================================================
+         STATE — the single source of truth. Everything (the element, the
+         generated code, the presets) derives from this, so the panel and the
+         exported snippet can never disagree.
+         ===================================================================== */
+      const state = {};          // only non-default values live here
+      const DEFAULTS = {};
+      for (const c of CONTROLS) DEFAULTS[c.key] = c.def;
+
+      const get = (k) => (k in state ? state[k] : DEFAULTS[k]);
+      const isSet = (k) => k in state && String(state[k]) !== String(DEFAULTS[k]);
+
+      function set(k, v) {
+        if (v === null || String(v) === String(DEFAULTS[k])) delete state[k];
+        else state[k] = v;
+        apply();
+      }
+
+      /* =====================================================================
+         APPLY — push state onto the element.
+         ===================================================================== */
+      function apply() {
+        for (const c of CONTROLS) {
+          const v = get(c.key);
+          if (c.kind === 'var') {
+            if (isSet(c.key)) chat.style.setProperty(c.key, c.fmt ? c.fmt(v) : v);
+            else chat.style.removeProperty(c.key);
+          } else if (c.kind === 'attr') {
+            if (c.type === 'bool') {
+              // Booleans that default ON must be written as ="false" to turn off.
+              if (c.def === true) v ? chat.removeAttribute(c.key) : chat.setAttribute(c.key, 'false');
+              else v ? chat.setAttribute(c.key, '') : chat.removeAttribute(c.key);
+            } else if (String(v ?? '').trim() === '') chat.removeAttribute(c.key);
+            else chat.setAttribute(c.key, v);
+          } else if (c.kind === 'frame') {
+            frame.style[c.css] = c.fmt ? c.fmt(v) : v;
+          }
+        }
+        // Labels are a property, not attributes — rebuild the whole object.
+        const labels = {};
+        for (const c of CONTROLS) if (c.kind === 'label' && isSet(c.key)) labels[c.key] = get(c.key);
+        chat.labels = labels;
+
+        renderSlots();
+        renderCode();
+      }
+
+      /* =====================================================================
+         SLOTS — toggled on/off so every slot in the API is testable.
+         ===================================================================== */
+      const SLOT_HTML = {
+        'assistant-avatar': '<span slot="assistant-avatar" class="demo-avatar">AI</span>',
+        'user-avatar': '<span slot="user-avatar" class="demo-avatar demo-avatar--user">ME</span>',
+        header: `<div slot="header" class="demo-head">
+            <b>Custom header slot</b><span>— replaces the whole bar</span>
+            <span class="demo-head__sp"></span>
+            <select><option>gpt-4o-mini</option><option>llama3.2</option></select>
+          </div>`,
+        'composer-actions-start': `<button slot="composer-actions-start" class="demo-cbtn" title="Attach (demo)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.4 11.05 12.25 20.2a6 6 0 0 1-8.49-8.49l9.2-9.19a4 4 0 0 1 5.65 5.66l-9.2 9.19a2 2 0 1 1-2.83-2.83l8.49-8.48"/></svg>
+          </button>`,
+        'composer-actions-end': `<button slot="composer-actions-end" class="demo-cbtn" title="Mic (demo)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></svg>
+          </button>`,
+        'send-icon': '<span slot="send-icon" style="font-size:13px;font-weight:700">GO</span>',
+        'empty-icon': '<span slot="empty-icon" style="font-size:30px">💬</span>',
+      };
+
+      function renderSlots() {
+        for (const [name, html] of Object.entries(SLOT_HTML)) {
+          const existing = chat.querySelector(`[slot="${name}"]`);
+          const want = get('slot:' + name);
+          if (want && !existing) chat.insertAdjacentHTML('beforeend', html);
+          else if (!want && existing) existing.remove();
+        }
+      }
+
+      /* =====================================================================
+         TRANSPORTS
+         ===================================================================== */
+      let scenario = 'normal';
+      let pendingFail = false;
+
+      const mock = functionAdapter(async function* (messages, signal) {
+        const fn = SCENARIOS[pendingFail ? 'error' : scenario] ?? SCENARIOS.normal;
+        pendingFail = false;
+        yield* fn(messages, signal);
       });
 
       function setTransport() {
-        const kind = $('transport').value;
-        const status = $('transportStatus');
-        const isOllama = kind === 'ollama';
-        $('ollamaRow').style.display = isOllama ? '' : 'none';
-        $('ollamaHint').style.display = isOllama ? '' : 'none';
-        if (isOllama) {
+        const kind = get('transport');
+        const st = $('transportStatus');
+        if (kind === 'ollama') {
           chat.transport = openAIAdapter({
-            model: $('ollamaModel').value.trim() || 'llama3.2',
+            model: get('ollamaModel') || 'llama3.2',
             baseURL: 'http://localhost:11434/v1/chat/completions',
+            params: { temperature: 0.4 },
           });
-          status.textContent = 'Using local Ollama — make sure it is running.';
-          status.className = 'status ok';
+          probeOllama();
         } else {
-          chat.transport = mockTransport;
-          status.textContent = '';
-          status.className = 'status';
+          chat.transport = mock;
+          if (st) { st.textContent = 'Mock transport — no setup needed.'; st.className = 'status ok'; }
         }
       }
 
-      // Seed a couple of messages so names/timestamps/avatars show immediately.
-      chat.addMessage('user', 'Hey, is this thing customizable?');
-      chat.addMessage('assistant', 'Absolutely — **every** name, color, and toggle on the left is something a developer using this component controls.');
+      async function probeOllama() {
+        const st = $('transportStatus');
+        if (!st) return;
+        st.textContent = 'Checking Ollama…';
+        st.className = 'status';
+        try {
+          const r = await fetch('http://localhost:11434/api/tags');
+          const { models } = await r.json();
+          const names = models.map((m) => m.model);
+          st.textContent = names.length ? `Online — ${names.join(', ')}` : 'Online, but no models pulled.';
+          st.className = 'status ok';
+        } catch {
+          st.innerHTML = 'Not reachable. Start it with:<br><span class="mono">$env:OLLAMA_ORIGINS="*"; ollama serve</span>';
+          st.className = 'status err';
+        }
+      }
 
-      // ---- Conversation history (CONSUMER-OWNED) --------------------------------
-      let conversations = [{ id: 1, title: 'Getting started', messages: [...chat.messages] }];
-      let activeId = 1;
+      /* =====================================================================
+         CODE EXPORT — the payoff: whatever you tweak, you can paste out.
+         ===================================================================== */
+      function renderCode() {
+        const attrs = [], vars = [], labels = [], slots = [];
+        for (const c of CONTROLS) {
+          if (!isSet(c.key)) continue;
+          const v = get(c.key);
+          if (c.kind === 'attr') {
+            if (c.type === 'bool') attrs.push(c.def === true ? `${c.key}="false"` : c.key);
+            else attrs.push(`${c.key}="${String(v).replace(/"/g, '&quot;')}"`);
+          } else if (c.kind === 'var') vars.push(`  ${c.key}: ${c.fmt ? c.fmt(v) : v};`);
+          else if (c.kind === 'label') labels.push(`  ${c.key}: ${JSON.stringify(v)},`);
+        }
+        for (const name of Object.keys(SLOT_HTML)) {
+          if (get('slot:' + name)) slots.push('  ' + SLOT_HTML[name].trim().split('\n')[0].trim());
+        }
+
+        let out = '';
+        if (vars.length) out += `/* CSS */\nai-chat {\n${vars.join('\n')}\n}\n\n`;
+        out += `<!-- HTML -->\n<ai-chat${attrs.length ? '\n  ' + attrs.join('\n  ') + '\n' : ' '}>`;
+        out += slots.length ? '\n' + slots.join('\n') + '\n</ai-chat>' : '</ai-chat>';
+
+        out += `\n\n// JS\nimport 'ai-chat-element';\nimport { ${
+          get('transport') === 'ollama' ? 'openAIAdapter' : 'functionAdapter'
+        } } from 'ai-chat-element';\n\nconst chat = document.querySelector('ai-chat');\n`;
+        out += get('transport') === 'ollama'
+          ? `chat.transport = openAIAdapter({\n  model: '${get('ollamaModel') || 'llama3.2'}',\n  baseURL: 'http://localhost:11434/v1/chat/completions',\n});\n`
+          : `chat.transport = functionAdapter(async function* (messages, signal) {\n  // stream text chunks from your backend\n});\n`;
+        if (labels.length) out += `\nchat.labels = {\n${labels.join('\n')}\n};\n`;
+
+        $('codeOut').textContent = out;
+      }
+
+      /* =====================================================================
+         HISTORY (consumer-owned — the component holds ONE conversation)
+         ===================================================================== */
       const histList = $('histList');
-      function renderHistory() {
+      let convos = [{ id: 1, title: 'Getting started', messages: [] }];
+      let activeId = 1;
+
+      const titleOf = (msgs) => {
+        const f = msgs.find((m) => m.role === 'user');
+        return f ? (f.content.length > 30 ? f.content.slice(0, 30).trim() + '…' : f.content) : 'New chat';
+      };
+      const commit = () => {
+        const c = convos.find((x) => x.id === activeId);
+        if (!c) return;
+        c.messages = [...chat.messages];
+        if (c.title === 'New chat') c.title = titleOf(c.messages);
+      };
+
+      function drawHist() {
         histList.innerHTML = '';
-        for (const c of conversations) {
-          const b = document.createElement('button');
-          b.textContent = c.title;
-          b.className = c.id === activeId ? 'active' : '';
-          b.addEventListener('click', () => switchTo(c.id));
-          histList.appendChild(b);
+        if (!convos.length) {
+          histList.innerHTML = '<p class="h-empty">No conversations. Send a message to start one.</p>';
+          return;
         }
-      }
-      function saveActive() { const c = conversations.find((c) => c.id === activeId); if (c) c.messages = [...chat.messages]; }
-      function switchTo(id) {
-        saveActive(); activeId = id;
-        chat.messages = [...(conversations.find((c) => c.id === id)?.messages ?? [])];
-        renderHistory();
-      }
-      chat.addEventListener('ai-chat:new-chat', (e) => {
-        // If the current conversation is already empty, don't spawn another —
-        // just stay put (matches ChatGPT/Claude). preventDefault() keeps the
-        // component from clearing an already-empty chat needlessly.
-        if (chat.messages.length === 0) { e.preventDefault(); return; }
-        saveActive();
-        const id = Date.now();
-        conversations = [{ id, title: 'New conversation', messages: [] }, ...conversations];
-        activeId = id; renderHistory();
-      });
-      chat.addEventListener('ai-chat:submit', (e) => {
-        const c = conversations.find((c) => c.id === activeId);
-        if (c && (c.title === 'New conversation' || !c.title)) { c.title = e.detail.content.slice(0, 28); renderHistory(); }
-      });
-      renderHistory();
-
-      // ---- Avatars (added/removed by the toggle) ----
-      function setAvatars(on) {
-        chat.querySelectorAll('[slot="assistant-avatar"], [slot="user-avatar"]').forEach((el) => el.remove());
-        if (!on) return;
-        const mk = (slot, text) => { const s = document.createElement('span'); s.slot = slot; s.textContent = text; s.style.cssText = 'font-size:11px;font-weight:700'; return s; };
-        chat.append(mk('assistant-avatar', 'AI'), mk('user-avatar', 'ME'));
-      }
-
-      // ---- Apply everything ----
-      const px = (id) => $(id).value + 'px';
-      function apply() {
-        // theme
-        chat.setAttribute('theme', $('theme').value);
-        document.body.classList.toggle('page-dark', $('theme').value === 'dark');
-
-        // colors — accent is always applied; the rest are OPT-IN overrides so
-        // they don't fight the theme. A color var is only set once the user has
-        // actually touched that picker (see `touchedColors`); otherwise the
-        // theme (light/dark/auto) controls it.
-        const S = (k, v) => chat.style.setProperty(k, v);
-        S('--ai-chat-accent', $('accent').value);
-        const colorMap = {
-          bg: '--ai-chat-bg', fg: '--ai-chat-fg', muted: '--ai-chat-muted',
-          borderColor: '--ai-chat-border', userBg: '--ai-chat-user-bg',
-          assistantBg: '--ai-chat-assistant-bg', codeBg: '--ai-chat-code-bg',
-          errorColor: '--ai-chat-error',
-        };
-        for (const [id, cssVar] of Object.entries(colorMap)) {
-          if (touchedColors.has(id)) S(cssVar, $(id).value);
-          else chat.style.removeProperty(cssVar);
-        }
-
-        // shape & size
-        S('--ai-chat-radius', px('radius'));
-        S('--ai-chat-outer-radius', px('outerRadius'));
-        S('--ai-chat-button-radius', $('roundAvatars').checked ? px('buttonRadius') : px('buttonRadius'));
-        S('--ai-chat-avatar-radius', $('roundAvatars').checked ? '50%' : 'var(--ai-chat-radius)');
-        S('--ai-chat-border-width', px('border'));
-        S('--ai-chat-input-border-width', px('border'));
-        S('--ai-chat-composer-border-width', $('composerBorder').checked ? px('border') : '0px');
-        S('--ai-chat-font-size', px('font'));
-        S('--ai-chat-line-height', ($('lineHeight').value / 10 + 0.5).toFixed(2));
-        S('--ai-chat-max-width', px('maxWidth'));
-        S('--ai-chat-gap', px('gap'));
-        S('--ai-chat-send-size', px('sendSize'));
-        S('--ai-chat-input-max-height', px('inputMax'));
-
-        // attributes / props
-        chat.showNames = $('showNames').checked;
-        chat.showTimestamps = $('showTimestamps').checked;
-        chat.assistantBubble = $('assistantBubble').checked;
-        chat.showHeader = $('showHeader').checked;
-        chat.showClear = $('showClear').checked;
-        chat.showRetry = $('showRetry').checked;
-        chat.showAside = $('showAside').checked;
-        chat.setAttribute('aside-side', $('asideSide').value);
-        chat.disabled = $('disabled').checked;
-        chat.placeholder = $('placeholder').value;
-
-        // labels
-        chat.labels = {
-          userName: $('userName').value,
-          assistantName: $('assistantName').value,
-          emptyHeading: $('emptyHeading').value,
-          emptyBody: $('emptyBody').value,
-          headerTitle: $('headerTitle').value,
-          clearChat: $('clearChat').value,
-          retry: $('retry').value,
-          copy: $('copy').value,
-        };
-
-        setAvatars($('showAvatars').checked);
-
-        // the consumer's frame
-        frame.style.setProperty('--frame-radius', px('frameRadius'));
-        frame.style.setProperty('--frame-shadow', $('frameShadow').checked ? '0 20px 50px -20px rgba(0,0,0,.4)' : 'none');
-
-        // value readouts
-        $('radiusVal').textContent = px('radius');
-        $('outerRadiusVal').textContent = px('outerRadius');
-        $('buttonRadiusVal').textContent = px('buttonRadius');
-        $('borderVal').textContent = px('border');
-        $('fontVal').textContent = px('font');
-        $('lineHeightVal').textContent = ($('lineHeight').value / 10 + 0.5).toFixed(2);
-        $('maxWidthVal').textContent = px('maxWidth');
-        $('gapVal').textContent = px('gap');
-        $('sendSizeVal').textContent = px('sendSize');
-        $('inputMaxVal').textContent = px('inputMax');
-        $('frameRadiusVal').textContent = px('frameRadius');
-      }
-
-      // Track which color pickers the user has actually touched. Until touched,
-      // the theme (light/dark/auto) owns those colors — so switching to "dark"
-      // actually goes dark instead of being overridden by a default color value.
-      const touchedColors = new Set();
-      const colorIds = ['bg','fg','muted','borderColor','userBg','assistantBg','codeBg','errorColor'];
-      colorIds.forEach((id) => $(id).addEventListener('input', () => touchedColors.add(id)));
-
-      // Changing the theme resets manual color overrides so the theme shows
-      // through, and syncs the pickers to the theme's actual colors.
-      $('theme').addEventListener('change', () => {
-        touchedColors.clear();
-        // Reflect the theme's resolved colors back into the pickers.
-        requestAnimationFrame(() => {
-          const cs = getComputedStyle(chat);
-          const toHex = (v) => {
-            const m = v.trim().match(/^#([0-9a-f]{6})$/i); if (m) return v.trim();
-            const c = document.createElement('canvas').getContext('2d'); c.fillStyle = v.trim();
-            return c.fillStyle;
+        for (const c of convos) {
+          const row = document.createElement('div');
+          row.className = 'h-item';
+          row.setAttribute('aria-current', String(c.id === activeId));
+          const open = document.createElement('button');
+          open.type = 'button'; open.className = 'h-open'; open.textContent = c.title;
+          open.onclick = () => {
+            commit(); activeId = c.id;
+            chat.messages = [...(convos.find((x) => x.id === c.id)?.messages ?? [])];
+            drawHist();
           };
-          const pick = { bg:'--ai-chat-bg', fg:'--ai-chat-fg', muted:'--ai-chat-muted',
-            borderColor:'--ai-chat-border', userBg:'--ai-chat-user-bg',
-            assistantBg:'--ai-chat-assistant-bg', codeBg:'--ai-chat-code-bg', errorColor:'--ai-chat-error' };
-          for (const [id, v] of Object.entries(pick)) {
-            try { $(id).value = toHex(cs.getPropertyValue(v)); } catch {}
+          const del = document.createElement('button');
+          del.type = 'button'; del.className = 'h-del';
+          del.setAttribute('aria-label', `Delete ${c.title}`);
+          del.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+          del.onclick = () => {
+            if (!confirm(`Delete "${c.title}"?`)) return;
+            convos = convos.filter((x) => x.id !== c.id);
+            if (activeId === c.id) {
+              activeId = convos[0]?.id ?? null;
+              chat.messages = activeId ? [...convos[0].messages] : [];
+            }
+            drawHist();
+          };
+          row.append(open, del);
+          histList.appendChild(row);
+        }
+      }
+
+      chat.addEventListener('ai-chat:new-chat', (e) => {
+        const c = convos.find((x) => x.id === activeId);
+        if (c) { c.messages = e.detail.messages; if (c.title === 'New chat') c.title = titleOf(c.messages); }
+        const id = Date.now();
+        convos.unshift({ id, title: 'New chat', messages: [] });
+        activeId = id;
+        drawHist();
+      });
+      chat.addEventListener('ai-chat:message', () => { commit(); drawHist(); });
+      chat.addEventListener('ai-chat:submit', () => {
+        if (!activeId) { const id = Date.now(); convos.unshift({ id, title: 'New chat', messages: [] }); activeId = id; }
+        commit(); drawHist();
+      });
+
+      /* =====================================================================
+         EVENT LOG — see what your app would receive.
+         ===================================================================== */
+      const logLines = [];
+      function logEvent(name, detail) {
+        const t = new Date().toLocaleTimeString([], { hour12: false });
+        let d = '';
+        if (detail?.content) d = JSON.stringify(detail.content.slice(0, 40));
+        else if (detail?.message) d = `{role:"${detail.message.role}", ${detail.message.content.length} chars}`;
+        else if (detail?.error) d = JSON.stringify(String(detail.error).slice(0, 40));
+        else if (detail?.messages) d = `${detail.messages.length} messages`;
+        logLines.unshift(`${t}  ${name}  ${d}`);
+        logLines.length = Math.min(logLines.length, 40);
+        const el = $('eventLog');
+        if (el) el.textContent = logLines.join('\n') || 'No events yet.';
+      }
+      for (const n of ['submit', 'message', 'error', 'new-chat']) {
+        chat.addEventListener('ai-chat:' + n, (e) => logEvent('ai-chat:' + n, e.detail));
+      }
+
+      /* =====================================================================
+         BOOT
+         ===================================================================== */
+      buildPanel($('panel'), {
+        state, get, set, isSet, DEFAULTS,
+        onAction: (id) => ACTIONS[id]?.(),
+        onPreset: (p) => {
+          for (const k of Object.keys(state)) delete state[k];
+          Object.assign(state, p.values);
+          apply();
+          buildPanel($('panel'), PANEL_CTX);   // re-sync the widgets
+        },
+        onScenario: (v) => { scenario = v; },
+        onTransport: setTransport,
+      });
+      const PANEL_CTX = {
+        state, get, set, isSet, DEFAULTS,
+        onAction: (id) => ACTIONS[id]?.(),
+        onPreset: (p) => {
+          for (const k of Object.keys(state)) delete state[k];
+          Object.assign(state, p.values);
+          apply();
+          buildPanel($('panel'), PANEL_CTX);
+        },
+        onScenario: (v) => { scenario = v; },
+        onTransport: setTransport,
+      };
+
+      const ACTIONS = {
+        seed: () => {
+          chat.messages = [];
+          chat.addMessage('user', 'Can you show me a code sample and a table?');
+          chat.addMessage('assistant', SCENARIOS.sampleReply);
+          commit(); drawHist();
+        },
+        long: () => {
+          chat.messages = [];
+          for (let i = 1; i <= 14; i++) {
+            chat.addMessage('user', `Question number ${i} — does scrolling still behave?`);
+            chat.addMessage('assistant', `Answer ${i}. Scroll up mid-stream and the view should stay put; the jump-to-latest button appears.`);
           }
-        });
-      });
+          commit(); drawHist();
+        },
+        failNext: () => { pendingFail = true; chat.send('This request will fail — then hit Retry.'); },
+        clear: () => chat.clear(),
+        stop: () => chat.stop(),
+        reset: () => { for (const k of Object.keys(state)) delete state[k]; apply(); buildPanel($('panel'), PANEL_CTX); },
+      };
 
-      // Wire controls
-      document.querySelectorAll('.panel input, .panel select').forEach((el) => {
-        el.addEventListener('input', apply);
-        el.addEventListener('change', apply);
-      });
-      $('transport').addEventListener('change', setTransport);
-      $('ollamaModel').addEventListener('change', setTransport);
-      $('reset').addEventListener('click', () => location.reload());
-      $('triggerError').addEventListener('click', () => { failNext = true; chat.send('This one is going to fail.'); });
+      // Page theme (independent of the component's own `theme` attribute)
+      $('pgTheme').onclick = () => {
+        const el = document.documentElement;
+        el.dataset.pg = el.dataset.pg === 'dark' ? 'light' : 'dark';
+      };
+      $('copyCode').onclick = async () => {
+        await navigator.clipboard.writeText($('codeOut').textContent);
+        $('copyCode').textContent = 'Copied';
+        setTimeout(() => ($('copyCode').textContent = 'Copy'), 1200);
+      };
 
-      // Collapsible groups
-      document.querySelectorAll('.group > h2').forEach((h) =>
-        h.addEventListener('click', () => h.parentElement.classList.toggle('collapsed')));
-
-      setTransport();
       apply();
+      setTransport();
+      ACTIONS.seed();
+      drawHist();
+      logEvent('ready', {});
+      window.chat = chat;
     </script>
   </body>
 </html>

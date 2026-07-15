@@ -730,7 +730,12 @@ npm install
 npm run dev       # starts Vite and opens the examples landing page in your browser
 npm run build     # build the package into dist/
 npm run typecheck
+npm test          # runs the suite in a real Chromium (Playwright)
 ```
+
+Tests run in a **real browser**, not a simulated DOM — this component's behavior
+lives in the Shadow DOM (slot projection, `::slotted`, `:host`), which jsdom and
+happy-dom don't reproduce faithfully. `npm run test:watch` re-runs on change.
 
 `npm run dev` opens a landing page linking to the playground:
 
