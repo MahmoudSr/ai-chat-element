@@ -208,6 +208,37 @@
       .h-del:hover { color: #dc2626; }
       .h-empty { font-size: 11.5px; color: var(--ai-chat-muted); padding: 10px 9px; line-height: 1.45; margin: 0; }
 
+      /* ---------- confirm dialog ---------- */
+      .dlg {
+        border: 1px solid var(--pg-line);
+        border-radius: 12px;
+        padding: 0;
+        background: var(--pg-panel);
+        color: var(--pg-ink);
+        max-width: 340px;
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+      }
+      .dlg::backdrop { background: rgba(8, 10, 14, 0.45); }
+      .dlg form { padding: 18px; }
+      .dlg h2 { margin: 0 0 6px; font-size: 15px; letter-spacing: -0.01em; }
+      .dlg p {
+        margin: 0 0 16px; font-size: 13px; line-height: 1.5;
+        color: var(--pg-soft);
+        overflow-wrap: anywhere;   /* a long chat title must not blow out the box */
+      }
+      .dlg__row { display: flex; justify-content: flex-end; gap: 8px; }
+      .dlg__btn {
+        font: inherit; font-size: 12.5px; cursor: pointer;
+        padding: 7px 13px; border-radius: 7px;
+        border: 1px solid var(--pg-line);
+        background: var(--pg-bg); color: var(--pg-ink);
+      }
+      .dlg__btn:hover { border-color: var(--pg-soft); }
+      .dlg__btn--danger {
+        background: #dc2626; border-color: #dc2626; color: #fff; font-weight: 550;
+      }
+      .dlg__btn--danger:hover { background: #b91c1c; border-color: #b91c1c; }
+
       @media (max-width: 900px) {
         .wrap { flex-direction: column; }
         .panel { width: 100%; max-height: 44vh; border-right: none; border-bottom: 1px solid var(--pg-line); }
@@ -221,6 +252,21 @@
       <div class="bar__spacer"></div>
       <button class="act" id="pgTheme" title="Toggle the page theme (not the component's)">Page theme</button>
     </div>
+
+    <!-- Confirm dialog for deleting a conversation. Native <dialog> gives us the
+         backdrop, Esc-to-close and focus trapping for free — no library. This is
+         the CONSUMER's chrome: the component owns one conversation and knows
+         nothing about a list, so the delete flow belongs here, in your app. -->
+    <dialog id="confirmDlg" class="dlg">
+      <form method="dialog">
+        <h2 id="dlgTitle">Delete conversation?</h2>
+        <p id="dlgBody">This can't be undone.</p>
+        <div class="dlg__row">
+          <button value="cancel" class="dlg__btn">Cancel</button>
+          <button value="ok" class="dlg__btn dlg__btn--danger" id="dlgOk">Delete</button>
+        </div>
+      </form>
+    </dialog>
 
     <div class="wrap">
       <aside class="panel" id="panel"><!-- controls injected --></aside>
@@ -412,6 +458,22 @@
       }
 
       /* =====================================================================
+         CONFIRM DIALOG — promise-wrapped <dialog> so callers read like confirm()
+         without the native popup. Returns true only on an explicit Delete;
+         Esc, the backdrop and Cancel all resolve false.
+         ===================================================================== */
+      const dlg = $('confirmDlg');
+      function confirmDelete(title) {
+        $('dlgTitle').textContent = 'Delete conversation?';
+        $('dlgBody').textContent = `"${title}" and its messages will be permanently removed.`;
+        dlg.showModal();
+        $('dlgOk').focus();
+        return new Promise((resolve) => {
+          dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok'), { once: true });
+        });
+      }
+
+      /* =====================================================================
          HISTORY (consumer-owned — the component holds ONE conversation)
          ===================================================================== */
       const histList = $('histList');
@@ -450,8 +512,8 @@
           del.type = 'button'; del.className = 'h-del';
           del.setAttribute('aria-label', `Delete ${c.title}`);
           del.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
-          del.onclick = () => {
-            if (!confirm(`Delete "${c.title}"?`)) return;
+          del.onclick = async () => {
+            if (!(await confirmDelete(c.title))) return;
             convos = convos.filter((x) => x.id !== c.id);
             if (activeId === c.id) {
               activeId = convos[0]?.id ?? null;
