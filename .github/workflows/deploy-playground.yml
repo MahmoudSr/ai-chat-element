@@ -30,9 +30,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Must match the Node/npm that generated package-lock.json. On 20 (npm 10)
+      # `npm ci` rejects a lockfile written by npm 11 — it reads the nested
+      # vitest->vite 5 entries as missing top-level deps and refuses to install.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - run: npm ci
