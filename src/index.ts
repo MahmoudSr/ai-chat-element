@@ -6,6 +6,9 @@ import './ai-chat.js';
 
 export { AiChat } from './ai-chat.js';
 export type { ChatMessage, ChatTransport, StreamChunk, Role } from './types.js';
+// The labels interface is part of the public API (consumers type their `labels`
+// object / i18n overrides with it), so it must be exported here too.
+export type { ChatLabels } from './labels.js';
 
 // Adapters are also available from the dedicated `./adapters` entry point,
 // but re-exported here for convenience.

@@ -676,7 +676,26 @@ Put your own markup in any of these (`<x slot="name">`):
 
 ## TypeScript
 
-The package ships types. For JSX (React), declare the tag once:
+The package ships types. Import them alongside the runtime exports:
+
+```ts
+import { AiChat, openAIAdapter } from 'ai-chat-element';
+import type {
+  ChatMessage,
+  ChatTransport,
+  StreamChunk,
+  Role,
+  ChatLabels,
+} from 'ai-chat-element';
+
+const labels: Partial<ChatLabels> = { assistantName: 'Acme Assistant' };
+const transport: ChatTransport = openAIAdapter({ model: 'gpt-4o-mini', apiKey: '…' });
+```
+
+Adapter option types (`OpenAIAdapterOptions`, `AnthropicAdapterOptions`) are
+exported too, from either entry point.
+
+For JSX (React), declare the tag once:
 
 ```ts
 declare namespace JSX {

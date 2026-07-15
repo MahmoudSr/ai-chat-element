@@ -4,6 +4,15 @@ All notable changes to `ai-chat-element` are documented here. This project
 adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+
+- **`ChatLabels` was not exported** from the package entry point, so TypeScript
+  consumers couldn't import it to type their `labels` / i18n object — even though
+  it was documented as a public type. It is now exported alongside the other
+  types (runtime behaviour is unchanged).
+
 ## [0.1.1] - 2026-07-14
 
 Bug-fix release. All fixes were found by end-to-end browser testing against the
