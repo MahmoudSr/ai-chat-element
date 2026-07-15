@@ -1,0 +1,61 @@
+name: Deploy playground
+
+# Publishes the examples to GitHub Pages:
+# https://mahmoudsr.github.io/ai-chat-element/
+#
+# The playground imports src/ directly, so it has to be built (vite.config.site.ts)
+# rather than served as-is. Pages then hosts the static output.
+
+on:
+  push:
+    branches: [main]
+  # Lets you re-deploy by hand from the Actions tab without an empty commit.
+  workflow_dispatch:
+
+# Needed by the Pages deploy action: id-token proves the build's identity.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time. Don't cancel a running one — a half-finished deploy
+# would leave the live site broken.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Gate the deploy on the suite: a broken playground is worse than a stale
+      # one, and this is the same browser the tests expect.
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+
+      - run: npm run build:site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist-site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
