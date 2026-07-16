@@ -196,6 +196,10 @@ Colors: `--ai-chat-bg` (#fff), `--ai-chat-fg` (#1a1a1a), `--ai-chat-muted`
 (#1a1a1a), `--ai-chat-code-bg` (#0d1117), `--ai-chat-code-fg` (#e6edf3),
 `--ai-chat-error` (#dc2626). Dark mode auto-swaps bg/fg/muted/border/assistant-*.
 
+Keyboard focus ring (`:focus-visible` only, subtle by default):
+`--ai-chat-focus-color` (softened accent), `--ai-chat-focus-width` (2px, 0 removes),
+`--ai-chat-focus-offset` (2px).
+
 Borders (0 removes): `--ai-chat-border-width` (1px), `--ai-chat-input-border-width`,
 `--ai-chat-composer-border-width` (0), `--ai-chat-header-border-width`,
 `--ai-chat-code-border-width`, `--ai-chat-table-border-width`.

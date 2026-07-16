@@ -109,6 +109,13 @@ export const CONTROLS = [
   { g: 'Borders', kind: 'var', key: '--ai-chat-code-border-width', type: 'range', def: 1, min: 0, max: 4, fmt: px, label: 'code-border-width' },
   { g: 'Borders', kind: 'var', key: '--ai-chat-table-border-width', type: 'range', def: 1, min: 0, max: 4, fmt: px, label: 'table-border-width' },
 
+  // ---------- Focus ring ----------
+  { g: 'Focus ring', kind: 'var', key: '--ai-chat-focus-color', type: 'text', def: 'color-mix(in srgb, var(--ai-chat-accent) 55%, transparent)', label: 'focus-color',
+    hint: 'Keyboard focus ring (:focus-visible only). Defaults to a softened accent — try a solid color or a different alpha.' },
+  { g: 'Focus ring', kind: 'var', key: '--ai-chat-focus-width', type: 'range', def: 2, min: 0, max: 6, fmt: px, label: 'focus-width',
+    hint: '0 removes the ring (not recommended — it is an accessibility affordance).' },
+  { g: 'Focus ring', kind: 'var', key: '--ai-chat-focus-offset', type: 'range', def: 2, min: 0, max: 6, fmt: px, label: 'focus-offset' },
+
   // ---------- Type & size ----------
   { g: 'Type & size', kind: 'var', key: '--ai-chat-font', type: 'text', def: '', label: 'font',
     hint: 'e.g. Georgia, serif — blank uses the system stack.' },

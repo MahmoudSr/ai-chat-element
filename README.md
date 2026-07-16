@@ -4,15 +4,17 @@ A reusable, framework-agnostic **AI chat UI** as a Web Component. Drop `<ai-chat
 
 ### ▶︎ [Try it in the playground](https://mahmoudsr.github.io/ai-chat-element/examples/playground.html)
 
-Every attribute, all 51 CSS variables, every label and slot — live. Pick a preset,
+Every attribute, all 54 CSS variables, every label and slot — live. Pick a preset,
 tweak it, and copy the generated code straight into your app.
 
-- 🎨 **Customizable to the corner** — **51 CSS variables, every one documented**; nothing is hardcoded. One line rebrands it (`--ai-chat-accent`); one knob rounds it (`--ai-chat-radius`); every surface has its own override when you need it.
+- 🎨 **Customizable to the corner** — **54 CSS variables, every one documented**; nothing is hardcoded. One line rebrands it (`--ai-chat-accent`); one knob rounds it (`--ai-chat-radius`); every surface has its own override when you need it.
 - 🔌 **Pluggable transport** — built-in adapters for OpenAI-compatible & Anthropic APIs, or bring your own backend
 - 🌊 **Streaming** token-by-token with a stop button and jump-to-latest
 - 📝 **Markdown + syntax-highlighted code** with copy buttons
 - 🧩 **Yours to shape** — 14 slots, 30 `::part()` hooks, sender names, timestamps, avatars, and every string (i18n-ready). No emoji by default.
-- ♿ **Accessible** — ARIA live region, keyboard support, respects reduced-motion
+- ♿ **Accessible** — polite screen-reader announcement of each settled reply
+  (no token-by-token spam), a keyboard focus ring, focus that never gets dropped,
+  full keyboard support, and respects `prefers-reduced-motion`
 - 📦 **~80 KB gzipped**, zero peer dependencies
 
 ---
@@ -260,7 +262,7 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | Attribute          | Type                        | Default | Description                                                                       |
 | ------------------ | --------------------------- | ------- | --------------------------------------------------------------------------------- |
 | `theme`            | `auto` \| `light` \| `dark` | `auto`  | Color mode; `auto` follows the OS.                                                |
-| `placeholder`      | string                      | —       | Input placeholder text.                                                           |
+| `placeholder`      | string                      | `Send a message…` | Input placeholder text.                                                 |
 | `empty-heading`    | string                      | —       | Heading shown when there are no messages.                                         |
 | `empty-body`       | string                      | —       | Secondary line under the empty heading.                                           |
 | `show-names`       | boolean                     | `true`  | Show the sender name above each message.                                          |
@@ -592,6 +594,15 @@ Dark mode swaps `bg`, `fg`, `muted`, `border`, `assistant-bg`, `assistant-fg`
 automatically (via `theme` / the OS). Override those same vars under
 `ai-chat[theme="dark"]` to customize the dark palette.
 
+**Keyboard focus ring** — shown only for keyboard focus (`:focus-visible`),
+never on a mouse click. Subtle by default; tune it to taste.
+
+| Variable                  | Default                     | Controls                                   |
+| ------------------------- | --------------------------- | ------------------------------------------ |
+| `--ai-chat-focus-color`   | `= accent, softened to 55%` | Ring color on every focusable control      |
+| `--ai-chat-focus-width`   | `2px`                       | Ring thickness (`0` removes it)            |
+| `--ai-chat-focus-offset`  | `2px`                       | Gap between the control and the ring        |
+
 **Borders** (set any to `0` to remove)
 
 | Variable                          | Default          | Controls                          |
@@ -645,7 +656,7 @@ automatically (via `theme` / the OS). Override those same vars under
 
 | Variable                     | Default          | Controls                |
 | ---------------------------- | ---------------- | ----------------------- |
-| `--ai-chat-bubble-padding`   | `4px 14px`       | Inside message bubbles  |
+| `--ai-chat-bubble-padding`   | `6px 14px`       | Inside message bubbles  |
 | `--ai-chat-input-padding`    | `8px 14px 2px`   | Inside the textarea     |
 | `--ai-chat-messages-padding` | `20px 16px`      | Around the message list |
 | `--ai-chat-composer-padding` | `12px 16px 16px` | Around the composer     |

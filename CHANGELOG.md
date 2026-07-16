@@ -6,6 +6,65 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-16
+
+Bug-fix + accessibility release. No breaking changes; all additive or corrective.
+
+### Added
+
+- **Keyboard focus ring.** Every interactive control (send/stop, retry, new-chat,
+  clear, jump, code-copy, composer) now shows a visible ring on keyboard focus
+  (`:focus-visible` only — never on a mouse click), fixing an invisible-focus
+  WCAG 2.4.7 gap. It's deliberately subtle by default (a thin, softened-accent
+  ring) and fully customizable via three new CSS variables:
+  `--ai-chat-focus-color`, `--ai-chat-focus-width` (`0` removes it), and
+  `--ai-chat-focus-offset`. Documented in both docs; brings the total to 54 vars.
+
+### Changed
+
+- `--ai-chat-bubble-padding` default `4px 14px` → `6px 14px` (a little more
+  breathing room in bubbles).
+
+### Fixed
+
+- **SSE parser dropped the last event when a stream closed without a trailing
+  blank line.** The read loop only emitted an event once it saw the separating
+  blank line, so a server/proxy that closed right after the final event — the
+  common case for Ollama's OpenAI-compat shim and its `data: [DONE]` line — lost
+  the last token(s) or the `[DONE]` sentinel, cutting responses short. The parser
+  now flushes any trailing buffer as a final event at stream end.
+- **Multi-byte characters split across the last two network chunks were lost.**
+  The `TextDecoder` was never flushed, so trailing bytes of an emoji/CJK/accented
+  character buffered at the split point vanished when the stream ended. Now flushed.
+- **Multiple `data:` lines in one SSE event are concatenated with `\n`** per the
+  spec, instead of being parsed as separate (and, for split JSON, invalid) lines.
+  No effect on OpenAI/Anthropic (single-line data today); hardens "any compatible
+  server".
+- **Failed requests now surface the provider's actual error message** instead of
+  a raw JSON envelope truncated mid-token. A 401 that used to read
+  `Request failed: 401 Unauthorized – {"error":{"message":"Incorrect API ke`
+  now reads `Request failed (401 Unauthorized): Incorrect API key provided.`
+  The error parser (new shared `adapters/errors.ts`) understands the
+  `{ error: { message } }`, flattened `{ error }`, and top-level `{ message }`
+  shapes, and falls back to a cleanly ellipsised body for anything else.
+- **The jump-to-latest scroll now honors `prefers-reduced-motion`.** It used
+  `scrollTo({behavior:'smooth'})`, which ignores the CSS `scroll-behavior: auto`
+  reduced-motion override, so users who asked for reduced motion still got an
+  animated scroll (WCAG 2.3.3). The behavior is now gated on the media query in JS.
+- **Keyboard focus is no longer dropped when a focused control disappears.**
+  Retry (removes the failed message), Stop (swaps Stop→Send), New-chat/clear
+  (empties the view), and a click on Send (swaps Send→Stop) all destroyed the
+  element under focus, leaving focus on `<body>`. Focus now returns to the
+  composer input in each case — but only when focus was already inside the
+  widget, so a programmatic `clear()` from elsewhere on the page never yanks
+  focus in.
+- **Streaming no longer spams the screen reader.** The message list was a
+  `role="log"` with `aria-live="polite"`, so every streamed token re-announced
+  the growing partial reply token-by-token — an unusable firehose. The log is no
+  longer a live region; instead a single visually-hidden `role="status"` region
+  announces the settled reply (or the error / empty-response note) ONCE per turn,
+  after streaming completes.
+
 ## [0.1.3] - 2026-07-15
 
 **Critical fix. Every earlier version (0.1.0, 0.1.1, 0.1.2) is broken for any
@@ -147,5 +206,9 @@ Initial public release.
 - Accessibility: ARIA live region, keyboard support, reduced-motion.
 - Licensed under MPL-2.0.
 
+[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.3...v0.1.5
+[0.1.3]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/MahmoudSr/ai-chat-element/releases/tag/v0.1.0

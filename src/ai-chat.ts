@@ -151,6 +151,14 @@ export class AiChat extends LitElement {
   @state() private _input = '';
   /** Shown when the user has scrolled up away from the latest message. */
   @state() private _showJump = false;
+  /**
+   * Text pushed to a visually-hidden aria-live region so screen readers hear the
+   * assistant's reply ONCE, when it settles — not token-by-token. The message
+   * list itself is a `role="log"` WITHOUT aria-live: a polite live region
+   * re-announces on every mutation, so streaming deltas would spam a growing
+   * partial message on each token. See `_announce()` / `_renderLiveRegion()`.
+   */
+  @state() private _announcement = '';
 
   private _abort?: AbortController;
   /**
@@ -183,6 +191,7 @@ export class AiChat extends LitElement {
   /** Clear the conversation and cancel any in-flight generation. Also clears any
    *  half-typed draft in the composer so a new chat starts truly empty. */
   clear(): void {
+    const hadFocus = this._focusIsInside();
     this.stop();
     this.messages = [];
     this._input = '';
@@ -190,6 +199,33 @@ export class AiChat extends LitElement {
       this._textarea.style.height = 'auto';
       this._textarea.style.overflowY = 'hidden';
     }
+    // The New-chat button that triggered this may have just been removed from
+    // the DOM (it lives in the header/sidebar); if focus was in the widget, move
+    // it to the composer so keyboard users aren't dropped onto <body>.
+    if (hadFocus) this._focusComposer();
+  }
+
+  /**
+   * True when keyboard focus currently sits inside this widget — either on a
+   * control in our shadow DOM, or on the host itself. Used to decide whether an
+   * action that removes the focused element (retry, stop, clear) should relocate
+   * focus: we only do so when we actually own focus, never yanking it from
+   * elsewhere on the page when a consumer calls these methods programmatically.
+   */
+  private _focusIsInside(): boolean {
+    return (
+      this.shadowRoot?.activeElement != null ||
+      document.activeElement === this
+    );
+  }
+
+  /** Move focus to the composer input (the natural resting place after an
+   *  action removes the previously focused control). No-op when disabled. */
+  private _focusComposer(): void {
+    if (this.disabled) return;
+    // Wait for the render that removes the old control / shows the new composer
+    // state so the textarea exists and is focusable when we call focus().
+    void this.updateComplete.then(() => this._textarea?.focus());
   }
 
   /**
@@ -210,19 +246,28 @@ export class AiChat extends LitElement {
       }
     }
     if (lastUser === -1) return false;
+    // The Retry button that triggered this is inside the failed message we're
+    // about to remove; if focus was on it, relocate to the composer so it isn't
+    // dropped onto <body> when the message is discarded.
+    const hadFocus = this._focusIsInside();
     const content = this.messages[lastUser].content;
     this.messages = this.messages.slice(0, lastUser);
+    if (hadFocus) this._focusComposer();
     return this.send(content);
   }
 
   /** Cancel any in-flight generation. */
   stop(): void {
+    // The Stop button is about to be replaced by the Send button; if focus was
+    // on it, move it to the composer so keyboard users keep their place.
+    const hadFocus = this._focusIsInside();
     this._abort?.abort();
     this._abort = undefined;
     this._busy = false;
     this.messages = this.messages.map((m) =>
       m.streaming ? { ...m, streaming: false } : m,
     );
+    if (hadFocus) this._focusComposer();
   }
 
   /**
@@ -322,6 +367,17 @@ export class AiChat extends LitElement {
         this._busy = false;
         this._abort = undefined;
         const final = this.messages.find((m) => m.id === assistant.id);
+        // Announce the settled turn to screen readers ONCE (not per token). All
+        // three terminal states get a spoken result: the reply text, the error,
+        // or the empty-response note. Uses the (overridable) labels for the
+        // non-content cases so it's translatable.
+        if (final?.error) {
+          this._announce(final.error);
+        } else if (final && !final.content) {
+          this._announce(this._labels.emptyResponse);
+        } else if (final) {
+          this._announce(final.content);
+        }
         // Only announce a completed turn when it actually produced content.
         // Skipping empties (and errors) keeps consumers who persist on
         // `ai-chat:message` from saving blank ghost turns to their history.
@@ -337,6 +393,19 @@ export class AiChat extends LitElement {
       }
     }
     return true;
+  }
+
+  /**
+   * Announce text via the visually-hidden aria-live region. Clears first, then
+   * sets on the next microtask, so two identical consecutive replies still each
+   * trigger an announcement (a live region ignores an unchanged text node).
+   */
+  private _announce(text: string): void {
+    if (!text) return;
+    this._announcement = '';
+    void this.updateComplete.then(() => {
+      this._announcement = text;
+    });
   }
 
   private _patch(id: string, fn: (m: ChatMessage) => ChatMessage): void {
@@ -370,6 +439,10 @@ export class AiChat extends LitElement {
       this._textarea.style.overflowY = 'hidden';
     }
     void this.send(text);
+    // Keep focus in the composer. On Enter it's already there, but a *click* on
+    // the Send button moved focus onto it — and it's immediately swapped for the
+    // Stop button, so focus would be lost. Return it to the input either way.
+    this._focusComposer();
   }
 
   override connectedCallback(): void {
@@ -511,10 +584,16 @@ export class AiChat extends LitElement {
   private _scrollToBottom(smooth = false): void {
     const el = this._scrollEl;
     if (!el) return;
+    // scrollTo({behavior:'smooth'}) ignores the CSS `scroll-behavior: auto`
+    // override, so honor prefers-reduced-motion here in JS or reduced-motion
+    // users still get an animated scroll (WCAG 2.3.3).
+    const reduce =
+      typeof matchMedia === 'function' &&
+      matchMedia('(prefers-reduced-motion: reduce)').matches;
     requestAnimationFrame(() => {
       el.scrollTo({
         top: el.scrollHeight,
-        behavior: smooth ? 'smooth' : 'auto',
+        behavior: smooth && !reduce ? 'smooth' : 'auto',
       });
       // Sync the baseline so our own downward scroll isn't later misread as the
       // user scrolling up.
@@ -552,9 +631,13 @@ export class AiChat extends LitElement {
         <div class="root" part="root">
           ${this._renderHeader()}
           <div class="scroll-region">
+            <!-- role="log" gives the list structure/navigation, but NO aria-live:
+                 a polite live region re-announces on every mutation, so streaming
+                 deltas would spam a growing partial message token-by-token. The
+                 settled reply is announced once via the hidden region below. -->
             <div class="messages" part="messages"
                  @click=${this._onMessagesClick} @scroll=${this._onScroll}
-                 role="log" aria-live="polite" aria-label=${this._labels.messagesRegion}>
+                 role="log" aria-label=${this._labels.messagesRegion}>
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
               <!-- Bottom sentinel watched by the IntersectionObserver to decide
                    whether we're pinned to the bottom (see firstUpdated). Only
@@ -562,6 +645,12 @@ export class AiChat extends LitElement {
                    plus a trailing sentinel would otherwise overflow and show a
                    scrollbar on an empty chat. -->
               ${hasMessages ? html`<div class="scroll-sentinel" aria-hidden="true"></div>` : nothing}
+            </div>
+            <!-- The single polite live region: screen readers hear the settled
+                 assistant reply (or error / empty note) ONCE per turn from here,
+                 never the streaming partials. Visually hidden. -->
+            <div class="sr-live" role="status" aria-live="polite" aria-atomic="true">
+              ${this._announcement}
             </div>
             ${
               this._showJump

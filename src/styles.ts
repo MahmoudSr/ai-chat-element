@@ -27,6 +27,18 @@ export const chatStyles = css`
     --ai-chat-code-fg: #e6edf3;
     --ai-chat-error: #dc2626;
 
+    /* ---- Keyboard focus ring ----
+       Shown only for keyboard focus (:focus-visible), never on mouse click, so
+       pointer users see nothing. Deliberately subtle by default: a thin ring in
+       a softened accent. Customize any of these — e.g. a bolder ring is just
+       --ai-chat-focus-width: 3px, a different hue is --ai-chat-focus-color, and
+       --ai-chat-focus-offset: 0 tucks it flush against the control. Set the
+       width to 0 to remove the ring entirely (not recommended — it's an
+       accessibility affordance). */
+    --ai-chat-focus-color: color-mix(in srgb, var(--ai-chat-accent) 55%, transparent);
+    --ai-chat-focus-width: 2px;
+    --ai-chat-focus-offset: 2px;
+
     /* ---- Borders ----
        Set any of these to 0 to remove that border entirely. The generic
        --ai-chat-border-width drives all of them; override the specific ones for
@@ -64,7 +76,7 @@ export const chatStyles = css`
 
     /* ---- Sizing knobs ---- */
     --ai-chat-avatar-size: 32px;
-    --ai-chat-bubble-padding: 4px 14px;
+    --ai-chat-bubble-padding: 6px 14px;
     --ai-chat-input-padding: 8px 14px 2px;
     /* How tall the input grows before it starts scrolling internally. */
     --ai-chat-input-max-height: 200px;
@@ -443,6 +455,19 @@ export const chatStyles = css`
   }
   .plain { white-space: pre-wrap; }
 
+  /* Visually-hidden but screen-reader-audible live region (the standard sr-only
+     clip pattern). Carries the settled assistant reply for a single polite
+     announcement per turn — see the note on .messages in the render. */
+  .sr-live {
+    position: absolute;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0; border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
   /* Invisible marker at the very bottom of the message list. An
      IntersectionObserver watches it to know if the user is at the bottom (so we
      keep auto-following the stream) vs. scrolled up (so we don't). The small
@@ -675,6 +700,27 @@ export const chatStyles = css`
   .btn--send:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn--stop { background: var(--ai-chat-fg); color: var(--ai-chat-bg); }
   .btn__square { width: 12px; height: 12px; border-radius: 3px; background: currentColor; }
+
+  /* ---- Keyboard focus ring ----
+     One subtle, customizable ring for every interactive control. :focus-visible
+     means keyboard focus only — a mouse click shows nothing. outline (not
+     box-shadow) is used on purpose: it isn't clipped by the ancestor
+     overflow:hidden on :host / .code-block, so the ring stays whole on the copy
+     button and the edge controls. All three knobs are consumer-overridable. */
+  .btn:focus-visible,
+  .clear-btn:focus-visible,
+  .new-chat-btn:focus-visible,
+  .retry-btn:focus-visible,
+  .jump:focus-visible,
+  .code-block__copy:focus-visible,
+  .composer__box:focus-within {
+    outline: var(--ai-chat-focus-width) solid var(--ai-chat-focus-color);
+    outline-offset: var(--ai-chat-focus-offset);
+  }
+  /* The composer box already tints its border on focus; keep that, and only add
+     the ring for keyboard users so a mouse click into the input stays clean. */
+  .composer__box:focus-within:not(:has(:focus-visible)) { outline: none; }
+
   .icon { display: block; }
   /* Slotted custom icons/avatars fill their box nicely. */
   ::slotted(svg), ::slotted(img) { display: block; max-width: 100%; }

@@ -1,5 +1,6 @@
 import type { ChatMessage, ChatTransport, StreamChunk } from '../types.js';
 import { parseSSE } from './sse.js';
+import { httpError, toMessage } from './errors.js';
 
 export interface OpenAIAdapterOptions {
   /** API key. WARNING: exposing a key in the browser is insecure — prefer a proxy. */
@@ -88,19 +89,4 @@ export function openAIAdapter(options: OpenAIAdapterOptions): ChatTransport {
       }
     },
   };
-}
-
-function toMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-async function httpError(response: Response): Promise<string> {
-  let detail = '';
-  try {
-    const body = await response.text();
-    detail = body ? ` – ${body.slice(0, 300)}` : '';
-  } catch {
-    /* ignore */
-  }
-  return `Request failed: ${response.status} ${response.statusText}${detail}`;
 }
