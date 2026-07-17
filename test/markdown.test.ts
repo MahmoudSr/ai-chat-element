@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderMarkdown } from '../src/markdown.ts';
+import { renderMarkdown } from '../src/markdown/markdown.ts';
 
 /**
  * Sanitization. This is the one area where a bug is a security hole rather than

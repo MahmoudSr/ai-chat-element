@@ -4,9 +4,9 @@ import { repeat } from 'lit/directives/repeat.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { classMap } from 'lit/directives/class-map.js';
 import type { ChatMessage, ChatTransport, Role } from './types.js';
-import { renderMarkdown } from './markdown.js';
+import { renderMarkdown } from './markdown/markdown.js';
 import { chatStyles } from './styles.js';
-import { hljsTheme } from './hljs-theme.js';
+import { hljsTheme } from './markdown/hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
 import {
   chevronDownIcon,
