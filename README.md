@@ -262,9 +262,9 @@ chat.transport = anthropicAdapter({
 });
 ```
 
-### Custom backend (recommended for production) 🔒
+### Custom backend
 
-**The safe pattern: your server holds the API key** and streams plain text back;
+🔒 **Recommended for production.** **The safe pattern: your server holds the API key** and streams plain text back;
 the component just renders it. The browser never sees the key, so it can't be
 stolen from your shipped JavaScript.
 
