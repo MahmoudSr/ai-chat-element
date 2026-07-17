@@ -68,6 +68,15 @@ export function controllable() {
     transport,
     delta: (t: string) => push({ type: 'delta', delta: t }),
     close,
+    /**
+     * Finish the stream with an explicit `done` chunk carrying stop-reason /
+     * usage metadata (then end). Use when a test needs the settled turn to
+     * carry `finishReason` / `usage`, e.g. surfacing them on `ai-chat:message`.
+     */
+    finish: (meta: Omit<Extract<StreamChunk, { type: 'done' }>, 'type'>) => {
+      push({ type: 'done', ...meta });
+      close();
+    },
     fail,
     get started() { return started; },
   };

@@ -6,6 +6,47 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Finish reason & token usage on completed turns.** A settled assistant
+  message now carries two new optional fields — `finishReason` and `usage` —
+  which flow out on `ai-chat:message`, letting consumers detect a reply truncated
+  at the token limit, a safety refusal, or show token cost. Both are normalized
+  across providers:
+  - `finishReason: FinishReason` — one vocabulary regardless of backend:
+    `'stop'` | `'length'` (truncated) | `'content_filter'` | `'tool_calls'` |
+    `'other'`. The provider's raw string is preserved on the transport's `done`
+    chunk as `rawFinishReason`.
+  - `usage: TokenUsage` — `{ inputTokens?, outputTokens? }`, populated when the
+    provider reports them.
+
+  The OpenAI adapter now sends `stream_options: { include_usage: true }` so the
+  provider emits a trailing usage chunk (consumers pass nothing); the Anthropic
+  adapter reads `message_start` (input tokens) and `message_delta` (stop reason +
+  output tokens). Providers/servers that don't report this metadata (e.g. some
+  Ollama builds) simply leave the fields `undefined`. New exported types
+  `FinishReason` and `TokenUsage`; the `StreamChunk` `done` variant gained
+  optional `finishReason` / `rawFinishReason` / `usage`. Additive — existing
+  transports and consumers are unaffected. Verified with red-on-old-code tests
+  for both adapters and the component (75 tests total, up from 67).
+
+### Documentation
+
+- **React / Next.js docs corrected and expanded.** The JSX shim now augments
+  `React.JSX.IntrinsicElements` (typed, not `any`); documented that custom events
+  (`ai-chat:message` etc.) use `addEventListener`, not `onXxx` props; and added an
+  **SSR warning** — importing the package calls `customElements.define`, which
+  crashes on the server, so Next.js needs `'use client'` + `dynamic(…, { ssr:false })`.
+  Fleshed out the Vue (`isCustomElement`) and Angular (`CUSTOM_ELEMENTS_SCHEMA`
+  placement) notes.
+- **Documented the per-role message parts** `message-user` / `message-assistant` /
+  `message-system` (already rendered, previously undocumented), so one side can be
+  styled without a `[data-role]` selector.
+- **Documented imperative-API return types and event payloads** — `send()` /
+  `retry()` return `Promise<boolean>`, `addMessage()` returns the created
+  `ChatMessage` without sending, and `ai-chat:new-chat` is cancelable — as tables
+  in both docs.
+
 ## [0.1.5] - 2026-07-16
 
 Bug-fix + accessibility release. No breaking changes; all additive or corrective.

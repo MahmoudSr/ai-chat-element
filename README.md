@@ -108,19 +108,31 @@ server-backed pattern above. See [Transports](#transports).
 
 ### React
 
+Three things trip people up in React, all shown below: you set **properties**
+(like `transport`) in an effect (they're objects, not attributes); you subscribe
+to the **custom events** with `addEventListener` (their names contain colons —
+`ai-chat:message` — so they can't be `onXxx` props); and on **SSR frameworks**
+(Next.js) the import must not run on the server (see the SSR note after this).
+
 ```tsx
+'use client'; // Next.js app-router: this component must be client-only
 import 'ai-chat-element';
 import { functionAdapter } from 'ai-chat-element';
+import type { AiChat } from 'ai-chat-element';
 import { useEffect, useRef } from 'react';
 
 export function Chat() {
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<AiChat>(null);
+
   useEffect(() => {
-    // Properties (transport) must be set in JS, not as attributes.
-    // Talk to your own /api/chat route so the API key stays on the server.
-    (ref.current as any).transport = functionAdapter(async function* (messages, signal) {
+    const el = ref.current;
+    if (!el) return;
+
+    // 1. Properties (transport) are set in JS, not as attributes.
+    //    Talk to your own /api/chat route so the API key stays on the server.
+    el.transport = functionAdapter(async function* (messages, signal) {
       const res = await fetch('/api/chat', { method: 'POST', signal, body: JSON.stringify(messages) });
-      const reader = res.body.getReader();
+      const reader = res.body!.getReader();
       const decoder = new TextDecoder();
       for (;;) {
         const { done, value } = await reader.read();
@@ -128,18 +140,46 @@ export function Chat() {
         yield decoder.decode(value);
       }
     });
+
+    // 2. Custom events use addEventListener (they aren't onXxx props).
+    const onMessage = (e: Event) =>
+      console.log((e as CustomEvent).detail.message);
+    el.addEventListener('ai-chat:message', onMessage);
+    return () => el.removeEventListener('ai-chat:message', onMessage);
   }, []);
+
   return <ai-chat ref={ref} theme="dark" />;
 }
 ```
 
-> In React < 19, add a type shim so `<ai-chat>` is recognized — see [TypeScript](#typescript).
+For `<ai-chat>` to typecheck in JSX, augment `React.JSX` once (see
+[TypeScript](#typescript) for the full snippet).
+
+> **Next.js / SSR — read this.** Importing `'ai-chat-element'` calls
+> `customElements.define`, which only exists in the browser — importing it on the
+> server throws. Keep it client-only: put `'use client'` at the top of the file
+> **and**, in the pages router (or any component that might be server-rendered),
+> load it dynamically with SSR disabled:
+>
+> ```tsx
+> import dynamic from 'next/dynamic';
+> const Chat = dynamic(() => import('./Chat'), { ssr: false });
+> ```
 
 ### Vue
 
+Tell the Vue compiler that `<ai-chat>` is a custom element (otherwise it warns
+and tries to resolve it as a Vue component). In `vite.config.ts`:
+
+```ts
+vue({ template: { compilerOptions: { isCustomElement: (tag) => tag === 'ai-chat' } } });
+```
+
+Then:
+
 ```vue
 <template>
-  <ai-chat ref="chat" theme="auto" />
+  <ai-chat ref="chat" theme="auto" @ai-chat:message="onMessage" />
 </template>
 
 <script setup>
@@ -151,24 +191,33 @@ const chat = ref(null);
 onMounted(() => {
   chat.value.transport = openAIAdapter({ apiKey: '…', model: 'gpt-4o-mini' });
 });
+const onMessage = (e) => console.log(e.detail.message);
 </script>
 ```
 
 ### Angular
 
-Add `CUSTOM_ELEMENTS_SCHEMA` to your module, then:
+Add `CUSTOM_ELEMENTS_SCHEMA` where the template lives — the standalone component
+itself (or the `NgModule` that declares it), not `main.ts`:
 
 ```ts
 import 'ai-chat-element';
 import { openAIAdapter } from 'ai-chat-element';
+import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 
-@Component({ template: `<ai-chat #chat theme="light"></ai-chat>` })
+@Component({
+  standalone: true,
+  schemas: [CUSTOM_ELEMENTS_SCHEMA], // <- required so Angular allows <ai-chat>
+  // Custom events (colon names) bind fine in the template:
+  template: `<ai-chat #chat theme="light" (ai-chat:message)="onMessage($event)"></ai-chat>`,
+})
 export class ChatComponent implements AfterViewInit {
   @ViewChild('chat') chat!: ElementRef;
   ngAfterViewInit() {
     this.chat.nativeElement.transport =
       openAIAdapter({ apiKey: '…', model: 'gpt-4o-mini' });
   }
+  onMessage(e: Event) { console.log((e as CustomEvent).detail.message); }
 }
 ```
 
@@ -286,9 +335,24 @@ Set via JS only (they hold objects/arrays):
 | `.messages`  | `ChatMessage[]`       | The conversation (read or seed it).                |
 | `.labels`    | `Partial<ChatLabels>` | Override any UI/accessibility strings (see below). |
 
-**Methods:** `send(text)`, `stop()`, `clear()`, `retry()`, `addMessage(role, content)`.
+**Methods:**
 
-**Events:** `ai-chat:submit`, `ai-chat:message`, `ai-chat:error`, `ai-chat:new-chat`.
+| Method                    | Returns              | Notes                                                          |
+| ------------------------- | -------------------- | -------------------------------------------------------------- |
+| `send(text)`              | `Promise<boolean>`   | Sends a user turn and streams the reply. Resolves `true` when the turn ran, `false` if it was a no-op (empty text, or no transport set). Resolves only **after** the stream settles. |
+| `retry()`                 | `Promise<boolean>`   | Re-sends the last user turn (e.g. after an error). Same resolution semantics as `send`. |
+| `addMessage(role, content)` | `ChatMessage`      | Appends a message to `.messages` **without** sending it — returns the created message (with its generated `id`). Use it to seed history. |
+| `stop()`                  | `void`               | Aborts the in-flight stream, if any.                           |
+| `clear()`                 | `void`               | Empties the conversation and the composer draft (also calls `stop()`). |
+
+**Events** (all `bubbles: true, composed: true`; read `e.detail`):
+
+| Event             | `detail`                    | When / notes                                                        |
+| ----------------- | --------------------------- | ------------------------------------------------------------------- |
+| `ai-chat:submit`  | `{ content: string }`       | Fires when the user sends, before the request goes out.             |
+| `ai-chat:message` | `{ message: ChatMessage }`  | Once per completed reply — **only when it has content** (empty/failed turns don't fire). The `message` carries `finishReason` / `usage` when reported. |
+| `ai-chat:error`   | `{ error: string }`         | Transport failure; `error` is a human-readable message.             |
+| `ai-chat:new-chat`| `{ messages: ChatMessage[] }` | Fires when the New-chat button is clicked, **before** clearing. **Cancelable** — call `e.preventDefault()` to keep the current conversation. `messages` is the conversation about to be cleared. |
 
 `ai-chat:message` fires once per completed assistant turn — but **only when the
 reply has content**. Empty responses and failed turns don't fire it, so if you
@@ -297,6 +361,41 @@ persist on this event you won't save blank/ghost messages.
 ```js
 chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
 ```
+
+### Finish reason & token usage
+
+When the transport reports them, the settled message carries two optional
+fields — surfaced identically for OpenAI and Anthropic, so you write one check
+regardless of backend:
+
+| Field                  | Type          | Notes                                                        |
+| ---------------------- | ------------- | ------------------------------------------------------------ |
+| `message.finishReason` | `FinishReason`| Why generation stopped, normalized (see below).              |
+| `message.usage`        | `TokenUsage`  | `{ inputTokens?, outputTokens? }` when the provider sends them.|
+
+`FinishReason` is one normalized vocabulary across providers:
+`'stop'` (finished naturally), `'length'` (**truncated at the token limit**),
+`'content_filter'` (blocked by safety), `'tool_calls'` (stopped to call a tool),
+or `'other'`. Both fields are optional — a provider or local server that doesn't
+report them (e.g. some Ollama builds) simply leaves them `undefined`.
+
+```js
+chat.addEventListener('ai-chat:message', (e) => {
+  const { content, finishReason, usage } = e.detail.message;
+  if (finishReason === 'length') showBanner('Reply was cut off — hit continue.');
+  if (usage) console.log(`${usage.inputTokens} in / ${usage.outputTokens} out`);
+});
+```
+
+Building a **custom transport**? Attach the same metadata to your `done` chunk
+and it flows through unchanged:
+
+```js
+yield { type: 'done', finishReason: 'stop', usage: { inputTokens: 12, outputTokens: 34 } };
+```
+
+The OpenAI adapter opts into usage reporting for you (it sends
+`stream_options: { include_usage: true }`); you don't pass anything.
 
 ---
 
@@ -676,11 +775,20 @@ For styling that a variable can't reach, target the shadow parts with
 `ai-chat::part(name) { … }`:
 
 `layout`, `root`, `aside`, `aside-list`, `header`, `header-slot`, `header-title`,
-`clear-button`, `messages`, `message`, `bubble`, `avatar`, `meta`, `name`,
-`time`, `composer`, `composer-box`, `composer-actions`, `composer-actions-start`,
+`clear-button`, `messages`, `message`, `message-user`, `message-assistant`,
+`message-system`, `bubble`, `avatar`, `meta`, `name`, `time`, `composer`,
+`composer-box`, `composer-actions`, `composer-actions-start`,
 `composer-actions-end`, `input`, `send-button`, `stop-button`, `jump-button`,
 `retry-button`, `empty`, `empty-icon`, `empty-heading`, `empty-body`, `error`,
 `empty-response`.
+
+Every message row carries `message` **and** a per-role part, so you can style one
+side without a `[data-role]` selector:
+
+```css
+ai-chat::part(message-user) { text-align: right; }
+ai-chat::part(message-assistant) { opacity: 0.95; }
+```
 
 `header` is the built-in bar; `header-slot` is the wrapper around it that also
 holds your `header` slot content. When you fill that slot, the wrapper keeps the
@@ -717,6 +825,8 @@ import type {
   ChatTransport,
   StreamChunk,
   Role,
+  FinishReason,
+  TokenUsage,
   ChatLabels,
 } from 'ai-chat-element';
 
@@ -727,15 +837,33 @@ const transport: ChatTransport = openAIAdapter({ model: 'gpt-4o-mini', apiKey: '
 Adapter option types (`OpenAIAdapterOptions`, `AnthropicAdapterOptions`) are
 exported too, from either entry point.
 
-For JSX (React), declare the tag once:
+For JSX (React), augment `React.JSX` once so `<ai-chat>` typechecks with its
+attributes and a `ref` to the real element type:
 
 ```ts
-declare namespace JSX {
-  interface IntrinsicElements {
-    'ai-chat': any;
+import type { AiChat } from 'ai-chat-element';
+import type { DetailedHTMLProps, HTMLAttributes } from 'react';
+
+declare module 'react' {
+  namespace JSX {
+    interface IntrinsicElements {
+      'ai-chat': DetailedHTMLProps<HTMLAttributes<AiChat>, AiChat> & {
+        theme?: 'auto' | 'light' | 'dark';
+        placeholder?: string;
+        'show-header'?: boolean;
+        // …other attributes as needed; unknowns still work at runtime.
+      };
+    }
   }
 }
 ```
+
+> Older setups may expect the pre-React-19 global form
+> (`declare global { namespace JSX { … } }`). Target whichever `JSX` namespace
+> your React version resolves — the modern one lives under `react`. Remember that
+> **properties** (`transport`, `messages`, `labels`) and **custom events**
+> (`ai-chat:message`) aren't JSX props: set the former on the element ref and
+> subscribe to the latter with `addEventListener` (see [React](#react)).
 
 ---
 
@@ -755,7 +883,7 @@ happy-dom don't reproduce faithfully. `npm run test:watch` re-runs on change.
 
 `npm run dev` opens a landing page linking to the playground:
 
-[`examples/playground.html`](examples/playground.html) — every attribute, all 51
+[`examples/playground.html`](examples/playground.html) — every attribute, all 54
 CSS variables, every label and slot, live. It's built to be a real testing
 surface, not just a demo:
 

@@ -5,7 +5,14 @@
 import './ai-chat.js';
 
 export { AiChat } from './ai-chat.js';
-export type { ChatMessage, ChatTransport, StreamChunk, Role } from './types.js';
+export type {
+  ChatMessage,
+  ChatTransport,
+  StreamChunk,
+  Role,
+  FinishReason,
+  TokenUsage,
+} from './types.js';
 // The labels interface is part of the public API (consumers type their `labels`
 // object / i18n overrides with it), so it must be exported here too.
 export type { ChatLabels } from './labels.js';

@@ -4,3 +4,4 @@ export { anthropicAdapter } from './anthropic.js';
 export type { AnthropicAdapterOptions } from './anthropic.js';
 export { functionAdapter } from './function.js';
 export { parseSSE } from './sse.js';
+export { normalizeFinishReason } from './finish.js';

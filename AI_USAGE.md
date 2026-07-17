@@ -21,8 +21,8 @@ plain HTML because it is a standard custom element. It ships its own styles
 - Package name: `ai-chat-element`
 - Main import: `import 'ai-chat-element'` (registers `<ai-chat>`)
 - Named exports: `openAIAdapter`, `anthropicAdapter`, `functionAdapter`, `AiChat`
-- Types: `ChatMessage`, `ChatTransport`, `StreamChunk`, `Role`, `ChatLabels`,
-  `OpenAIAdapterOptions`, `AnthropicAdapterOptions`
+- Types: `ChatMessage`, `ChatTransport`, `StreamChunk`, `Role`, `FinishReason`,
+  `TokenUsage`, `ChatLabels`, `OpenAIAdapterOptions`, `AnthropicAdapterOptions`
 
 ## The two-step mental model (do NOT skip step 2)
 
@@ -115,7 +115,10 @@ chat.transport = functionAdapter(async function* (messages, signal) {
 
 A transport is any object with:
 `send(messages: ChatMessage[], signal: AbortSignal): AsyncIterable<StreamChunk>`
-where `StreamChunk` is `{type:'delta',delta} | {type:'done'} | {type:'error',error}`.
+where `StreamChunk` is
+`{type:'delta',delta} | {type:'done', finishReason?, usage?} | {type:'error',error}`.
+The `done` chunk may carry `finishReason` (`FinishReason`) and `usage`
+(`TokenUsage`) — both optional; see the events note below.
 
 ## API surface
 
@@ -126,18 +129,35 @@ where `StreamChunk` is `{type:'delta',delta} | {type:'done'} | {type:'error',err
 
 **Properties (JS only):** `.transport` (required), `.messages`, `.labels`.
 
-**Methods:** `send(text)`, `stop()`, `clear()`, `retry()`,
-`addMessage(role, content)`.
+**Methods:** `send(text)` → `Promise<boolean>` (resolves after the stream
+settles; `false` = no-op, e.g. empty text or no transport), `retry()` →
+`Promise<boolean>` (re-sends the last user turn), `addMessage(role, content)` →
+`ChatMessage` (appends WITHOUT sending — returns the created message; use to seed
+history), `stop()` → `void`, `clear()` → `void` (empties conversation + draft,
+also stops any stream).
 
-**Events:** `ai-chat:submit` `{content}`, `ai-chat:message` `{message}` (fires only
-for a completed reply that HAS content — not for empty or failed turns, so
-persisting on it won't save blank messages), `ai-chat:error` `{error}`,
-`ai-chat:new-chat` `{messages}` (cancelable — fired by the New-chat button;
-`preventDefault()` keeps the current conversation).
+**Events** (all bubble + composed; read `e.detail`): `ai-chat:submit`
+`{content}`, `ai-chat:message` `{message}` (fires only for a completed reply that
+HAS content — not for empty or failed turns, so persisting on it won't save blank
+messages; `message` carries `finishReason`/`usage` when reported), `ai-chat:error`
+`{error}`, `ai-chat:new-chat` `{messages}` (cancelable — fired by the New-chat
+button before clearing; `preventDefault()` keeps the current conversation, and
+`messages` is what's about to be cleared).
 
 ```js
 chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
 ```
+
+**Finish reason & token usage:** the settled `message` carries optional
+`finishReason` and `usage` when the transport reports them.
+`finishReason: FinishReason` is normalized across providers to one vocabulary —
+`'stop'` | `'length'` (truncated at the token limit) | `'content_filter'` |
+`'tool_calls'` | `'other'` — so consumers don't branch per-provider.
+`usage: TokenUsage` is `{ inputTokens?, outputTokens? }`. Both are `undefined`
+when the provider (or a local server like some Ollama builds) doesn't report
+them. The OpenAI adapter opts into usage reporting automatically
+(`stream_options: { include_usage: true }`); custom transports attach the same
+fields to their own `done` chunk.
 
 ## Customization (all optional)
 
@@ -177,12 +197,16 @@ chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
   `headerTitle`, `clearChat`, `retry`, `emptyResponse`).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
   `header`, `header-slot`, `header-title`, `clear-button`, `messages`, `message`,
-  `bubble`, `avatar`, `meta`, `name`, `time`, `composer`, `composer-box`,
-  `composer-actions`, `composer-actions-start`, `composer-actions-end`, `input`,
-  `send-button`, `stop-button`, `jump-button`, `retry-button`, `empty`,
-  `empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`.
+  `message-user`, `message-assistant`, `message-system`, `bubble`, `avatar`,
+  `meta`, `name`, `time`, `composer`, `composer-box`, `composer-actions`,
+  `composer-actions-start`, `composer-actions-end`, `input`, `send-button`,
+  `stop-button`, `jump-button`, `retry-button`, `empty`, `empty-icon`,
+  `empty-heading`, `empty-body`, `error`, `empty-response`.
   (`header` = the built-in bar; `header-slot` = the wrapper that also holds your
-  `header` slot content and keeps the bar's padding/divider when you fill it.)
+  `header` slot content and keeps the bar's padding/divider when you fill it.
+  Every message row exposes both `message` and a per-role part —
+  `message-user` / `message-assistant` / `message-system` — so you can style one
+  side without a `[data-role]` selector.)
 
 ## All CSS variables (complete — do not invent names not on this list)
 

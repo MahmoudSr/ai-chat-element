@@ -37,6 +37,8 @@ describe('openAIAdapter', () => {
 
     expect(body(calls[0]).stream, 'must request SSE streaming').toBe(true);
     expect(body(calls[0]).model).toBe('gpt-4o-mini');
+    // Opt into token-usage reporting on the stream (see finish-usage.test.ts).
+    expect(body(calls[0]).stream_options).toEqual({ include_usage: true });
   });
 
   it('merges `params` into the request body', async () => {

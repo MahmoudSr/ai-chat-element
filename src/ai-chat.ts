@@ -29,6 +29,8 @@ const nextId = () =>
  * `message` and `error` events, or drive it programmatically.
  *
  * @fires ai-chat:message   { message: ChatMessage }     after each completed turn
+ *                          (message carries `finishReason` / `usage` when the
+ *                          transport reported them)
  * @fires ai-chat:error     { error: string }            on transport failure
  * @fires ai-chat:submit    { content: string }          when the user sends
  * @fires ai-chat:new-chat  { messages: ChatMessage[] }  when New-chat is clicked
@@ -345,6 +347,18 @@ export class AiChat extends LitElement {
           this._emitError(chunk.error);
           break;
         } else if (chunk.type === 'done') {
+          // Stash any stop-reason / token-usage metadata onto the settled
+          // message so it flows out on `ai-chat:message`. Only patch fields the
+          // transport actually reported.
+          if (chunk.finishReason || chunk.usage) {
+            this._patch(assistant.id, (m) => ({
+              ...m,
+              ...(chunk.finishReason
+                ? { finishReason: chunk.finishReason }
+                : {}),
+              ...(chunk.usage ? { usage: chunk.usage } : {}),
+            }));
+          }
           break;
         }
       }

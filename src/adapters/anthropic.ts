@@ -1,6 +1,12 @@
-import type { ChatMessage, ChatTransport, StreamChunk } from '../types.js';
+import type {
+  ChatMessage,
+  ChatTransport,
+  StreamChunk,
+  TokenUsage,
+} from '../types.js';
 import { parseSSE } from './sse.js';
 import { httpError, toMessage } from './errors.js';
+import { normalizeFinishReason } from './finish.js';
 
 export interface AnthropicAdapterOptions {
   /** API key. WARNING: exposing a key in the browser is insecure — prefer a proxy. */
@@ -82,6 +88,25 @@ export function anthropicAdapter(
         return;
       }
 
+      // Metadata is spread across events: `message_start` carries input tokens,
+      // `message_delta` carries the stop_reason and cumulative output tokens.
+      // Gather both and attach to the `done` chunk emitted on `message_stop`.
+      let rawStopReason: string | undefined;
+      let usage: TokenUsage | undefined;
+      const setUsage = (patch: TokenUsage) => {
+        usage = { ...usage, ...patch };
+      };
+      const doneChunk = (): StreamChunk => ({
+        type: 'done',
+        ...(rawStopReason
+          ? {
+              rawFinishReason: rawStopReason,
+              finishReason: normalizeFinishReason(rawStopReason),
+            }
+          : {}),
+        ...(usage ? { usage } : {}),
+      });
+
       try {
         for await (const data of parseSSE(response, signal)) {
           let json: any;
@@ -91,13 +116,24 @@ export function anthropicAdapter(
             continue;
           }
           switch (json.type) {
+            case 'message_start': {
+              const input = json.message?.usage?.input_tokens;
+              if (typeof input === 'number') setUsage({ inputTokens: input });
+              break;
+            }
             case 'content_block_delta': {
               const delta: string | undefined = json.delta?.text;
               if (delta) yield { type: 'delta', delta };
               break;
             }
+            case 'message_delta': {
+              if (json.delta?.stop_reason) rawStopReason = json.delta.stop_reason;
+              const output = json.usage?.output_tokens;
+              if (typeof output === 'number') setUsage({ outputTokens: output });
+              break;
+            }
             case 'message_stop':
-              yield { type: 'done' };
+              yield doneChunk();
               return;
             case 'error':
               yield {
@@ -107,7 +143,7 @@ export function anthropicAdapter(
               return;
           }
         }
-        yield { type: 'done' };
+        yield doneChunk();
       } catch (err) {
         if (signal.aborted) return;
         yield { type: 'error', error: toMessage(err) };

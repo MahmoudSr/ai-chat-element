@@ -573,7 +573,14 @@
         const t = new Date().toLocaleTimeString([], { hour12: false });
         let d = '';
         if (detail?.content) d = JSON.stringify(detail.content.slice(0, 40));
-        else if (detail?.message) d = `{role:"${detail.message.role}", ${detail.message.content.length} chars}`;
+        else if (detail?.message) {
+          const m = detail.message;
+          const extra = [
+            m.finishReason ? `finish:${m.finishReason}` : null,
+            m.usage ? `tokens:${m.usage.inputTokens ?? '?'}/${m.usage.outputTokens ?? '?'}` : null,
+          ].filter(Boolean).join(', ');
+          d = `{role:"${m.role}", ${m.content.length} chars${extra ? ', ' + extra : ''}}`;
+        }
         else if (detail?.error) d = JSON.stringify(String(detail.error).slice(0, 40));
         else if (detail?.messages) d = `${detail.messages.length} messages`;
         logLines.unshift(`${t}  ${name}  ${d}`);

@@ -1,6 +1,12 @@
-import type { ChatMessage, ChatTransport, StreamChunk } from '../types.js';
+import type {
+  ChatMessage,
+  ChatTransport,
+  StreamChunk,
+  TokenUsage,
+} from '../types.js';
 import { parseSSE } from './sse.js';
 import { httpError, toMessage } from './errors.js';
+import { normalizeFinishReason } from './finish.js';
 
 export interface OpenAIAdapterOptions {
   /** API key. WARNING: exposing a key in the browser is insecure — prefer a proxy. */
@@ -49,6 +55,11 @@ export function openAIAdapter(options: OpenAIAdapterOptions): ChatTransport {
           body: JSON.stringify({
             model: options.model,
             stream: true,
+            // Ask for a trailing usage chunk (empty `choices`, populated
+            // `usage`). OpenAI requires this opt-in to report token counts on a
+            // streamed response; compatible servers that don't support it simply
+            // omit the chunk, so this is safe to always send.
+            stream_options: { include_usage: true },
             messages: messages.map((m) => ({
               role: m.role,
               content: m.content,
@@ -67,10 +78,26 @@ export function openAIAdapter(options: OpenAIAdapterOptions): ChatTransport {
         return;
       }
 
+      // Metadata trickles in across separate chunks: `finish_reason` lands on
+      // the last content chunk (choices populated), while `usage` arrives in a
+      // final chunk with empty `choices`. Accumulate both and attach to `done`.
+      let rawFinishReason: string | undefined;
+      let usage: TokenUsage | undefined;
+      const doneChunk = (): StreamChunk => ({
+        type: 'done',
+        ...(rawFinishReason
+          ? {
+              rawFinishReason,
+              finishReason: normalizeFinishReason(rawFinishReason),
+            }
+          : {}),
+        ...(usage ? { usage } : {}),
+      });
+
       try {
         for await (const data of parseSSE(response, signal)) {
           if (data === '[DONE]') {
-            yield { type: 'done' };
+            yield doneChunk();
             return;
           }
           let json: any;
@@ -79,10 +106,18 @@ export function openAIAdapter(options: OpenAIAdapterOptions): ChatTransport {
           } catch {
             continue; // ignore keep-alive / non-JSON lines
           }
-          const delta: string | undefined = json.choices?.[0]?.delta?.content;
+          const choice = json.choices?.[0];
+          const delta: string | undefined = choice?.delta?.content;
           if (delta) yield { type: 'delta', delta };
+          if (choice?.finish_reason) rawFinishReason = choice.finish_reason;
+          if (json.usage) {
+            usage = {
+              inputTokens: json.usage.prompt_tokens,
+              outputTokens: json.usage.completion_tokens,
+            };
+          }
         }
-        yield { type: 'done' };
+        yield doneChunk();
       } catch (err) {
         if (signal.aborted) return;
         yield { type: 'error', error: toMessage(err) };
