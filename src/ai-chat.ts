@@ -588,11 +588,26 @@ export class AiChat extends LitElement {
    * (The observer still handles re-pinning and the jump button.)
    */
   private _lastScrollTop = 0;
+  private _lastScrollHeight = 0;
   private _onScroll(e: Event): void {
     const el = e.currentTarget as HTMLElement;
     const top = el.scrollTop;
-    if (top < this._lastScrollTop - 1) this._stickToBottom = false; // scrolled up
+    // Only a REAL upward drag unpins. Mid-stream, each token re-renders the
+    // message's markdown, and the rendered content can suddenly change height —
+    // most notably SHRINK when prose collapses into a code block/table. Pinned
+    // at the bottom, that shrink makes the browser clamp scrollTop down to the
+    // new max and fire a scroll event that looks identical to the user scrolling
+    // up — which used to kill auto-follow exactly when markdown styling kicked
+    // in. Disambiguate by where we END UP: a clamp/reflow leaves us AT the
+    // bottom (or with grown content); a user's upward scroll moves us AWAY from
+    // the bottom with unchanged content. Only the latter unpins.
+    const grew = el.scrollHeight > this._lastScrollHeight;
+    const atBottom = el.scrollHeight - top - el.clientHeight <= 2;
+    if (!grew && !atBottom && top < this._lastScrollTop - 1) {
+      this._stickToBottom = false;
+    }
     this._lastScrollTop = top;
+    this._lastScrollHeight = el.scrollHeight;
   }
 
   private _scrollToBottom(smooth = false): void {
@@ -610,8 +625,9 @@ export class AiChat extends LitElement {
         behavior: smooth && !reduce ? 'smooth' : 'auto',
       });
       // Sync the baseline so our own downward scroll isn't later misread as the
-      // user scrolling up.
+      // user scrolling up, and record the height we scrolled within.
       this._lastScrollTop = el.scrollTop;
+      this._lastScrollHeight = el.scrollHeight;
     });
   }
 

@@ -6,6 +6,11 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-17
+
+Feature release: stop-reason + token-usage metadata, a streaming auto-follow
+fix, and a docs pass (React/SSR, parts, imperative API).
+
 ### Added
 
 - **Finish reason & token usage on completed turns.** A settled assistant
@@ -28,7 +33,20 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
   `FinishReason` and `TokenUsage`; the `StreamChunk` `done` variant gained
   optional `finishReason` / `rawFinishReason` / `usage`. Additive — existing
   transports and consumers are unaffected. Verified with red-on-old-code tests
-  for both adapters and the component (75 tests total, up from 67).
+  for both adapters and the component (77 tests total this release, up from 67).
+
+### Fixed
+
+- **Auto-follow no longer stops when streamed markdown restyles.** Mid-stream,
+  each token re-renders the message's markdown, and the rendered content can
+  suddenly shrink (prose collapsing into a code block/table). Pinned at the
+  bottom, that shrink made the browser clamp `scrollTop` down and fire a scroll
+  event indistinguishable from the user scrolling up — so the view stopped
+  following the reply exactly when markdown styling kicked in. The scroll
+  handler now unpins only on a *genuine* upward scroll (one that ends away from
+  the bottom with unchanged content); reflow clamps are ignored. A real user
+  scroll still unpins instantly. Regression-tested in a sized real viewport
+  (red-on-old-code verified).
 
 ### Documentation
 
@@ -247,7 +265,8 @@ Initial public release.
 - Accessibility: ARIA live region, keyboard support, reduced-motion.
 - Licensed under MPL-2.0.
 
-[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.3...v0.1.5
 [0.1.3]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.1...v0.1.2
