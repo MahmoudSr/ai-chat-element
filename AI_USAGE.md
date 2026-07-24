@@ -22,7 +22,8 @@ plain HTML because it is a standard custom element. It ships its own styles
 - Main import: `import 'ai-chat-element'` (registers `<ai-chat>`)
 - Named exports: `openAIAdapter`, `anthropicAdapter`, `functionAdapter`, `AiChat`
 - Types: `ChatMessage`, `ChatTransport`, `StreamChunk`, `Role`, `FinishReason`,
-  `TokenUsage`, `ChatLabels`, `OpenAIAdapterOptions`, `AnthropicAdapterOptions`
+  `TokenUsage`, `Attachment`, `ChatLabels`, `OpenAIAdapterOptions`,
+  `AnthropicAdapterOptions`
 
 ## The two-step mental model (do NOT skip step 2)
 
@@ -125,24 +126,31 @@ The `done` chunk may carry `finishReason` (`FinishReason`) and `usage`
 **Attributes:** `theme` (`auto`|`light`|`dark`), `placeholder`, `empty-heading`,
 `empty-body`, `show-names`, `show-timestamps`, `assistant-bubble`, `show-header`,
 `show-clear`, `show-retry` (default on), `show-aside`, `aside-side`
-(`left`|`right`), `system-prompt`, `disabled`.
+(`left`|`right`), `system-prompt`, `disabled`, `allow-attachments`, `hide-attach-button` (keep
+paste/drag but hide the built-in button), `accept` (default `image/*`),
+`max-attachments` (default 5), `max-attachment-size` (bytes, 0 = no cap).
 
 **Properties (JS only):** `.transport` (required), `.messages`, `.labels`.
 
-**Methods:** `send(text)` → `Promise<boolean>` (resolves after the stream
-settles; `false` = no-op, e.g. empty text or no transport), `retry()` →
+**Methods:** `send(text, attachments?)` → `Promise<boolean>` (resolves after the
+stream settles; `false` = no-op, e.g. empty text AND no attachments, or no
+transport), `retry()` →
 `Promise<boolean>` (re-sends the last user turn), `addMessage(role, content)` →
 `ChatMessage` (appends WITHOUT sending — returns the created message; use to seed
 history), `stop()` → `void`, `clear()` → `void` (empties conversation + draft,
 also stops any stream).
 
 **Events** (all bubble + composed; read `e.detail`): `ai-chat:submit`
-`{content}`, `ai-chat:message` `{message}` (fires only for a completed reply that
-HAS content — not for empty or failed turns, so persisting on it won't save blank
-messages; `message` carries `finishReason`/`usage` when reported), `ai-chat:error`
-`{error}`, `ai-chat:new-chat` `{messages}` (cancelable — fired by the New-chat
-button before clearing; `preventDefault()` keeps the current conversation, and
-`messages` is what's about to be cleared).
+`{content, attachments}`, `ai-chat:message` `{message}` (fires only for a completed
+reply that HAS content — not for empty or failed turns, so persisting on it won't
+save blank messages; `message` carries `finishReason`/`usage` when reported),
+`ai-chat:error` `{error}`, `ai-chat:new-chat` `{messages}` (cancelable — fired by
+the New-chat button before clearing; `preventDefault()` keeps the current
+conversation, and `messages` is what's about to be cleared), `ai-chat:attach`
+`{attachments}` (cancelable — fired after picked/dropped/pasted files pass
+validation; `preventDefault()` drops them from the tray; mutate `attachment.url`
+to swap in an uploaded URL before send), `ai-chat:attach-rejected`
+`{file, reason, message}` (reason = `type`|`size`|`too-many`).
 
 ```js
 chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
@@ -189,19 +197,34 @@ fields to their own `done` chunk.
   `composer-actions-start` (left) and `composer-actions-end` (right, before send)
   slots — no layout work needed. `--ai-chat-input-max-height` (default 200px) caps
   how tall it grows before scrolling.
+- **Attachments:** off by default; `allow-attachments` adds a built-in attach
+  button + drag-drop + paste (paste a screenshot straight in). Only IMAGES are
+  auto-sent to the built-in OpenAI/Anthropic adapters (their chat APIs take images
+  directly; no slot for generic files) — other files still render and reach you
+  via `ai-chat:submit` with the raw `File`, so your own backend can handle a PDF.
+  Config: `accept` (types), `max-attachments` (default 5), `max-attachment-size`
+  (bytes). To upload to storage instead of sending inline data URLs, listen for
+  the cancelable `ai-chat:attach` and set `attachment.url` to the uploaded URL.
+  Replace the button icon via the `attach-icon` slot. Want paste/drag WITHOUT the
+  built-in button? Add `hide-attach-button` and trigger the picker yourself via
+  `chat.openFilePicker()`.
 - **Keyboard:** Enter sends, Shift+Enter = newline, Esc stops an in-flight
   response (works from anywhere inside the widget).
 - **i18n / all strings:** override any subset via the `.labels` object
   (`userName`, `assistantName`, `emptyHeading`, `emptyBody`, `copy`, `copied`,
   `typing`, `send`, `stop`, `jumpToLatest`, `inputLabel`, `messagesRegion`,
-  `headerTitle`, `clearChat`, `retry`, `emptyResponse`).
+  `headerTitle`, `clearChat`, `retry`, `emptyResponse`, `attach`,
+  `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
+  three `attach*` messages use `{name}` as a filename placeholder).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
   `header`, `header-slot`, `header-title`, `clear-button`, `messages`, `message`,
   `message-user`, `message-assistant`, `message-system`, `bubble`, `avatar`,
-  `meta`, `name`, `time`, `composer`, `composer-box`, `composer-actions`,
-  `composer-actions-start`, `composer-actions-end`, `input`, `send-button`,
-  `stop-button`, `jump-button`, `retry-button`, `empty`, `empty-icon`,
-  `empty-heading`, `empty-body`, `error`, `empty-response`.
+  `meta`, `name`, `time`, `message-attachments`, `message-attachment`, `composer`,
+  `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
+  `composer-actions`, `composer-actions-start`, `composer-actions-end`,
+  `attach-button`, `input`, `send-button`, `stop-button`, `jump-button`,
+  `retry-button`, `empty`, `empty-icon`, `empty-heading`, `empty-body`, `error`,
+  `empty-response`.
   (`header` = the built-in bar; `header-slot` = the wrapper that also holds your
   `header` slot content and keeps the bar's padding/divider when you fill it.
   Every message row exposes both `message` and a per-role part —
@@ -232,7 +255,7 @@ Radius (all = --ai-chat-radius): `--ai-chat-radius` (8px), `--ai-chat-outer-radi
 (= radius; 0 for square), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,
 `--ai-chat-send-radius`, `--ai-chat-new-chat-radius` (= button-radius),
 `--ai-chat-jump-radius` (50%), `--ai-chat-code-radius`,
-`--ai-chat-avatar-radius`, `--ai-chat-radius-sm`.
+`--ai-chat-avatar-radius`, `--ai-chat-attachment-radius`, `--ai-chat-radius-sm`.
 Note: `--ai-chat-button-radius: 50%` gives circular icon buttons but turns the
 sidebar's full-width New-chat button into a pill — set `--ai-chat-new-chat-radius`
 (e.g. to the master radius) to keep that button rectangular.
@@ -242,9 +265,13 @@ Fonts/size: `--ai-chat-font`, `--ai-chat-font-mono`, `--ai-chat-font-size` (15px
 (16px), `--ai-chat-avatar-size` (32px), `--ai-chat-button-size` (42px),
 `--ai-chat-send-size` (34px), `--ai-chat-clear-size` (32px), `--ai-chat-jump-size`
 (36px), `--ai-chat-input-max-height` (200px),
+`--ai-chat-attachment-thumb-size` (32px),
+`--ai-chat-attachment-image-max-width` (320px),
 `--ai-chat-show-avatars` (grid; `none` hides).
 
-Padding: `--ai-chat-bubble-padding`, `--ai-chat-input-padding`,
+Padding: `--ai-chat-bubble-inset-x` (14px; horizontal text inset — the name/time
+label aligns to it, and `--ai-chat-bubble-padding` derives its horizontal value
+from it), `--ai-chat-bubble-padding`, `--ai-chat-input-padding`,
 `--ai-chat-messages-padding`, `--ai-chat-composer-padding`, `--ai-chat-header-padding`.
 
 Sidebar (with show-aside): `--ai-chat-aside-width` (260px), `--ai-chat-aside-bg`

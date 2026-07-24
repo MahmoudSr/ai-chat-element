@@ -8,6 +8,34 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Added
 
+- **File & image attachments** (opt-in via `allow-attachments`). Adds a built-in
+  attach button to the composer plus **drag-drop** and **paste** (paste a
+  screenshot straight into the input) — all three funnel through one pipeline.
+  - **Images auto-send** to the built-in OpenAI / Anthropic adapters as the
+    provider's native image format (OpenAI `image_url`, Anthropic base64/url
+    image blocks). Non-image files render in the UI and reach the consumer via
+    `ai-chat:submit` (with the raw `File`), so a consumer's own backend can handle
+    them — but they are **not** auto-sent (the streaming chat APIs have no slot for
+    a generic file). A message with no image attachments serializes to a plain
+    `content` string exactly as before — zero change for existing consumers.
+  - **`hide-attach-button`** keeps paste + drag but hides the built-in button, for
+    consumers who want paste-a-screenshot without a visible button (or who supply
+    their own trigger via `composer-actions-start` + the new `openFilePicker()`
+    method).
+  - New model: `ChatMessage.attachments?: Attachment[]` and an exported
+    `Attachment` type. New attributes: `allow-attachments`, `hide-attach-button`,
+    `accept` (default `image/*`), `max-attachments` (default 5),
+    `max-attachment-size` (bytes; 0 = no cap). New events: cancelable
+    **`ai-chat:attach`** (mutate `attachment.url`
+    to swap in an uploaded URL before send; `preventDefault()` to handle files
+    yourself) and **`ai-chat:attach-rejected`** (`type` / `size` / `too-many`).
+    `ai-chat:submit` now also carries `attachments`. `send(text, attachments?)`.
+  - New parts (`composer-attachments`, `attachment-chip`, `attachment-remove`,
+    `message-attachments`, `message-attachment`, `attach-button`), `attach-icon`
+    slot, 3 CSS vars (`--ai-chat-attachment-radius`, `-thumb-size`,
+    `-image-max-width`), and 5 labels (`attach`, `removeAttachment`,
+    `attachTooLarge`, `attachWrongType`, `attachTooMany`). Playground gained an
+    Attachments panel + event-log wiring. 77 → 95 tests.
 - **Continuous integration.** A standalone `ci.yml` workflow runs typecheck, the
   full test suite (in real Chromium), and the library build on every push and PR
   to `main`; `main` is branch-protected with CI as a required check. Previously
@@ -19,12 +47,21 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Changed
 
+- **Name/timestamp meta now aligns to the message text, not the bubble edge.**
+  The horizontal inset of the meta row tracks the bubble's text inset (new
+  `--ai-chat-bubble-inset-x`, default 14px, from which `--ai-chat-bubble-padding`
+  derives its horizontal value) — so the label sits directly above the first line
+  of text for both the user bubble and the assistant bubble.
 - The Plain-HTML example now **pins the `esm.sh` CDN URL** to a specific version
   (`ai-chat-element@0.2.0`) so a future release can't change a consumer's page
   unannounced, with a note on how to opt back into `latest`.
 
 ### Fixed
 
+- **Jump-to-latest button no longer sticks after New chat.** Clearing the
+  conversation while scrolled up left the scroll-to-bottom arrow visible (and
+  inert — the empty chat had nothing to scroll); `clear()` now resets the
+  scroll-follow state so a fresh chat starts pinned with no jump button.
 - Corrected 3 broken `#custom-backend` anchor links in the README (an emoji in
   the heading had poisoned the generated slug).
 

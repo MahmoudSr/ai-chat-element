@@ -62,6 +62,7 @@ export const chatStyles = css`
     --ai-chat-button-radius: var(--ai-chat-radius);
     --ai-chat-new-chat-radius: var(--ai-chat-button-radius);
     --ai-chat-avatar-radius: var(--ai-chat-radius);
+    --ai-chat-attachment-radius: var(--ai-chat-radius);
     /* The component's own outer corners. Rounded by default (follows the master
        radius) so the widget looks finished on its own. Set to 0 for a square
        frame when your surrounding container (a card, panel, etc.) already
@@ -76,7 +77,12 @@ export const chatStyles = css`
 
     /* ---- Sizing knobs ---- */
     --ai-chat-avatar-size: 32px;
-    --ai-chat-bubble-padding: 6px 14px;
+    /* Horizontal inset of the bubble's text. The bubble padding derives from it,
+       and the name/time meta row aligns to it — so the label sits above the TEXT,
+       not the bubble edge, and they stay in sync if you change it. Override
+       --ai-chat-bubble-padding wholesale only if you don't need that alignment. */
+    --ai-chat-bubble-inset-x: 14px;
+    --ai-chat-bubble-padding: 6px var(--ai-chat-bubble-inset-x);
     --ai-chat-input-padding: 8px 14px 2px;
     /* How tall the input grows before it starts scrolling internally. */
     --ai-chat-input-max-height: 200px;
@@ -87,6 +93,10 @@ export const chatStyles = css`
     --ai-chat-send-radius: var(--ai-chat-button-radius);
     /* Compact icon button (header / floating New-chat). */
     --ai-chat-clear-size: 32px;
+    /* Attachment thumbnail size in the composer tray; max inline image width in
+       a sent message. */
+    --ai-chat-attachment-thumb-size: 32px;
+    --ai-chat-attachment-image-max-width: 320px;
     /* Jump-to-latest floating button. Circular by default, but still derives
        from a var so it can be squared off with the rest via --ai-chat-radius. */
     --ai-chat-jump-size: 36px;
@@ -416,11 +426,18 @@ export const chatStyles = css`
     display: flex;
     align-items: baseline;
     gap: 8px;
-    margin: 0 4px 5px;
+    /* Align the name/time to where the bubble TEXT starts, not the bubble edge.
+       The horizontal margin tracks the bubble's text inset so the label sits
+       directly above the first line of text. */
+    margin: 0 var(--ai-chat-bubble-inset-x) 5px;
     font-size: 12px;
     line-height: 1.2;
   }
   .message--user .message__meta { flex-direction: row-reverse; }
+  /* The assistant message is borderless plain text by default (no horizontal
+     padding), so its text starts at the column edge — align the meta there too.
+     When assistant-bubble is on, it regains the inset (rule below). */
+  .message--assistant .message__meta { margin-left: 0; margin-right: 0; }
   .message__name { font-weight: 600; color: var(--ai-chat-fg); }
   .message__time { color: var(--ai-chat-muted); font-variant-numeric: tabular-nums; }
 
@@ -452,6 +469,11 @@ export const chatStyles = css`
     padding: var(--ai-chat-bubble-padding);
     width: fit-content;
     border-top-left-radius: var(--ai-chat-radius-sm);
+  }
+  /* With the bubble back, the AI text is inset again — realign its meta to match. */
+  :host([assistant-bubble]) .message--assistant .message__meta {
+    margin-left: var(--ai-chat-bubble-inset-x);
+    margin-right: var(--ai-chat-bubble-inset-x);
   }
   .plain { white-space: pre-wrap; }
 
@@ -700,6 +722,130 @@ export const chatStyles = css`
   .btn--send:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn--stop { background: var(--ai-chat-fg); color: var(--ai-chat-bg); }
   .btn__square { width: 12px; height: 12px; border-radius: 3px; background: currentColor; }
+  /* Attach button: a quiet, transparent icon button so it recedes next to the
+     accent-colored send button. */
+  .btn--attach {
+    background: transparent;
+    color: var(--ai-chat-muted);
+    border-radius: var(--ai-chat-button-radius);
+  }
+  .btn--attach:hover:not(:disabled) {
+    background: var(--ai-chat-border);
+    color: var(--ai-chat-fg);
+  }
+  .btn--attach:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ---- Attachments ---- */
+  /* Drop-zone feedback: a dashed accent outline while a file is dragged over. */
+  .composer__box--dragover {
+    border-color: var(--ai-chat-accent);
+    outline: 2px dashed var(--ai-chat-accent);
+    outline-offset: -4px;
+  }
+  /* Staged-attachment tray above the textarea. */
+  .composer__attachments {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    padding: 10px 12px 4px;
+  }
+  /* A flat, wide, thin pill: a small image thumb (or file icon) on the left, the
+     name on the right, an inline remove (x) at the end. No border — just a subtle
+     fill — so it reads as light and horizontal, not a chunky bordered card. */
+  .attachment-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    max-width: 240px;
+    padding: 4px 8px 4px 4px;
+    border-radius: var(--ai-chat-attachment-radius);
+    background: color-mix(in srgb, var(--ai-chat-fg) 7%, var(--ai-chat-bg));
+    font-size: 0.82em; line-height: 1.2;
+  }
+  .attachment-chip__thumb {
+    width: var(--ai-chat-attachment-thumb-size);
+    height: var(--ai-chat-attachment-thumb-size);
+    object-fit: cover;
+    border-radius: calc(var(--ai-chat-attachment-radius) - 4px);
+    flex: 0 0 auto;
+    display: block;
+  }
+  /* File (non-image) chips get an icon tile the same size as a thumbnail so image
+     and file chips line up to the same height. */
+  .attachment-chip__icon {
+    flex: 0 0 auto;
+    display: grid; place-items: center;
+    width: var(--ai-chat-attachment-thumb-size);
+    height: var(--ai-chat-attachment-thumb-size);
+    border-radius: calc(var(--ai-chat-attachment-radius) - 4px);
+    color: var(--ai-chat-muted);
+  }
+  .attachment-chip__name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    color: var(--ai-chat-fg); font-weight: 500;
+  }
+  /* Inline remove at the trailing edge — no floating badge, keeps the pill flat. */
+  .attachment-chip__remove {
+    flex: 0 0 auto;
+    display: grid; place-items: center;
+    width: 18px; height: 18px; padding: 0; margin-left: 2px;
+    border: none; border-radius: 50%;
+    background: transparent; color: var(--ai-chat-muted);
+    cursor: pointer;
+    transition: background 0.1s ease, color 0.1s ease;
+  }
+  .attachment-chip__remove:hover { background: color-mix(in srgb, var(--ai-chat-fg) 12%, transparent); color: var(--ai-chat-fg); }
+  .attachment-chip__remove .icon { width: 12px; height: 12px; }
+
+  /* Attachments rendered on a sent message (above the text). */
+  .message__attachments {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-bottom: 6px;
+    /* Never let a wide image stretch the bubble past the text column. */
+    max-width: 100%;
+  }
+  /* A single image: capped, keeps its aspect ratio, hugs its own width. The IMG
+     itself is width-capped (not just the wrapper) so a wide screenshot can't push
+     the fit-content bubble wider than the cap. */
+  .message__images--single {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+  }
+  .message__images--single .message__attachment--image {
+    width: auto; height: auto;
+    max-width: min(100%, var(--ai-chat-attachment-image-max-width));
+    max-height: 360px; object-fit: contain;
+    border-radius: var(--ai-chat-attachment-radius);
+    display: block;
+  }
+  /* 2+ images: a fixed grid of uniform square thumbnails (Messenger/WhatsApp
+     style). --_cols (1-3) is set inline from the image count; the whole grid is
+     width-capped so it never blows out the bubble. */
+  .message__images--grid {
+    display: grid;
+    grid-template-columns: repeat(var(--_cols, 3), 1fr);
+    gap: 4px;
+    /* Flat pixel width (NOT a percentage): a percentage resolves against the
+       fit-content bubble circularly and fails to cap, letting a multi-image grid
+       blow out to full message width. A fixed cap keeps the bubble tight; the
+       outer wrapper's max-width:100% still shrinks it on a narrow screen. */
+    width: var(--ai-chat-attachment-image-max-width);
+  }
+  .message__images--grid .message__attachment--image {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: calc(var(--ai-chat-attachment-radius) - 2px);
+    display: block;
+  }
+  .message__attachment--file {
+    display: inline-flex; align-items: center; gap: 6px;
+    max-width: 240px;
+    padding: 6px 10px;
+    border: var(--ai-chat-input-border-width) solid var(--ai-chat-border);
+    border-radius: var(--ai-chat-attachment-radius);
+    background: color-mix(in srgb, var(--ai-chat-fg) 4%, var(--ai-chat-bg));
+    font-size: 0.9em;
+  }
+  .message__attachment-icon { display: grid; place-items: center; color: var(--ai-chat-muted); flex: 0 0 auto; }
+  .message__attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* ---- Keyboard focus ring ----
      One subtle, customizable ring for every interactive control. :focus-visible
@@ -713,6 +859,7 @@ export const chatStyles = css`
   .retry-btn:focus-visible,
   .jump:focus-visible,
   .code-block__copy:focus-visible,
+  .attachment-chip__remove:focus-visible,
   .composer__box:focus-within {
     outline: var(--ai-chat-focus-width) solid var(--ai-chat-focus-color);
     outline-offset: var(--ai-chat-focus-offset);

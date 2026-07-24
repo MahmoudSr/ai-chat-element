@@ -57,6 +57,21 @@ export const CONTROLS = [
   { g: 'Chrome', kind: 'attr', key: 'empty-heading', type: 'text', def: '', label: 'empty-heading' },
   { g: 'Chrome', kind: 'attr', key: 'empty-body', type: 'text', def: '', label: 'empty-body' },
 
+  // ---------- Attachments ----------
+  { g: 'Attachments', kind: 'attr', key: 'allow-attachments', type: 'bool', def: false, label: 'allow-attachments',
+    hint: 'Turn on, then try the 📎 button, DRAG a file onto the input, or PASTE an image (copy a screenshot, click the input, Ctrl/Cmd+V).' },
+  { g: 'Attachments', kind: 'attr', key: 'hide-attach-button', type: 'bool', def: false, label: 'hide-attach-button',
+    showIf: (get) => get('allow-attachments'),
+    hint: 'Hides the 📎 button but KEEPS paste + drag. Try pasting an image with this on.' },
+  { g: 'Attachments', kind: 'attr', key: 'accept', type: 'text', def: 'image/*', label: 'accept',
+    showIf: (get) => get('allow-attachments'),
+    hint: 'Allowed types: image/*, .pdf, image/png,application/pdf, or * for anything. Only images auto-send to the AI.' },
+  { g: 'Attachments', kind: 'attr', key: 'max-attachments', type: 'range', def: 5, min: 1, max: 10, label: 'max-attachments',
+    showIf: (get) => get('allow-attachments') },
+  { g: 'Attachments', kind: 'attr', key: 'max-attachment-size', type: 'text', def: '', label: 'max-attachment-size (bytes)',
+    showIf: (get) => get('allow-attachments'),
+    hint: 'Leave blank for no cap. e.g. 1048576 = 1 MB.' },
+
   // ---------- Slots ----------
   { g: 'Slots', kind: 'slot', key: 'slot:assistant-avatar', type: 'bool', def: false, label: 'assistant-avatar' },
   { g: 'Slots', kind: 'slot', key: 'slot:user-avatar', type: 'bool', def: false, label: 'user-avatar' },
@@ -66,6 +81,8 @@ export const CONTROLS = [
   { g: 'Slots', kind: 'slot', key: 'slot:composer-actions-end', type: 'bool', def: false, label: 'composer-actions-end' },
   { g: 'Slots', kind: 'slot', key: 'slot:send-icon', type: 'bool', def: false, label: 'send-icon' },
   { g: 'Slots', kind: 'slot', key: 'slot:empty-icon', type: 'bool', def: false, label: 'empty-icon' },
+  { g: 'Slots', kind: 'slot', key: 'slot:attach-icon', type: 'bool', def: false, label: 'attach-icon',
+    hint: 'Needs allow-attachments.' },
 
   // ---------- Colors ----------
   { g: 'Colors', kind: 'var', key: '--ai-chat-accent', type: 'color', def: '#4f46e5', label: 'accent',
@@ -214,6 +231,11 @@ export const PRESETS = [
 
 const GROUPS_OPEN = new Set(['Transport', 'Behaviour']);
 
+// Toggling one of these reveals/hides other controls (via their `showIf`), so a
+// change must rebuild the panel. `showIf` is a function we can't introspect, so
+// these gate keys are listed explicitly — keep in sync when adding a showIf.
+const GATE_KEYS = new Set(['allow-attachments', 'show-aside', 'transport']);
+
 export function buildPanel(root, ctx) {
   const { get, set, isSet, onAction, onPreset, onScenario, onTransport } = ctx;
   const openState = new Map(
@@ -303,7 +325,13 @@ export function buildPanel(root, ctx) {
       input = document.createElement('input');
       input.type = 'checkbox';
       input.checked = !!get(c.key);
-      input.onchange = () => set(c.key, input.checked);
+      input.onchange = () => {
+        set(c.key, input.checked);
+        // If other controls are gated on this toggle (via showIf), the panel must
+        // re-render so those rows appear/disappear. Without this, e.g. toggling
+        // allow-attachments would never reveal hide-attach-button / accept / etc.
+        if (GATE_KEYS.has(c.key)) rebuild();
+      };
     } else if (c.type === 'color') {
       input = document.createElement('input');
       input.type = 'color';
@@ -335,7 +363,8 @@ export function buildPanel(root, ctx) {
         if (c.key === 'scenario') { onScenario(input.value); set(c.key, input.value); return; }
         set(c.key, input.value);
         if (c.key === 'transport') { onTransport(); rebuild(); }
-        if (c.key === 'show-aside') rebuild();
+        // Other select gates (if any) rebuild via GATE_KEYS.
+        else if (GATE_KEYS.has(c.key)) rebuild();
       };
     } else if (c.type === 'textarea') {
       input = document.createElement('textarea');

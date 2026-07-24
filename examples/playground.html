@@ -367,6 +367,7 @@
           </button>`,
         'send-icon': '<span slot="send-icon" style="font-size:13px;font-weight:700">GO</span>',
         'empty-icon': '<span slot="empty-icon" style="font-size:30px">💬</span>',
+        'attach-icon': '<span slot="attach-icon" style="font-size:15px">➕</span>',
       };
 
       function renderSlots() {
@@ -583,12 +584,19 @@
         }
         else if (detail?.error) d = JSON.stringify(String(detail.error).slice(0, 40));
         else if (detail?.messages) d = `${detail.messages.length} messages`;
+        // attach / attach-rejected
+        if (detail?.attachments) {
+          const names = detail.attachments.map((a) => `${a.name}(${a.kind})`).join(', ');
+          d = (d ? d + ' ' : '') + `[${names}]`;
+        } else if (detail?.file) {
+          d = `${detail.reason}: ${detail.file.name || '(unnamed)'}`;
+        }
         logLines.unshift(`${t}  ${name}  ${d}`);
         logLines.length = Math.min(logLines.length, 40);
         const el = $('eventLog');
         if (el) el.textContent = logLines.join('\n') || 'No events yet.';
       }
-      for (const n of ['submit', 'message', 'error', 'new-chat']) {
+      for (const n of ['submit', 'message', 'error', 'new-chat', 'attach', 'attach-rejected']) {
         chat.addEventListener('ai-chat:' + n, (e) => logEvent('ai-chat:' + n, e.detail));
       }
 

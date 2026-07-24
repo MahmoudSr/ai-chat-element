@@ -32,3 +32,6 @@ CLAUDE.md
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# Test screenshot artifacts (Vitest browser page.screenshot)
+test/*.png

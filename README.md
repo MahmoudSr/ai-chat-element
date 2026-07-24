@@ -9,14 +9,14 @@ A reusable, framework-agnostic **AI chat UI** as a Web Component. Drop `<ai-chat
 
 ### ▶︎ [Try it in the playground](https://mahmoudsr.github.io/ai-chat-element/examples/playground.html)
 
-Every attribute, all 54 CSS variables, every label and slot — live. Pick a preset,
+Every attribute, all 58 CSS variables, every label and slot — live. Pick a preset,
 tweak it, and copy the generated code straight into your app.
 
-- 🎨 **Customizable to the corner** — **54 CSS variables, every one documented**; nothing is hardcoded. One line rebrands it (`--ai-chat-accent`); one knob rounds it (`--ai-chat-radius`); every surface has its own override when you need it.
+- 🎨 **Customizable to the corner** — **58 CSS variables, every one documented**; nothing is hardcoded. One line rebrands it (`--ai-chat-accent`); one knob rounds it (`--ai-chat-radius`); every surface has its own override when you need it.
 - 🔌 **Pluggable transport** — built-in adapters for OpenAI-compatible & Anthropic APIs, or bring your own backend
 - 🌊 **Streaming** token-by-token with a stop button and jump-to-latest
 - 📝 **Markdown + syntax-highlighted code** with copy buttons
-- 🧩 **Yours to shape** — 14 slots, 30 `::part()` hooks, sender names, timestamps, avatars, and every string (i18n-ready). No emoji by default.
+- 🧩 **Yours to shape** — 15 slots, 36 `::part()` hooks, sender names, timestamps, avatars, and every string (i18n-ready). No emoji by default.
 - ♿ **Accessible** — polite screen-reader announcement of each settled reply
   (no token-by-token spam), a keyboard focus ring, focus that never gets dropped,
   full keyboard support, and respects `prefers-reduced-motion`
@@ -331,6 +331,11 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `aside-side`       | `left` \| `right`           | `left`  | Which side the sidebar sits on.                                                   |
 | `system-prompt`    | string                      | —       | Prepended to every request (not shown in UI).                                     |
 | `disabled`         | boolean                     | `false` | Disables the input.                                                               |
+| `allow-attachments`| boolean                     | `false` | Enable file/image attachments (attach button + drag-drop + paste). See [Attachments](#attachments). |
+| `hide-attach-button` | boolean                   | `false` | Keep paste/drop but hide the built-in attach button (bring your own trigger). |
+| `accept`           | string                      | `image/*` | Which file types the picker/drop/paste accepts (standard `accept` form). |
+| `max-attachments`  | number                      | `5`     | Max attachments per message.                                                      |
+| `max-attachment-size` | number (bytes)           | `0`     | Max size per file; `0` = no cap.                                                  |
 
 To turn a boolean attribute off, set it to `"false"` (e.g. `show-timestamps="false"`).
 
@@ -346,20 +351,23 @@ Set via JS only (they hold objects/arrays):
 
 | Method                    | Returns              | Notes                                                          |
 | ------------------------- | -------------------- | -------------------------------------------------------------- |
-| `send(text)`              | `Promise<boolean>`   | Sends a user turn and streams the reply. Resolves `true` when the turn ran, `false` if it was a no-op (empty text, or no transport set). Resolves only **after** the stream settles. |
+| `send(text, attachments?)` | `Promise<boolean>`  | Sends a user turn and streams the reply. Resolves `true` when the turn ran, `false` if it was a no-op (empty text **and** no attachments, or no transport set). Resolves only **after** the stream settles. |
 | `retry()`                 | `Promise<boolean>`   | Re-sends the last user turn (e.g. after an error). Same resolution semantics as `send`. |
 | `addMessage(role, content)` | `ChatMessage`      | Appends a message to `.messages` **without** sending it — returns the created message (with its generated `id`). Use it to seed history. |
 | `stop()`                  | `void`               | Aborts the in-flight stream, if any.                           |
 | `clear()`                 | `void`               | Empties the conversation and the composer draft (also calls `stop()`). |
+| `openFilePicker()`        | `void`               | Opens the native file picker (for use with `hide-attach-button` + your own trigger). No-op unless `allow-attachments` is set. |
 
 **Events** (all `bubbles: true, composed: true`; read `e.detail`):
 
 | Event             | `detail`                    | When / notes                                                        |
 | ----------------- | --------------------------- | ------------------------------------------------------------------- |
-| `ai-chat:submit`  | `{ content: string }`       | Fires when the user sends, before the request goes out.             |
+| `ai-chat:submit`  | `{ content: string, attachments: Attachment[] }` | Fires when the user sends, before the request goes out. `attachments` is `[]` unless files were attached. |
 | `ai-chat:message` | `{ message: ChatMessage }`  | Once per completed reply — **only when it has content** (empty/failed turns don't fire). The `message` carries `finishReason` / `usage` when reported. |
 | `ai-chat:error`   | `{ error: string }`         | Transport failure; `error` is a human-readable message.             |
 | `ai-chat:new-chat`| `{ messages: ChatMessage[] }` | Fires when the New-chat button is clicked, **before** clearing. **Cancelable** — call `e.preventDefault()` to keep the current conversation. `messages` is the conversation about to be cleared. |
+| `ai-chat:attach`  | `{ attachments: Attachment[] }` | Fires when files are picked/dropped/pasted, after they pass validation. **Cancelable** — `e.preventDefault()` removes them from the tray (you're handling them yourself). Mutate `attachment.url` here to swap in an uploaded URL before send. |
+| `ai-chat:attach-rejected` | `{ file: File, reason: 'type' \| 'size' \| 'too-many', message: string }` | Fires when a picked file is rejected by `accept` / `max-attachment-size` / `max-attachments`. |
 
 `ai-chat:message` fires once per completed assistant turn — but **only when the
 reply has content**. Empty responses and failed turns don't fire it, so if you
@@ -583,6 +591,77 @@ the widget).
 
 ---
 
+## Attachments
+
+Off by default. Add `allow-attachments` and you get a built-in attach button in
+the composer, plus **drag-drop** and **paste** (paste a screenshot straight into
+the input) — all three funnel through the same pipeline:
+
+```html
+<ai-chat allow-attachments accept="image/*"></ai-chat>
+```
+
+That's the whole zero-code path: **images are sent to the built-in OpenAI /
+Anthropic adapters automatically** (as the provider's native image format), so an
+image + a question just works with no server.
+
+Configure it:
+
+| Attribute             | Default   | What it does                                   |
+| --------------------- | --------- | ---------------------------------------------- |
+| `allow-attachments`   | `false`   | Turns the feature on (button + paste + drag).  |
+| `hide-attach-button`  | `false`   | Keep paste + drag but hide the built-in button (see below). |
+| `accept`              | `image/*` | Allowed file types (standard `accept` syntax: `image/*`, `.pdf`, `image/png,application/pdf`, `*`). |
+| `max-attachments`     | `5`       | Max files per message.                         |
+| `max-attachment-size` | `0`       | Max bytes per file (`0` = no cap).             |
+
+### Paste/drag without the button
+
+`allow-attachments` gives you the attach button **and** paste/drag together. If
+you want paste-a-screenshot and drag-drop but **not** the built-in button — say
+you're providing your own trigger — add `hide-attach-button`:
+
+```html
+<ai-chat allow-attachments hide-attach-button></ai-chat>
+```
+
+Paste and drag keep working; the button is gone. To open the picker from your own
+button, call `chat.openFilePicker()` (e.g. from a button you slot into
+`composer-actions-start`).
+
+### What reaches the AI
+
+The UI accepts **whatever `accept` allows**, but only **images** are auto-sent to
+the built-in adapters — the OpenAI/Anthropic *streaming chat* APIs accept images
+directly, but have no standard slot for a PDF or other document. Non-image files
+still render in the UI and reach your code via `ai-chat:submit` (with the raw
+`File` on each attachment), so if you run **your own backend** (via
+`functionAdapter`) you can process a PDF there — exactly how Claude.ai does it
+(its server extracts the document before the model sees it).
+
+### Uploading to your own storage
+
+By default attachments are inline `data:` URLs — fine for images going straight
+to a model. If you'd rather upload files to storage and send a URL instead, listen
+for the cancelable **`ai-chat:attach`** event, upload, and swap the `url`:
+
+```js
+chat.addEventListener('ai-chat:attach', async (e) => {
+  for (const att of e.detail.attachments) {
+    const url = await uploadToMyStorage(att.file); // att.file is the raw File
+    att.url = url;                                  // sent instead of the data URL
+  }
+});
+```
+
+Rejected files (wrong type / too large / too many) fire
+**`ai-chat:attach-rejected`** with `{ file, reason, message }` so you can surface
+an error. Style the tray and chips via the `composer-attachments`,
+`attachment-chip`, `attachment-remove`, `message-attachments`, and
+`message-attachment` parts; replace the button icon via the `attach-icon` slot.
+
+---
+
 ## Labels & i18n
 
 Every user-facing and accessibility string lives in one `labels` object. Override
@@ -607,6 +686,12 @@ chat.labels = {
   clearChat: 'Nuevo chat',
   retry: 'Reintentar',
   emptyResponse: 'Sin respuesta.',
+  // Attachment strings ({name} is replaced with the filename):
+  attach: 'Adjuntar archivos',
+  removeAttachment: 'Quitar adjunto',
+  attachTooLarge: '{name} es demasiado grande.',
+  attachWrongType: '{name} no es un tipo de archivo permitido.',
+  attachTooMany: 'Demasiados adjuntos.',
 };
 ```
 
@@ -734,6 +819,7 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-jump-radius`   | `50%`             | Jump-to-latest button (circular by default)  |
 | `--ai-chat-code-radius`   | `= radius`        | Code blocks                                  |
 | `--ai-chat-avatar-radius` | `= radius`        | Avatars                                      |
+| `--ai-chat-attachment-radius` | `= radius`    | Attachment chips + inline images             |
 | `--ai-chat-radius-sm`     | `= radius`        | Small inner corners                          |
 
 > Setting `--ai-chat-button-radius: 50%` for circular icon buttons also reaches
@@ -756,13 +842,16 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-clear-size`       | `32px`            | Compact New-chat icon button (header/floating) |
 | `--ai-chat-jump-size`        | `36px`            | Jump-to-latest floating button                 |
 | `--ai-chat-input-max-height` | `200px`           | Input grows to here, then scrolls              |
+| `--ai-chat-attachment-thumb-size` | `32px`       | Attachment thumbnail size in the composer tray |
+| `--ai-chat-attachment-image-max-width` | `320px` | Max width of an inline image in a sent message |
 | `--ai-chat-show-avatars`     | `grid`            | `none` force-hides avatars even if slotted     |
 
 **Spacing (padding)**
 
 | Variable                     | Default          | Controls                |
 | ---------------------------- | ---------------- | ----------------------- |
-| `--ai-chat-bubble-padding`   | `6px 14px`       | Inside message bubbles  |
+| `--ai-chat-bubble-inset-x`   | `14px`           | Horizontal text inset; the name/time label aligns to it |
+| `--ai-chat-bubble-padding`   | `6px = inset-x`  | Inside message bubbles (horizontal derives from `bubble-inset-x`) |
 | `--ai-chat-input-padding`    | `8px 14px 2px`   | Inside the textarea     |
 | `--ai-chat-messages-padding` | `20px 16px`      | Around the message list |
 | `--ai-chat-composer-padding` | `12px 16px 16px` | Around the composer     |
@@ -783,11 +872,13 @@ For styling that a variable can't reach, target the shadow parts with
 
 `layout`, `root`, `aside`, `aside-list`, `header`, `header-slot`, `header-title`,
 `clear-button`, `messages`, `message`, `message-user`, `message-assistant`,
-`message-system`, `bubble`, `avatar`, `meta`, `name`, `time`, `composer`,
-`composer-box`, `composer-actions`, `composer-actions-start`,
-`composer-actions-end`, `input`, `send-button`, `stop-button`, `jump-button`,
-`retry-button`, `empty`, `empty-icon`, `empty-heading`, `empty-body`, `error`,
-`empty-response`.
+`message-system`, `bubble`, `avatar`, `meta`, `name`, `time`,
+`message-attachments`, `message-attachment`, `composer`,
+`composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
+`composer-actions`, `composer-actions-start`,
+`composer-actions-end`, `attach-button`, `input`, `send-button`, `stop-button`,
+`jump-button`, `retry-button`, `empty`, `empty-icon`, `empty-heading`,
+`empty-body`, `error`, `empty-response`.
 
 Every message row carries `message` **and** a per-role part, so you can style one
 side without a `[data-role]` selector:
@@ -818,6 +909,7 @@ Put your own markup in any of these (`<x slot="name">`):
 | `send-icon` / `stop-icon`          | Send / stop button icons                                              |
 | `clear-icon` / `retry-icon`        | New-chat / retry button icons                                         |
 | `jump-icon` / `error-icon`         | Jump-to-latest / error icons                                          |
+| `attach-icon`                      | Attach-button icon (with `allow-attachments`)                        |
 
 ---
 
@@ -834,6 +926,7 @@ import type {
   Role,
   FinishReason,
   TokenUsage,
+  Attachment,
   ChatLabels,
 } from 'ai-chat-element';
 

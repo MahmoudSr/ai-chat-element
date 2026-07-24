@@ -113,4 +113,29 @@ describe('auto-follow vs markdown re-render', () => {
 
     expect(following(el), 'a real upward scroll must still unpin').toBe(false);
   });
+
+  it('clear() resets the jump button when scrolled up (new chat starts clean)', async () => {
+    // Bug: scroll up (jump arrow shows), hit New chat -> the arrow stuck, and
+    // clicking it did nothing (empty chat has nothing to scroll); it only cleared
+    // when you went back to the old chat and scrolled down.
+    const el = sized();
+    const sc = await streamPastTheFold(el);
+
+    // Scroll up so the jump button shows / we're unpinned.
+    sc.scrollTop = 0;
+    sc.dispatchEvent(new Event('scroll'));
+    await tick(20);
+    const showJump = () => (el as unknown as { _showJump: boolean })._showJump;
+    // Sanity: we're actually in the "scrolled up" state before clearing.
+    expect(following(el), 'precondition: unpinned after scrolling up').toBe(false);
+
+    // New chat.
+    el.clear();
+    await el.updateComplete;
+    await tick(10);
+
+    // A fresh chat must be pinned with no jump button — not stuck showing it.
+    expect(following(el), 'clear() should re-pin to bottom').toBe(true);
+    expect(showJump(), 'clear() should hide the jump button').toBe(false);
+  });
 });

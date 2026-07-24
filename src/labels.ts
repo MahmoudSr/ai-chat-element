@@ -40,6 +40,18 @@ export interface ChatLabels {
   /** Placeholder shown when the assistant returns an empty response (finished
    *  streaming with no content and no error) — avoids a blank ghost bubble. */
   emptyResponse: string;
+  /** aria-label for the attach-file button (when `allow-attachments` is set). */
+  attach: string;
+  /** aria-label for the remove (×) button on an attachment chip. */
+  removeAttachment: string;
+  /** Shown/announced when a picked file exceeds `max-attachment-size`.
+   *  `{name}` is replaced with the filename. */
+  attachTooLarge: string;
+  /** Shown/announced when a picked file's type isn't allowed by `accept`.
+   *  `{name}` is replaced with the filename. */
+  attachWrongType: string;
+  /** Shown/announced when adding a file would exceed `max-attachments`. */
+  attachTooMany: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -59,4 +71,9 @@ export const DEFAULT_LABELS: ChatLabels = {
   clearChat: 'New chat',
   retry: 'Retry',
   emptyResponse: 'No response.',
+  attach: 'Attach files',
+  removeAttachment: 'Remove attachment',
+  attachTooLarge: '{name} is too large.',
+  attachWrongType: "{name} isn't an allowed file type.",
+  attachTooMany: 'Too many attachments.',
 };
