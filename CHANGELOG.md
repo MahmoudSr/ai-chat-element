@@ -6,6 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Continuous integration.** A standalone `ci.yml` workflow runs typecheck, the
+  full test suite (in real Chromium), and the library build on every push and PR
+  to `main`; `main` is branch-protected with CI as a required check. Previously
+  the suite only ran as a side effect of the Pages deploy.
+- **`CONTRIBUTING.md` and `SECURITY.md`.** Contributor setup / conventions and a
+  private vulnerability-reporting policy (with the markdown-render sanitization
+  scope spelled out).
+- **README badges** — npm version, gzipped bundle size, CI status, and license.
+
+### Changed
+
+- The Plain-HTML example now **pins the `esm.sh` CDN URL** to a specific version
+  (`ai-chat-element@0.2.0`) so a future release can't change a consumer's page
+  unannounced, with a note on how to opt back into `latest`.
+
+### Fixed
+
+- Corrected 3 broken `#custom-backend` anchor links in the README (an emoji in
+  the heading had poisoned the generated slug).
+
 ## [0.2.0] - 2026-07-17
 
 Feature release: stop-reason + token-usage metadata, a streaming auto-follow
