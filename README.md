@@ -1,5 +1,10 @@
 # ai-chat-element
 
+[![npm version](https://img.shields.io/npm/v/ai-chat-element.svg)](https://www.npmjs.com/package/ai-chat-element)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/ai-chat-element?label=gzipped)](https://bundlephobia.com/package/ai-chat-element)
+[![CI](https://github.com/MahmoudSr/ai-chat-element/actions/workflows/ci.yml/badge.svg)](https://github.com/MahmoudSr/ai-chat-element/actions/workflows/ci.yml)
+[![license: MPL-2.0](https://img.shields.io/npm/l/ai-chat-element.svg)](./LICENSE)
+
 A reusable, framework-agnostic **AI chat UI** as a Web Component. Drop `<ai-chat>` into **React, Angular, Vue, Svelte, or plain HTML** — it's a standard custom element, so it works everywhere.
 
 ### ▶︎ [Try it in the playground](https://mahmoudsr.github.io/ai-chat-element/examples/playground.html)
@@ -93,8 +98,10 @@ server-backed pattern above. See [Transports](#transports).
 <ai-chat theme="auto" placeholder="Ask me anything…"></ai-chat>
 
 <script type="module">
-  import 'https://esm.sh/ai-chat-element';
-  import { openAIAdapter } from 'https://esm.sh/ai-chat-element';
+  // Pin the version so a future release can't change your page unannounced.
+  // Drop the @0.2.0 to always get the latest (fine for a quick try, not prod).
+  import 'https://esm.sh/ai-chat-element@0.2.0';
+  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.2.0';
 
   const chat = document.querySelector('ai-chat');
   // Local, keyless example: talk to Ollama running on your machine.
