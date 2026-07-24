@@ -67,6 +67,60 @@ describe('openAIAdapter', () => {
 
     expect(body(calls[0]).messages[0]).toEqual({ role: 'user', content: 'hi' });
   });
+
+  it('sends content as a plain STRING when there are no attachments', async () => {
+    const calls = captureFetch();
+    await drain(openAIAdapter({ model: 'm' }).send(msgs, new AbortController().signal));
+    // No-regression guard: the common path must be byte-identical to before —
+    // a string, never an array. (Fails if the builder always arrays.)
+    expect(body(calls[0]).messages[0].content).toBe('hi');
+  });
+
+  it('maps an image attachment to an image_url part alongside the text', async () => {
+    const calls = captureFetch();
+    const withImage: ChatMessage[] = [
+      {
+        id: '1',
+        role: 'user',
+        content: "what's this?",
+        createdAt: 0,
+        attachments: [
+          {
+            id: 'a1',
+            kind: 'image',
+            mimeType: 'image/png',
+            name: 'shot.png',
+            size: 3,
+            url: 'data:image/png;base64,AAA',
+          },
+        ],
+      },
+    ];
+    await drain(openAIAdapter({ model: 'm' }).send(withImage, new AbortController().signal));
+
+    expect(body(calls[0]).messages[0].content).toEqual([
+      { type: 'text', text: "what's this?" },
+      { type: 'image_url', image_url: { url: 'data:image/png;base64,AAA' } },
+    ]);
+  });
+
+  it('does NOT send a non-image (file) attachment to the model', async () => {
+    const calls = captureFetch();
+    const withPdf: ChatMessage[] = [
+      {
+        id: '1',
+        role: 'user',
+        content: 'read this',
+        createdAt: 0,
+        attachments: [
+          { id: 'a1', kind: 'file', mimeType: 'application/pdf', name: 'x.pdf', size: 9, url: 'data:application/pdf;base64,ZZ' },
+        ],
+      },
+    ];
+    await drain(openAIAdapter({ model: 'm' }).send(withPdf, new AbortController().signal));
+    // A file-only message has no images => stays a plain string, no parts array.
+    expect(body(calls[0]).messages[0].content).toBe('read this');
+  });
 });
 
 describe('anthropicAdapter', () => {
@@ -103,5 +157,53 @@ describe('anthropicAdapter', () => {
     // Anthropic takes `system` separately — it must NOT be left in messages[].
     expect(body(calls[0]).system).toBe('be terse');
     expect(body(calls[0]).messages.some((m: ChatMessage) => m.role === 'system')).toBe(false);
+  });
+
+  it('sends content as a plain STRING when there are no attachments', async () => {
+    const calls = captureFetch();
+    await drain(anthropicAdapter({ model: 'm', apiKey: 'k' }).send(msgs, new AbortController().signal));
+    expect(body(calls[0]).messages[0].content).toBe('hi');
+  });
+
+  it('maps an image data-URL to a base64 image block (media_type + data split out)', async () => {
+    const calls = captureFetch();
+    const withImage: ChatMessage[] = [
+      {
+        id: '1',
+        role: 'user',
+        content: 'look',
+        createdAt: 0,
+        attachments: [
+          { id: 'a1', kind: 'image', mimeType: 'image/png', name: 's.png', size: 3, url: 'data:image/png;base64,AAA' },
+        ],
+      },
+    ];
+    await drain(anthropicAdapter({ model: 'm', apiKey: 'k' }).send(withImage, new AbortController().signal));
+
+    expect(body(calls[0]).messages[0].content).toEqual([
+      { type: 'text', text: 'look' },
+      { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'AAA' } },
+    ]);
+  });
+
+  it('maps a remote https image URL to a url image source', async () => {
+    const calls = captureFetch();
+    const withRemote: ChatMessage[] = [
+      {
+        id: '1',
+        role: 'user',
+        content: '',
+        createdAt: 0,
+        attachments: [
+          { id: 'a1', kind: 'image', mimeType: 'image/png', name: 's.png', size: 3, url: 'https://cdn.example/s.png' },
+        ],
+      },
+    ];
+    await drain(anthropicAdapter({ model: 'm', apiKey: 'k' }).send(withRemote, new AbortController().signal));
+
+    // Empty content => no text block, just the image.
+    expect(body(calls[0]).messages[0].content).toEqual([
+      { type: 'image', source: { type: 'url', url: 'https://cdn.example/s.png' } },
+    ]);
   });
 });
