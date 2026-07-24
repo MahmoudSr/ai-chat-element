@@ -1,0 +1,42 @@
+name: CI
+
+# Gates every push and PR against main on the full quality bar:
+# typecheck + tests (real Chromium) + library build. This is the check that
+# was previously only a side effect of the Pages deploy — now it runs on PRs
+# too, so nothing lands on main red.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A newer push to the same branch/PR supersedes an in-flight run — no point
+# finishing CI for a commit that's already been replaced.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Node 24 to match the npm that wrote package-lock.json — npm ci on an
+      # older npm rejects this lockfile (see deploy-playground.yml for the why).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      # Tests run in a real Chromium via Playwright — the Shadow DOM bugs this
+      # component has had don't reproduce in a fake DOM, so install the browser.
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+
+      - run: npm run build
