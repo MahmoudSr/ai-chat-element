@@ -20,8 +20,19 @@ export const CONTROLS = [
   { g: 'Transport', kind: 'meta', key: 'transport', type: 'select', label: 'Transport', def: 'mock',
     options: [['mock', 'Mock (no setup)'], ['ollama', 'Ollama (local model)']],
     hint: 'Mock needs nothing. Ollama talks to a real model on your machine.' },
-  { g: 'Transport', kind: 'meta', key: 'ollamaModel', type: 'text', def: 'llama3.2', label: 'Ollama model',
-    showIf: (get) => get('transport') === 'ollama' },
+  { g: 'Transport', kind: 'meta', key: 'ollamaModel', type: 'select', def: 'llama3.2', label: 'Ollama model',
+    showIf: (get) => get('transport') === 'ollama',
+    // Options come from the models actually installed (fetched from /api/tags by
+    // probeOllama). Falls back to the current value until the list loads.
+    options: (ctx) => {
+      const installed = ctx.installedModels || [];
+      const cur = ctx.get('ollamaModel');
+      const names = installed.length ? installed : (cur ? [cur] : ['llama3.2']);
+      // Keep the current value selectable even if it's not (yet) in the list.
+      if (cur && !names.includes(cur)) names.unshift(cur);
+      return names.map((n) => [n, n]);
+    },
+    hint: 'Pick from the models you have installed. Vision models (e.g. llava) can read images.' },
   { g: 'Transport', kind: 'meta', key: 'scenario', type: 'select', label: 'Mock replies', def: 'normal',
     options: [
       ['normal', 'Normal (markdown + code)'],
@@ -46,6 +57,10 @@ export const CONTROLS = [
   { g: 'Chrome', kind: 'attr', key: 'show-header', type: 'bool', def: false, label: 'show-header' },
   { g: 'Chrome', kind: 'attr', key: 'show-clear', type: 'bool', def: false, label: 'show-clear' },
   { g: 'Chrome', kind: 'attr', key: 'show-retry', type: 'bool', def: true, label: 'show-retry' },
+  { g: 'Chrome', kind: 'attr', key: 'show-copy', type: 'bool', def: true, label: 'show-copy',
+    hint: 'Per-message copy button (both roles). Hover a message to reveal the actions row.' },
+  { g: 'Chrome', kind: 'attr', key: 'show-edit', type: 'bool', def: false, label: 'show-edit',
+    hint: 'Edit button on USER messages. Confirming fires ai-chat:message-edit — see the event log.' },
   { g: 'Chrome', kind: 'attr', key: 'show-names', type: 'bool', def: true, label: 'show-names' },
   { g: 'Chrome', kind: 'attr', key: 'show-timestamps', type: 'bool', def: true, label: 'show-timestamps' },
   { g: 'Chrome', kind: 'attr', key: 'assistant-bubble', type: 'bool', def: false, label: 'assistant-bubble',
@@ -57,6 +72,21 @@ export const CONTROLS = [
   { g: 'Chrome', kind: 'attr', key: 'empty-heading', type: 'text', def: '', label: 'empty-heading' },
   { g: 'Chrome', kind: 'attr', key: 'empty-body', type: 'text', def: '', label: 'empty-body' },
 
+  // ---------- Attachments ----------
+  { g: 'Attachments', kind: 'attr', key: 'allow-attachments', type: 'bool', def: false, label: 'allow-attachments',
+    hint: 'Turn on, then try the 📎 button, DRAG a file onto the input, or PASTE an image (copy a screenshot, click the input, Ctrl/Cmd+V).' },
+  { g: 'Attachments', kind: 'attr', key: 'hide-attach-button', type: 'bool', def: false, label: 'hide-attach-button',
+    showIf: (get) => get('allow-attachments'),
+    hint: 'Hides the 📎 button but KEEPS paste + drag. Try pasting an image with this on.' },
+  { g: 'Attachments', kind: 'attr', key: 'accept', type: 'text', def: 'image/*', label: 'accept',
+    showIf: (get) => get('allow-attachments'),
+    hint: 'Allowed types: image/*, .pdf, image/png,application/pdf, or * for anything. Only images auto-send to the AI.' },
+  { g: 'Attachments', kind: 'attr', key: 'max-attachments', type: 'range', def: 5, min: 1, max: 10, label: 'max-attachments',
+    showIf: (get) => get('allow-attachments') },
+  { g: 'Attachments', kind: 'attr', key: 'max-attachment-size', type: 'text', def: '', label: 'max-attachment-size (bytes)',
+    showIf: (get) => get('allow-attachments'),
+    hint: 'Leave blank for no cap. e.g. 1048576 = 1 MB.' },
+
   // ---------- Slots ----------
   { g: 'Slots', kind: 'slot', key: 'slot:assistant-avatar', type: 'bool', def: false, label: 'assistant-avatar' },
   { g: 'Slots', kind: 'slot', key: 'slot:user-avatar', type: 'bool', def: false, label: 'user-avatar' },
@@ -64,8 +94,14 @@ export const CONTROLS = [
     hint: 'Needs show-header.' },
   { g: 'Slots', kind: 'slot', key: 'slot:composer-actions-start', type: 'bool', def: false, label: 'composer-actions-start' },
   { g: 'Slots', kind: 'slot', key: 'slot:composer-actions-end', type: 'bool', def: false, label: 'composer-actions-end' },
+  { g: 'Slots', kind: 'slot', key: 'slot:copy-icon', type: 'bool', def: false, label: 'copy-icon',
+    showIf: (get) => get('show-copy'), hint: 'Replaces the copy icon (needs show-copy).' },
+  { g: 'Slots', kind: 'slot', key: 'slot:edit-icon', type: 'bool', def: false, label: 'edit-icon',
+    showIf: (get) => get('show-edit'), hint: 'Replaces the edit icon (needs show-edit).' },
   { g: 'Slots', kind: 'slot', key: 'slot:send-icon', type: 'bool', def: false, label: 'send-icon' },
   { g: 'Slots', kind: 'slot', key: 'slot:empty-icon', type: 'bool', def: false, label: 'empty-icon' },
+  { g: 'Slots', kind: 'slot', key: 'slot:attach-icon', type: 'bool', def: false, label: 'attach-icon',
+    hint: 'Needs allow-attachments.' },
 
   // ---------- Colors ----------
   { g: 'Colors', kind: 'var', key: '--ai-chat-accent', type: 'color', def: '#4f46e5', label: 'accent',
@@ -83,6 +119,14 @@ export const CONTROLS = [
   { g: 'Colors', kind: 'var', key: '--ai-chat-code-fg', type: 'color', def: '#e6edf3', label: 'code-fg' },
   { g: 'Colors', kind: 'var', key: '--ai-chat-error', type: 'color', def: '#dc2626', label: 'error' },
   { g: 'Colors', kind: 'var', key: '--ai-chat-aside-bg', type: 'color', def: '#ffffff', label: 'aside-bg' },
+  { g: 'Colors', kind: 'var', key: '--ai-chat-action-color', type: 'text', def: 'var(--ai-chat-muted)', label: 'action-color',
+    hint: 'Resting color of the per-message copy/edit buttons.' },
+  { g: 'Colors', kind: 'var', key: '--ai-chat-action-hover-color', type: 'text', def: 'var(--ai-chat-fg)', label: 'action-hover-color' },
+  { g: 'Colors', kind: 'var', key: '--ai-chat-action-hover-bg', type: 'text', def: 'color-mix(in srgb, var(--ai-chat-fg) 8%, transparent)', label: 'action-hover-bg' },
+  { g: 'Colors', kind: 'var', key: '--ai-chat-preview-backdrop', type: 'text', def: 'color-mix(in srgb, #000 35%, transparent)', label: 'preview-backdrop',
+    hint: 'Scrim behind the full-size image preview. Try 0 for none, or rgb(0 0 0 / 0.7) for a classic lightbox.' },
+  { g: 'Colors', kind: 'var', key: '--ai-chat-image-border-color', type: 'text', def: 'color-mix(in srgb, var(--ai-chat-fg) 14%, transparent)', label: 'image-border-color',
+    hint: 'Hairline edge on images, so a white screenshot still reads on a white chat.' },
 
   // ---------- Radius ----------
   { g: 'Radius', kind: 'var', key: '--ai-chat-radius', type: 'range', def: 8, min: 0, max: 28, fmt: px, label: 'radius (master)',
@@ -100,6 +144,8 @@ export const CONTROLS = [
     hint: 'The sidebar button is full-width — 50% would make it a pill, so it has its own knob.' },
   { g: 'Radius', kind: 'var', key: '--ai-chat-jump-radius', type: 'text', def: '50%', label: 'jump-radius' },
   { g: 'Radius', kind: 'var', key: '--ai-chat-avatar-radius', type: 'text', def: '8px', label: 'avatar-radius' },
+  { g: 'Radius', kind: 'var', key: '--ai-chat-action-radius', type: 'text', def: '8px', label: 'action-radius',
+    hint: 'Per-message action buttons. Try 50% for circular.' },
 
   // ---------- Borders ----------
   { g: 'Borders', kind: 'var', key: '--ai-chat-border-width', type: 'range', def: 1, min: 0, max: 4, fmt: px, label: 'border-width' },
@@ -108,6 +154,8 @@ export const CONTROLS = [
   { g: 'Borders', kind: 'var', key: '--ai-chat-header-border-width', type: 'range', def: 1, min: 0, max: 4, fmt: px, label: 'header-border-width' },
   { g: 'Borders', kind: 'var', key: '--ai-chat-code-border-width', type: 'range', def: 1, min: 0, max: 4, fmt: px, label: 'code-border-width' },
   { g: 'Borders', kind: 'var', key: '--ai-chat-table-border-width', type: 'range', def: 1, min: 0, max: 4, fmt: px, label: 'table-border-width' },
+  { g: 'Borders', kind: 'var', key: '--ai-chat-image-border-width', type: 'range', def: 1, min: 0, max: 4, fmt: px, label: 'image-border-width',
+    hint: 'Hairline edge on attached/sent images. 0 removes it.' },
 
   // ---------- Focus ring ----------
   { g: 'Focus ring', kind: 'var', key: '--ai-chat-focus-color', type: 'text', def: 'color-mix(in srgb, var(--ai-chat-accent) 55%, transparent)', label: 'focus-color',
@@ -129,6 +177,8 @@ export const CONTROLS = [
   { g: 'Type & size', kind: 'var', key: '--ai-chat-send-size', type: 'range', def: 34, min: 20, max: 52, fmt: px, label: 'send-size' },
   { g: 'Type & size', kind: 'var', key: '--ai-chat-clear-size', type: 'range', def: 32, min: 20, max: 52, fmt: px, label: 'clear-size' },
   { g: 'Type & size', kind: 'var', key: '--ai-chat-jump-size', type: 'range', def: 36, min: 20, max: 56, fmt: px, label: 'jump-size' },
+  { g: 'Type & size', kind: 'var', key: '--ai-chat-action-size', type: 'range', def: 28, min: 18, max: 44, fmt: px, label: 'action-size',
+    hint: 'Per-message copy/edit button size.' },
   { g: 'Type & size', kind: 'var', key: '--ai-chat-input-max-height', type: 'range', def: 200, min: 60, max: 420, fmt: px, label: 'input-max-height' },
   { g: 'Type & size', kind: 'var', key: '--ai-chat-show-avatars', type: 'select', def: 'grid', label: 'show-avatars',
     options: [['grid', 'grid (show)'], ['none', 'none (force-hide)']],
@@ -155,6 +205,10 @@ export const CONTROLS = [
   { g: 'Labels (i18n)', kind: 'label', key: 'typing', type: 'text', def: 'Assistant is typing' },
   { g: 'Labels (i18n)', kind: 'label', key: 'copy', type: 'text', def: 'Copy' },
   { g: 'Labels (i18n)', kind: 'label', key: 'copied', type: 'text', def: 'Copied!' },
+  { g: 'Labels (i18n)', kind: 'label', key: 'copyMessage', type: 'text', def: 'Copy message' },
+  { g: 'Labels (i18n)', kind: 'label', key: 'edit', type: 'text', def: 'Edit' },
+  { g: 'Labels (i18n)', kind: 'label', key: 'saveEdit', type: 'text', def: 'Save' },
+  { g: 'Labels (i18n)', kind: 'label', key: 'cancelEdit', type: 'text', def: 'Cancel' },
   { g: 'Labels (i18n)', kind: 'label', key: 'send', type: 'text', def: 'Send message' },
   { g: 'Labels (i18n)', kind: 'label', key: 'stop', type: 'text', def: 'Stop' },
   { g: 'Labels (i18n)', kind: 'label', key: 'jumpToLatest', type: 'text', def: 'Jump to latest' },
@@ -213,6 +267,11 @@ export const PRESETS = [
    =========================================================================== */
 
 const GROUPS_OPEN = new Set(['Transport', 'Behaviour']);
+
+// Toggling one of these reveals/hides other controls (via their `showIf`), so a
+// change must rebuild the panel. `showIf` is a function we can't introspect, so
+// these gate keys are listed explicitly — keep in sync when adding a showIf.
+const GATE_KEYS = new Set(['allow-attachments', 'show-aside', 'transport', 'show-copy', 'show-edit']);
 
 export function buildPanel(root, ctx) {
   const { get, set, isSet, onAction, onPreset, onScenario, onTransport } = ctx;
@@ -303,7 +362,13 @@ export function buildPanel(root, ctx) {
       input = document.createElement('input');
       input.type = 'checkbox';
       input.checked = !!get(c.key);
-      input.onchange = () => set(c.key, input.checked);
+      input.onchange = () => {
+        set(c.key, input.checked);
+        // If other controls are gated on this toggle (via showIf), the panel must
+        // re-render so those rows appear/disappear. Without this, e.g. toggling
+        // allow-attachments would never reveal hide-attach-button / accept / etc.
+        if (GATE_KEYS.has(c.key)) rebuild();
+      };
     } else if (c.type === 'color') {
       input = document.createElement('input');
       input.type = 'color';
@@ -325,7 +390,10 @@ export function buildPanel(root, ctx) {
       input = wrap;
     } else if (c.type === 'select') {
       input = document.createElement('select');
-      for (const [v, t] of c.options) {
+      // Options may be a static array or a function (resolved at render time, e.g.
+      // the Ollama model list fetched from the running server).
+      const opts = typeof c.options === 'function' ? c.options(ctx) : c.options;
+      for (const [v, t] of opts) {
         const o = document.createElement('option');
         o.value = v; o.textContent = t;
         o.selected = String(get(c.key)) === String(v);
@@ -335,7 +403,10 @@ export function buildPanel(root, ctx) {
         if (c.key === 'scenario') { onScenario(input.value); set(c.key, input.value); return; }
         set(c.key, input.value);
         if (c.key === 'transport') { onTransport(); rebuild(); }
-        if (c.key === 'show-aside') rebuild();
+        // Picking a different model rebuilds the transport so requests go to it.
+        else if (c.key === 'ollamaModel') onTransport();
+        // Other select gates (if any) rebuild via GATE_KEYS.
+        else if (GATE_KEYS.has(c.key)) rebuild();
       };
     } else if (c.type === 'textarea') {
       input = document.createElement('textarea');

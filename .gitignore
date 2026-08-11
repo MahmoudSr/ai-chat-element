@@ -32,3 +32,12 @@ CLAUDE.md
 Thumbs.db
 .vscode/*
 !.vscode/extensions.json
+
+# Test screenshot artifacts (Vitest browser page.screenshot)
+test/*.png
+
+# Agent tooling installed locally (skills, agent configs) — not part of the package
+.agents/
+.claude/
+skills-lock.json
+AGENTS.md

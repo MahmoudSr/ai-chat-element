@@ -12,6 +12,7 @@ export type {
   Role,
   FinishReason,
   TokenUsage,
+  Attachment,
 } from './types.js';
 // The labels interface is part of the public API (consumers type their `labels`
 // object / i18n overrides with it), so it must be exported here too.

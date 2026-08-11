@@ -40,6 +40,32 @@ export interface ChatLabels {
   /** Placeholder shown when the assistant returns an empty response (finished
    *  streaming with no content and no error) — avoids a blank ghost bubble. */
   emptyResponse: string;
+  /** aria-label for the attach-file button (when `allow-attachments` is set). */
+  attach: string;
+  /** aria-label for the remove (×) button on an attachment chip. */
+  removeAttachment: string;
+  /** Shown/announced when a picked file exceeds `max-attachment-size`.
+   *  `{name}` is replaced with the filename. */
+  attachTooLarge: string;
+  /** Shown/announced when a picked file's type isn't allowed by `accept`.
+   *  `{name}` is replaced with the filename. */
+  attachWrongType: string;
+  /** Shown/announced when adding a file would exceed `max-attachments`. */
+  attachTooMany: string;
+  /** aria-label for the per-message copy button (when `show-copy` is set). */
+  copyMessage: string;
+  /** aria-label for the per-message edit button (when `show-edit` is set,
+   *  user messages only). */
+  edit: string;
+  /** Label + aria-label for the confirm button while editing a message. */
+  saveEdit: string;
+  /** Label + aria-label for the cancel button while editing a message. */
+  cancelEdit: string;
+  /** aria-label for an image that opens a full-size preview when clicked.
+   *  `{name}` is replaced with the file name. */
+  previewImage: string;
+  /** aria-label for the close button on the image preview overlay. */
+  closePreview: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -59,4 +85,15 @@ export const DEFAULT_LABELS: ChatLabels = {
   clearChat: 'New chat',
   retry: 'Retry',
   emptyResponse: 'No response.',
+  attach: 'Attach files',
+  removeAttachment: 'Remove attachment',
+  attachTooLarge: '{name} is too large.',
+  attachWrongType: "{name} isn't an allowed file type.",
+  attachTooMany: 'Too many attachments.',
+  copyMessage: 'Copy message',
+  edit: 'Edit',
+  saveEdit: 'Save',
+  cancelEdit: 'Cancel',
+  previewImage: 'Preview {name}',
+  closePreview: 'Close preview',
 };

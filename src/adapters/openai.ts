@@ -7,6 +7,7 @@ import type {
 import { parseSSE } from './sse.js';
 import { httpError, toMessage } from './errors.js';
 import { normalizeFinishReason } from './finish.js';
+import { toOpenAIContent } from './content.js';
 
 export interface OpenAIAdapterOptions {
   /** API key. WARNING: exposing a key in the browser is insecure — prefer a proxy. */
@@ -62,7 +63,7 @@ export function openAIAdapter(options: OpenAIAdapterOptions): ChatTransport {
             stream_options: { include_usage: true },
             messages: messages.map((m) => ({
               role: m.role,
-              content: m.content,
+              content: toOpenAIContent(m),
             })),
             ...options.params,
           }),

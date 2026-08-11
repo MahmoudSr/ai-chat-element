@@ -38,9 +38,20 @@ export const SCENARIOS = {
 
   /** Ordinary reply with markdown + code. The default. */
   async *normal(messages, signal) {
-    const q = messages[messages.length - 1]?.content ?? '';
+    const last = messages[messages.length - 1];
+    const q = last?.content ?? '';
+    // Acknowledge attachments so the mock feels real when testing them.
+    const atts = last?.attachments ?? [];
+    if (atts.length) {
+      const names = atts.map((a) => `\`${a.name}\``).join(', ');
+      yield* stream(
+        `I received ${atts.length} attachment${atts.length > 1 ? 's' : ''}: ${names}. ` +
+          `(The mock can't actually see images — a real vision model would.)\n\n`,
+        signal,
+      );
+    }
     yield* stream(
-      `You said: **${q}**\n\nHere's a code block to test highlighting and the copy button:\n\n` +
+      `You said: **${q || '(no text)'}**\n\nHere's a code block to test highlighting and the copy button:\n\n` +
         '```js\n' +
         "const chat = document.querySelector('ai-chat');\n" +
         "chat.transport = openAIAdapter({ model: 'gpt-4o-mini', apiKey });\n" +

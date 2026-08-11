@@ -7,6 +7,7 @@ import type {
 import { parseSSE } from './sse.js';
 import { httpError, toMessage } from './errors.js';
 import { normalizeFinishReason } from './finish.js';
+import { toAnthropicContent } from './content.js';
 
 export interface AnthropicAdapterOptions {
   /** API key. WARNING: exposing a key in the browser is insecure — prefer a proxy. */
@@ -60,7 +61,7 @@ export function anthropicAdapter(
         .join('\n\n');
       const turns = messages
         .filter((m) => m.role !== 'system')
-        .map((m) => ({ role: m.role, content: m.content }));
+        .map((m) => ({ role: m.role, content: toAnthropicContent(m) }));
 
       let response: Response;
       try {

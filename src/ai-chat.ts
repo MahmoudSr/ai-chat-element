@@ -3,7 +3,12 @@ import { customElement, property, state, query } from 'lit/decorators.js';
 import { repeat } from 'lit/directives/repeat.js';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import { classMap } from 'lit/directives/class-map.js';
-import type { ChatMessage, ChatTransport, Role } from './types.js';
+import type {
+  ChatMessage,
+  ChatTransport,
+  Role,
+  Attachment,
+} from './types.js';
 import { renderMarkdown } from './markdown/markdown.js';
 import { chatStyles } from './styles.js';
 import { hljsTheme } from './markdown/hljs-theme.js';
@@ -15,6 +20,11 @@ import {
   retryIcon,
   alertIcon,
   emptyChatIcon,
+  attachIcon,
+  closeIcon,
+  fileIcon,
+  copyIcon,
+  editIcon,
 } from './icons.js';
 
 let idCounter = 0;
@@ -35,6 +45,10 @@ const nextId = () =>
  * @fires ai-chat:submit    { content: string }          when the user sends
  * @fires ai-chat:new-chat  { messages: ChatMessage[] }  when New-chat is clicked
  *                          (cancelable: preventDefault to keep the conversation)
+ * @fires ai-chat:message-edit { index, message, newContent }  when a user
+ *                          confirms an edit (show-edit). Cancelable — the
+ *                          component does NOT mutate messages; the consumer owns
+ *                          what edit means (truncate-after + resend, etc.).
  */
 @customElement('ai-chat')
 export class AiChat extends LitElement {
@@ -118,6 +132,24 @@ export class AiChat extends LitElement {
   showRetry = true;
 
   /**
+   * Show a built-in copy button in the per-message actions row (both roles).
+   * On by default. Set `show-copy="false"` to hide it; the row still renders
+   * for any consumer actions slotted via `message-actions-start` / `-end`.
+   */
+  @property({ type: Boolean, attribute: 'show-copy' })
+  showCopy = true;
+
+  /**
+   * Show a built-in edit button on USER messages only. Off by default. When the
+   * user confirms an edit the component fires a cancelable `ai-chat:message-edit`
+   * event `{ index, message, newContent }` — the CONSUMER owns what "edit" means
+   * (truncate-after + resend, edit-in-place, branch, ...). The component does not
+   * mutate `.messages` itself. No-op on assistant messages.
+   */
+  @property({ type: Boolean, attribute: 'show-edit' })
+  showEdit = false;
+
+  /**
    * Show the optional sidebar column (for a conversation-history list). Off by
    * default — when off, the column isn't rendered and a plain chat is entirely
    * unaffected. Fill it via the `aside` slot; drive it with the `ai-chat:new-chat`
@@ -145,14 +177,64 @@ export class AiChat extends LitElement {
   @property({ type: Boolean })
   disabled = false;
 
+  /**
+   * Enable file/image attachments: shows the built-in attach button in the
+   * composer and lets the user drag-drop or paste files. Off by default — a chat
+   * without it behaves exactly as before. Only image attachments are sent to the
+   * built-in adapters; other files still reach the consumer via `ai-chat:submit`.
+   * Reflected so CSS (`:host([allow-attachments])`) can react. Default: false.
+   */
+  @property({ type: Boolean, attribute: 'allow-attachments', reflect: true })
+  allowAttachments = false;
+
+  /**
+   * Hide the built-in attach button while keeping the rest of the attachment
+   * capability — paste, drag-drop, and the imperative `openFilePicker()` all
+   * still work. Use this when you want paste/drop without a visible button, or
+   * you're providing your own trigger via `composer-actions-start`. Only
+   * meaningful with `allow-attachments`. Default: false.
+   */
+  @property({ type: Boolean, attribute: 'hide-attach-button' })
+  hideAttachButton = false;
+
+  /**
+   * Which file types the picker/drop/paste accepts, in the standard `accept`
+   * form (`image/*`, `.pdf`, `image/png,application/pdf`, `*`). Default:
+   * `image/*`. The UI accepts whatever you allow here; note only images auto-send
+   * to the AI (see `allow-attachments`).
+   */
+  @property({ type: String })
+  accept = 'image/*';
+
+  /** Max number of attachments per message. Default: 5. */
+  @property({ type: Number, attribute: 'max-attachments' })
+  maxAttachments = 5;
+
+  /**
+   * Max size (bytes) for a single attachment. `0` (default) means no cap — the
+   * consumer decides. A file over the cap is rejected via `ai-chat:attach-rejected`.
+   */
+  @property({ type: Number, attribute: 'max-attachment-size' })
+  maxAttachmentSize = 0;
+
   /** The conversation. Bindable and reflected back out via events. */
   @property({ attribute: false })
   messages: ChatMessage[] = [];
 
   @state() private _busy = false;
   @state() private _input = '';
+  /** Attachments staged in the composer, not yet sent. */
+  @state() private _pending: Attachment[] = [];
+  /** True while a file is being dragged over the composer (drop-zone styling). */
+  @state() private _dragging = false;
   /** Shown when the user has scrolled up away from the latest message. */
   @state() private _showJump = false;
+  /** The image attachment shown in the full-size preview overlay (null = none). */
+  @state() private _preview: Attachment | null = null;
+  /** id of the user message currently being edited inline (null = none). */
+  @state() private _editingId: string | null = null;
+  /** Live text of the in-progress edit, mirrored from the inline textarea. */
+  @state() private _editDraft = '';
   /**
    * Text pushed to a visually-hidden aria-live region so screen readers hear the
    * assistant's reply ONCE, when it settles — not token-by-token. The message
@@ -177,6 +259,10 @@ export class AiChat extends LitElement {
   @query('.messages') private _scrollEl!: HTMLElement;
   @query('.scroll-sentinel') private _sentinel!: HTMLElement;
   @query('textarea') private _textarea!: HTMLTextAreaElement;
+  @query('.composer__file') private _fileInput?: HTMLInputElement;
+
+  /** Monotonic counter so pasted images get stable, distinct names. */
+  private _pasteCount = 0;
 
   /** Programmatically append a message without sending it. */
   addMessage(role: Role, content: string): ChatMessage {
@@ -197,6 +283,13 @@ export class AiChat extends LitElement {
     this.stop();
     this.messages = [];
     this._input = '';
+    this._pending = [];
+    // A fresh chat starts pinned to the bottom with no jump button. Without this,
+    // clearing while scrolled up leaves the jump arrow stuck (the empty chat has
+    // nothing to scroll, so clicking it does nothing and the observer never
+    // re-fires to hide it). Reset the scroll-follow state explicitly.
+    this._stickToBottom = true;
+    this._showJump = false;
     if (this._textarea) {
       this._textarea.style.height = 'auto';
       this._textarea.style.overflowY = 'hidden';
@@ -277,9 +370,12 @@ export class AiChat extends LitElement {
    * Returns `false` without sending when the text is empty, a generation is
    * already in flight, or no transport is configured.
    */
-  async send(content: string): Promise<boolean> {
+  async send(content: string, attachments?: Attachment[]): Promise<boolean> {
     const text = content.trim();
-    if (!text || this._busy) return false;
+    const atts = attachments ?? [];
+    // A turn is valid with text OR at least one attachment (an image with no
+    // caption is a real message). Only the empty-and-attachment-less case bails.
+    if ((!text && atts.length === 0) || this._busy) return false;
     if (!this.transport) {
       this._emitError(
         'No transport configured. Set the `.transport` property.',
@@ -290,10 +386,17 @@ export class AiChat extends LitElement {
     // Sending always snaps the user back to the latest turn.
     this._stickToBottom = true;
     this._showJump = false;
-    this.addMessage('user', text);
+    const userMsg: ChatMessage = {
+      id: nextId(),
+      role: 'user',
+      content: text,
+      createdAt: Date.now(),
+      ...(atts.length ? { attachments: atts } : {}),
+    };
+    this.messages = [...this.messages, userMsg];
     this.dispatchEvent(
       new CustomEvent('ai-chat:submit', {
-        detail: { content: text },
+        detail: { content: text, attachments: atts },
         bubbles: true,
         composed: true,
       }),
@@ -439,24 +542,202 @@ export class AiChat extends LitElement {
   private _onSubmit(e: Event): void {
     e.preventDefault();
     const text = this._input.trim();
-    // Nothing to send, or a generation is in flight. In both cases leave the
-    // box untouched so the user's text survives. The ⏹ stop button handles the
-    // running stream. (`send()` also guards these, but we check here so we only
-    // clear the input when the message is actually accepted — send() doesn't
-    // resolve until the whole stream finishes, far too late to clear the box.)
-    if (!text || this._busy) return;
+    const atts = this._pending;
+    // Nothing to send (no text AND no attachment), or a generation is in flight.
+    // In both cases leave the box untouched so the user's text survives. The ⏹
+    // stop button handles the running stream. (`send()` also guards these, but we
+    // check here so we only clear the input when the message is actually accepted
+    // — send() doesn't resolve until the whole stream finishes, too late to clear.)
+    if ((!text && atts.length === 0) || this._busy) return;
 
-    // Accepted: clear the box now and kick off the (long-running) send.
+    // Accepted: clear the box + attachment tray now and kick off the send.
     this._input = '';
+    this._pending = [];
     if (this._textarea) {
       this._textarea.style.height = 'auto';
       this._textarea.style.overflowY = 'hidden';
     }
-    void this.send(text);
+    void this.send(text, atts);
     // Keep focus in the composer. On Enter it's already there, but a *click* on
     // the Send button moved focus onto it — and it's immediately swapped for the
     // Stop button, so focus would be lost. Return it to the input either way.
     this._focusComposer();
+  }
+
+  // ── Attachments ─────────────────────────────────────────────────────────
+
+  /**
+   * Open the native file picker programmatically. Useful with
+   * `hide-attach-button` when you provide your own trigger (e.g. a button in the
+   * `composer-actions-start` slot). No-op unless `allow-attachments` is set.
+   */
+  openFilePicker(): void {
+    if (!this.allowAttachments || this.disabled) return;
+    this._fileInput?.click();
+  }
+
+  /** Attach-button click handler. */
+  private _openPicker(): void {
+    this.openFilePicker();
+  }
+
+  /** Native <input type=file> change: ingest the picked files, then reset the
+   *  input so picking the SAME file again still fires a change event. */
+  private _onFilePick(e: Event): void {
+    const input = e.target as HTMLInputElement;
+    if (input.files) void this._ingest(input.files);
+    input.value = '';
+  }
+
+  private _onDragOver(e: DragEvent): void {
+    if (!this.allowAttachments || this.disabled) return;
+    // Signal we'll accept a drop (otherwise the browser navigates to the file).
+    e.preventDefault();
+    this._dragging = true;
+  }
+
+  private _onDragLeave(e: DragEvent): void {
+    // Only clear when the pointer actually leaves the composer, not when moving
+    // between child elements (which fire dragleave on the parent).
+    if (e.currentTarget === e.target) this._dragging = false;
+  }
+
+  private _onDrop(e: DragEvent): void {
+    if (!this.allowAttachments || this.disabled) return;
+    e.preventDefault();
+    this._dragging = false;
+    if (e.dataTransfer?.files?.length) void this._ingest(e.dataTransfer.files);
+  }
+
+  /** Paste handler on the textarea: only intercept when the clipboard carries a
+   *  file/image. Plain-text paste is left entirely to the browser. */
+  private _onPaste(e: ClipboardEvent): void {
+    if (!this.allowAttachments || this.disabled) return;
+    const files = e.clipboardData?.files;
+    if (!files || files.length === 0) return; // text paste — do nothing special
+    e.preventDefault(); // we're taking over: don't also paste the image as text
+    void this._ingest(files, /* fromPaste */ true);
+  }
+
+  /**
+   * Validate and add a batch of files to the pending tray. Each file is checked
+   * against `accept`, `max-attachment-size`, and `max-attachments`; rejects fire
+   * `ai-chat:attach-rejected`. Accepted files are read to a data URL for preview
+   * and sending, then surfaced via a cancelable `ai-chat:attach` (so a consumer
+   * can upload + swap the url before send).
+   */
+  private async _ingest(list: FileList, fromPaste = false): Promise<void> {
+    if (!this.allowAttachments || this.disabled) return;
+    const added: Attachment[] = [];
+    for (const file of Array.from(list)) {
+      if (this._pending.length + added.length >= this.maxAttachments) {
+        this._rejectFile(file, 'too-many', this._labels.attachTooMany);
+        break;
+      }
+      if (!this._typeAllowed(file)) {
+        this._rejectFile(
+          file,
+          'type',
+          this._fill(this._labels.attachWrongType, file.name),
+        );
+        continue;
+      }
+      if (this.maxAttachmentSize > 0 && file.size > this.maxAttachmentSize) {
+        this._rejectFile(
+          file,
+          'size',
+          this._fill(this._labels.attachTooLarge, file.name),
+        );
+        continue;
+      }
+      const name =
+        file.name ||
+        `pasted-${fromPaste ? 'image' : 'file'}-${++this._pasteCount}${this._extFor(file.type)}`;
+      const url = await this._readAsDataURL(file);
+      added.push({
+        id: nextId(),
+        kind: file.type.startsWith('image/') ? 'image' : 'file',
+        mimeType: file.type || 'application/octet-stream',
+        name,
+        size: file.size,
+        url,
+        file,
+      });
+    }
+    if (added.length === 0) return;
+    this._pending = [...this._pending, ...added];
+
+    // Let the consumer react (e.g. upload to storage and swap `url`) before send.
+    // Cancelable: preventDefault removes the just-added attachments (the consumer
+    // is handling them entirely themselves).
+    const ev = new CustomEvent('ai-chat:attach', {
+      detail: { attachments: added },
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+    });
+    if (!this.dispatchEvent(ev)) {
+      const ids = new Set(added.map((a) => a.id));
+      this._pending = this._pending.filter((a) => !ids.has(a.id));
+    }
+  }
+
+  /** Remove a staged attachment (chip × button). */
+  private _removeAttachment(id: string): void {
+    this._pending = this._pending.filter((a) => a.id !== id);
+    this._focusComposer();
+  }
+
+  private _rejectFile(file: File, reason: string, message: string): void {
+    this._announce(message);
+    this.dispatchEvent(
+      new CustomEvent('ai-chat:attach-rejected', {
+        detail: { file, reason, message },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /** Does `file` satisfy the `accept` attribute? Mirrors the browser's own
+   *  matching: `*`, `image/*`, an exact MIME type, or a `.ext`. */
+  private _typeAllowed(file: File): boolean {
+    const accept = this.accept.trim();
+    if (!accept || accept === '*' || accept === '*/*') return true;
+    const type = (file.type || '').toLowerCase();
+    const name = file.name.toLowerCase();
+    return accept.split(',').some((raw) => {
+      const t = raw.trim().toLowerCase();
+      if (!t) return false;
+      if (t.startsWith('.')) return name.endsWith(t);
+      if (t.endsWith('/*')) return type.startsWith(t.slice(0, -1)); // "image/"
+      return type === t;
+    });
+  }
+
+  private _fill(template: string, name: string): string {
+    return template.replace('{name}', name);
+  }
+
+  /** Best-effort file extension from a MIME type, for naming pasted files. */
+  private _extFor(mime: string): string {
+    const map: Record<string, string> = {
+      'image/png': '.png',
+      'image/jpeg': '.jpg',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'image/svg+xml': '.svg',
+    };
+    return map[mime] ?? '';
+  }
+
+  private _readAsDataURL(file: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
   }
 
   override connectedCallback(): void {
@@ -497,7 +778,14 @@ export class AiChat extends LitElement {
   }
 
   private _onHostKeydown = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && this._busy) {
+    if (e.key !== 'Escape') return;
+    // The preview overlay is the topmost surface, so Esc closes it first.
+    if (this._preview) {
+      e.preventDefault();
+      this._closePreview();
+      return;
+    }
+    if (this._busy) {
       e.preventDefault();
       this.stop();
     }
@@ -693,6 +981,7 @@ export class AiChat extends LitElement {
           </div>
           ${this._renderComposer()}
         </div>
+        ${this._renderPreview()}
       </div>
     `;
   }
@@ -864,6 +1153,9 @@ export class AiChat extends LitElement {
       message: true,
       [`message--${m.role}`]: true,
       'message--streaming': !!m.streaming,
+      // Lets the bubble stretch for a comfortable editing width (CSS scopes the
+      // widening to this message only).
+      'message--editing': this._editingId === m.id,
     });
     const isAssistant = m.role === 'assistant';
     // Avatars are opt-in: provide an `assistant-avatar` / `user-avatar` slot to
@@ -905,11 +1197,26 @@ export class AiChat extends LitElement {
               </div>`
               : nothing
           }
-        <div class="message__body" part="bubble">
+        ${
+          // Attachments render OUTSIDE the bubble: an image shouldn't sit on a
+          // colored bubble background (it looks boxed-in). The image floats on
+          // its own with rounded corners, and any accompanying text gets its own
+          // bubble BELOW it — the iMessage/ChatGPT/Claude treatment.
+          this._renderMessageAttachments(m)
+        }
+        ${
+          // No bubble at all for an image-only turn — an empty colored rectangle
+          // under the image is exactly the "looks bad" case.
+          this._hasBubbleContent(m)
+            ? html`<div class="message__body" part="bubble">
           ${
-            isAssistant
-              ? html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`
-              : html`<div class="plain">${m.content}</div>`
+            this._editingId === m.id
+              ? this._renderEditForm(m)
+              : isAssistant
+                ? html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`
+                : m.content
+                  ? html`<div class="plain">${m.content}</div>`
+                  : nothing
           }
           ${
             m.streaming && !m.content
@@ -942,10 +1249,209 @@ export class AiChat extends LitElement {
               </div>`
               : nothing
           }
-        </div>
+        </div>`
+            : nothing
+        }
+        ${this._renderMessageActions(m)}
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Does this message need a bubble at all? An image-only turn shouldn't render
+   * an empty colored rectangle under the image — the attachments render on their
+   * own, outside the bubble. A bubble is needed for text, the typing indicator,
+   * the empty-response placeholder, an error, or while editing.
+   */
+  private _hasBubbleContent(m: ChatMessage): boolean {
+    if (this._editingId === m.id) return true;
+    if (m.content) return true;
+    if (m.error) return true;
+    if (m.streaming) return true; // typing indicator lives in the bubble
+    // Settled assistant turn with no content/error shows the empty-response note.
+    return m.role === 'assistant';
+  }
+
+  /**
+   * Per-message actions row (copy, edit, and consumer-slotted actions). Rendered
+   * under the bubble, revealed on hover/focus. Skipped while streaming and for
+   * messages with no content (an error-only or empty turn has nothing to act on).
+   * The row still renders when built-ins are off if the consumer has slotted
+   * custom actions — that check happens in slice 2.
+   */
+  private _renderMessageActions(m: ChatMessage) {
+    // No actions row while this message is in edit mode (Save/Cancel take over).
+    if (m.streaming || !m.content || this._editingId === m.id) return nothing;
+    const isUser = m.role === 'user';
+    const showCopy = this.showCopy;
+    const showEdit = this.showEdit && isUser;
+    if (!showCopy && !showEdit) return nothing;
+    return html`
+      <div class="message__actions" part="message-actions" role="group"
+           aria-label=${this._labels.copyMessage}>
+        ${
+          showCopy
+            ? html`<button class="message__action" part="action-button copy-button"
+                     type="button" title=${this._labels.copyMessage}
+                     aria-label=${this._labels.copyMessage}
+                     @click=${(e: Event) => this._onCopyMessage(e, m)}>
+                     <slot name="copy-icon">${copyIcon}</slot>
+                   </button>`
+            : nothing
+        }
+        ${
+          showEdit
+            ? html`<button class="message__action" part="action-button edit-button"
+                     type="button" title=${this._labels.edit}
+                     aria-label=${this._labels.edit}
+                     @click=${() => this._startEdit(m)}>
+                     <slot name="edit-icon">${editIcon}</slot>
+                   </button>`
+            : nothing
+        }
+      </div>
+    `;
+  }
+
+  /** Begin editing a user message (implemented in the edit slice). */
+  /**
+   * Inline edit form shown in place of a user bubble's text. Enter saves,
+   * Shift+Enter inserts a newline, Esc cancels — mirroring the composer's
+   * keyboard model so it feels native.
+   */
+  private _renderEditForm(m: ChatMessage) {
+    const onKeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this._confirmEdit(m);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this._cancelEdit();
+      }
+    };
+    return html`
+      <div class="message__edit" part="message-edit">
+        <textarea
+          class="message__edit-input" part="edit-input"
+          .value=${this._editDraft}
+          aria-label=${this._labels.edit}
+          @input=${(e: Event) => {
+            const ta = e.target as HTMLTextAreaElement;
+            this._editDraft = ta.value;
+            this._autosize(ta);
+          }}
+          @keydown=${onKeydown}
+        ></textarea>
+        <div class="message__edit-actions" part="edit-actions">
+          <button type="button" class="message__edit-btn message__edit-btn--cancel"
+                  part="edit-cancel-button"
+                  @click=${() => this._cancelEdit()}>
+            ${this._labels.cancelEdit}
+          </button>
+          <button type="button" class="message__edit-btn message__edit-btn--save"
+                  part="edit-save-button"
+                  @click=${() => this._confirmEdit(m)}>
+            ${this._labels.saveEdit}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Open the full-size preview for an image attachment. Fires a cancelable
+   * `ai-chat:preview` first, so a consumer can take over with their own
+   * lightbox/gallery (`e.preventDefault()`) instead of the built-in overlay.
+   */
+  private _openPreview(a: Attachment): void {
+    const ev = new CustomEvent('ai-chat:preview', {
+      detail: { attachment: a },
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+    });
+    if (!this.dispatchEvent(ev)) return; // consumer handled it
+    this._preview = a;
+  }
+
+  /** Close the image preview overlay. */
+  private _closePreview(): void {
+    this._preview = null;
+  }
+
+  /** Full-size image preview overlay. Click the backdrop or press Esc to close. */
+  private _renderPreview() {
+    const a = this._preview;
+    if (!a) return nothing;
+    return html`
+      <div class="preview" part="preview" role="dialog" aria-modal="true"
+           aria-label=${this._fill(this._labels.previewImage, a.name)}
+           @click=${this._closePreview}>
+        <img class="preview__img" part="preview-image" src=${a.url} alt=${a.name} />
+        <button type="button" class="preview__close" part="preview-close"
+                aria-label=${this._labels.closePreview}
+                @click=${this._closePreview}>${closeIcon}</button>
+      </div>
+    `;
+  }
+
+  /** Enter inline-edit mode for a user message: swap its bubble for a textarea. */
+  private _startEdit(m: ChatMessage): void {
+    if (m.role !== 'user') return;
+    this._editingId = m.id;
+    this._editDraft = m.content;
+    // Focus + select the textarea once it renders.
+    void this.updateComplete.then(() => {
+      const ta = this.shadowRoot?.querySelector<HTMLTextAreaElement>(
+        '.message__edit textarea',
+      );
+      if (!ta) return;
+      this._autosize(ta);
+      ta.focus();
+      ta.select();
+    });
+  }
+
+  /** Leave edit mode without saving, returning focus to the message's edit button. */
+  private _cancelEdit(): void {
+    this._editingId = null;
+    this._editDraft = '';
+  }
+
+  /**
+   * Confirm an edit. Fires the cancelable `ai-chat:message-edit` event and then
+   * leaves edit mode. The component does NOT mutate `.messages` — the consumer
+   * owns what "edit" means (typically: overwrite this turn, drop everything
+   * after it, and resend). Empty edits and no-op edits are ignored.
+   */
+  private _confirmEdit(m: ChatMessage): void {
+    const newContent = this._editDraft.trim();
+    const index = this.messages.indexOf(m);
+    // Nothing to do for an empty edit, an unchanged edit, or a stale message.
+    if (!newContent || newContent === m.content || index === -1) {
+      this._cancelEdit();
+      return;
+    }
+    this.dispatchEvent(
+      new CustomEvent('ai-chat:message-edit', {
+        detail: { index, message: m, newContent },
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      }),
+    );
+    this._cancelEdit();
+  }
+
+  /** Copy a whole message's text to the clipboard, with brief button feedback. */
+  private _onCopyMessage(e: Event, m: ChatMessage): void {
+    const btn = (e.currentTarget as HTMLElement) ?? null;
+    void navigator.clipboard?.writeText(m.content).then(() => {
+      if (!btn) return;
+      btn.classList.add('message__action--done');
+      window.setTimeout(() => btn.classList.remove('message__action--done'), 1200);
+    });
   }
 
   /** Format a timestamp as a short local time, e.g. "3:45 PM". */
@@ -963,11 +1469,26 @@ export class AiChat extends LitElement {
   private _renderComposer() {
     // One rounded box: the textarea sits on top (borderless, transparent) and a
     // bottom action row holds tool buttons on the left and send/stop on the
-    // right. The `composer-actions-start` / `-end` slots are empty by default —
-    // drop in attach / mic / text-to-speech buttons later with no re-layout.
+    // right. When `allow-attachments` is on, a staged-attachment tray sits above
+    // the textarea, a built-in attach button leads the start slot, and the box
+    // is a drop zone. The `composer-actions-start` / `-end` slots stay open for
+    // consumer buttons (mic, TTS, ...) with no re-layout.
+    const boxClasses = classMap({
+      composer__box: true,
+      'composer__box--dragover': this._dragging,
+    });
+    // Send is enabled when there's text OR at least one staged attachment.
+    const canSend = !!this._input.trim() || this._pending.length > 0;
     return html`
       <form class="composer" part="composer" @submit=${this._onSubmit}>
-        <div class="composer__box" part="composer-box">
+        <div
+          class=${boxClasses}
+          part="composer-box"
+          @dragover=${this._onDragOver}
+          @dragleave=${this._onDragLeave}
+          @drop=${this._onDrop}
+        >
+          ${this._pending.length ? this._renderPendingTray() : nothing}
           <textarea
             class="composer__input"
             part="input"
@@ -978,9 +1499,33 @@ export class AiChat extends LitElement {
             aria-label=${this._labels.inputLabel}
             @input=${this._onInput}
             @keydown=${this._onKeydown}
+            @paste=${this._onPaste}
           ></textarea>
           <div class="composer__actions" part="composer-actions">
             <div class="composer__actions-start" part="composer-actions-start">
+              ${
+                // The button is optional (hide-attach-button), but the hidden
+                // file input renders whenever attachments are allowed so paste /
+                // drop / a custom trigger (openFilePicker()) all keep working.
+                this.allowAttachments
+                  ? html`${
+                      this.hideAttachButton
+                        ? nothing
+                        : html`<button type="button" part="attach-button"
+                            class="btn btn--attach"
+                            ?disabled=${this.disabled}
+                            @click=${this._openPicker}
+                            aria-label=${this._labels.attach}>
+                            <slot name="attach-icon">${attachIcon}</slot>
+                          </button>`
+                    }
+                    <input class="composer__file" type="file"
+                      accept=${this.accept}
+                      ?multiple=${this.maxAttachments > 1}
+                      @change=${this._onFilePick}
+                      aria-hidden="true" tabindex="-1" hidden />`
+                  : nothing
+              }
               <slot name="composer-actions-start"></slot>
             </div>
             <div class="composer__actions-end" part="composer-actions-end">
@@ -992,7 +1537,7 @@ export class AiChat extends LitElement {
                           <slot name="stop-icon"><span class="btn__square"></span></slot>
                         </button>`
                   : html`<button type="submit" part="send-button" class="btn btn--send"
-                          ?disabled=${this.disabled || !this._input.trim()} aria-label=${this._labels.send}>
+                          ?disabled=${this.disabled || !canSend} aria-label=${this._labels.send}>
                           <slot name="send-icon">${sendIcon}</slot>
                         </button>`
               }
@@ -1000,6 +1545,85 @@ export class AiChat extends LitElement {
           </div>
         </div>
       </form>
+    `;
+  }
+
+  /** The row of staged-attachment chips inside the composer box. */
+  private _renderPendingTray() {
+    return html`
+      <div class="composer__attachments" part="composer-attachments">
+        ${repeat(
+          this._pending,
+          (a) => a.id,
+          (a) => html`
+            <div class="attachment-chip" part="attachment-chip" title=${a.name}>
+              ${
+                a.kind === 'image'
+                  ? html`<button type="button" class="attachment-chip__thumb-btn"
+                           aria-label=${this._fill(this._labels.previewImage, a.name)}
+                           @click=${() => this._openPreview(a)}>
+                           <img class="attachment-chip__thumb" src=${a.url} alt=${a.name} />
+                         </button>`
+                  : html`<span class="attachment-chip__icon" aria-hidden="true">${fileIcon}</span>`
+              }
+              <span class="attachment-chip__name">${a.name}</span>
+              <button type="button" part="attachment-remove"
+                class="attachment-chip__remove"
+                @click=${() => this._removeAttachment(a.id)}
+                aria-label=${this._labels.removeAttachment}>
+                ${closeIcon}
+              </button>
+            </div>
+          `,
+        )}
+      </div>
+    `;
+  }
+
+  /** Render the attachments on a sent message (above its text). */
+  private _renderMessageAttachments(m: ChatMessage) {
+    if (!m.attachments?.length) return nothing;
+    const images = m.attachments.filter((a) => a.kind === 'image');
+    const files = m.attachments.filter((a) => a.kind !== 'image');
+    // Grid sizing keys off the image count: 1 shows larger, 2+ tile into fixed
+    // square cells so a wide screenshot can't stretch the bubble to full width.
+    const gridClass =
+      images.length === 1 ? 'message__images--single' : 'message__images--grid';
+    return html`
+      <div class="message__attachments" part="message-attachments">
+        ${
+          images.length
+            ? html`<div class="message__images ${gridClass}"
+                     style=${images.length > 1
+                       ? `--_cols:${Math.min(images.length, 3)}`
+                       : ''}>
+                ${repeat(
+                  images,
+                  (a) => a.id,
+                  (a) => html`<button type="button"
+                    class="message__image-btn"
+                    title=${a.name}
+                    aria-label=${this._fill(this._labels.previewImage, a.name)}
+                    @click=${() => this._openPreview(a)}>
+                    <img
+                      class="message__attachment message__attachment--image"
+                      part="message-attachment" src=${a.url} alt=${a.name}
+                      loading="lazy" />
+                  </button>`,
+                )}
+              </div>`
+            : nothing
+        }
+        ${repeat(
+          files,
+          (a) => a.id,
+          (a) => html`<span class="message__attachment message__attachment--file"
+                       part="message-attachment" title=${a.name}>
+                       <span class="message__attachment-icon" aria-hidden="true">${fileIcon}</span>
+                       <span class="message__attachment-name">${a.name}</span>
+                     </span>`,
+        )}
+      </div>
     `;
   }
 }

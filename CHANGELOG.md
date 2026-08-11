@@ -6,8 +6,81 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-08-11
+
 ### Added
 
+- **Per-message actions (copy & edit).** Hovering a message reveals an actions
+  row beneath it, keyboard-reachable and hidden until needed.
+  - **Copy** is built in and **on by default** on both roles (`show-copy`). It
+    copies the message's text and flashes the accent color to confirm.
+  - **Edit** is opt-in (`show-edit`) and appears on **user messages only** — the
+    bubble itself becomes editable (Enter saves, Shift+Enter newlines, Esc
+    cancels) rather than opening a separate input. On confirm the component
+    fires cancelable **`ai-chat:message-edit`** `{ index, message, newContent }`
+    and **does not mutate `.messages`**: the consumer owns what an edit means.
+    The conventional ChatGPT behaviour is
+    `chat.messages = chat.messages.slice(0, index); chat.send(newContent)`, which
+    is what the playground demonstrates.
+  - New parts: `message-actions`, `action-button`, `copy-button`, `edit-button`,
+    `message-edit`, `edit-input`, `edit-actions`, `edit-save-button`,
+    `edit-cancel-button`. New slots: `copy-icon`, `edit-icon`. New labels:
+    `copyMessage`, `edit`, `saveEdit`, `cancelEdit`. New vars:
+    `--ai-chat-action-radius` / `-size` / `-color` / `-hover-color` / `-hover-bg`.
+- **Click an image to preview it full size** — works on both a staged
+  composer thumbnail and an image already sent. Closes on the ✕, a backdrop
+  click, or Esc. Fires cancelable **`ai-chat:preview`** `{ attachment }` first,
+  so a consumer can suppress the built-in overlay and open their own lightbox.
+  New parts `preview`, `preview-image`, `preview-close`; new labels
+  `previewImage` / `closePreview`; new var `--ai-chat-preview-backdrop`
+  (a subtle scrim by default; `0` removes it).
+- **A hairline edge on images** so a light screenshot still reads as an object on
+  a light chat, via `--ai-chat-image-border-width` (1px, `0` removes) and
+  `--ai-chat-image-border-color`.
+
+### Changed
+
+- **Sent images now render outside the bubble** (the iMessage/ChatGPT treatment):
+  the image floats on its own rounded corners above the turn, any accompanying
+  text gets its own bubble below it, and an image-only turn renders **no bubble
+  at all** instead of an empty colored rectangle behind the picture.
+
+### Fixed
+
+- **A screenshot-sized image sat on the left of a user turn instead of hugging
+  the right.** A real pasted screenshot has a huge natural width, which stretches
+  every `fit-content` wrapper to the full column while only the `<img>` itself is
+  width-capped — so the image needed the auto margin, not its wrappers. Tiny test
+  fixtures never reproduced it; the regression test now uses a 1600×900 image.
+
+- **File & image attachments** (opt-in via `allow-attachments`). Adds a built-in
+  attach button to the composer plus **drag-drop** and **paste** (paste a
+  screenshot straight into the input) — all three funnel through one pipeline.
+  - **Images auto-send** to the built-in OpenAI / Anthropic adapters as the
+    provider's native image format (OpenAI `image_url`, Anthropic base64/url
+    image blocks). Non-image files render in the UI and reach the consumer via
+    `ai-chat:submit` (with the raw `File`), so a consumer's own backend can handle
+    them — but they are **not** auto-sent (the streaming chat APIs have no slot for
+    a generic file). A message with no image attachments serializes to a plain
+    `content` string exactly as before — zero change for existing consumers.
+  - **`hide-attach-button`** keeps paste + drag but hides the built-in button, for
+    consumers who want paste-a-screenshot without a visible button (or who supply
+    their own trigger via `composer-actions-start` + the new `openFilePicker()`
+    method).
+  - New model: `ChatMessage.attachments?: Attachment[]` and an exported
+    `Attachment` type. New attributes: `allow-attachments`, `hide-attach-button`,
+    `accept` (default `image/*`), `max-attachments` (default 5),
+    `max-attachment-size` (bytes; 0 = no cap). New events: cancelable
+    **`ai-chat:attach`** (mutate `attachment.url`
+    to swap in an uploaded URL before send; `preventDefault()` to handle files
+    yourself) and **`ai-chat:attach-rejected`** (`type` / `size` / `too-many`).
+    `ai-chat:submit` now also carries `attachments`. `send(text, attachments?)`.
+  - New parts (`composer-attachments`, `attachment-chip`, `attachment-remove`,
+    `message-attachments`, `message-attachment`, `attach-button`), `attach-icon`
+    slot, 3 CSS vars (`--ai-chat-attachment-radius`, `-thumb-size`,
+    `-image-max-width`), and 5 labels (`attach`, `removeAttachment`,
+    `attachTooLarge`, `attachWrongType`, `attachTooMany`). Playground gained an
+    Attachments panel + event-log wiring. 77 → 95 tests.
 - **Continuous integration.** A standalone `ci.yml` workflow runs typecheck, the
   full test suite (in real Chromium), and the library build on every push and PR
   to `main`; `main` is branch-protected with CI as a required check. Previously
@@ -19,12 +92,21 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Changed
 
+- **Name/timestamp meta now aligns to the message text, not the bubble edge.**
+  The horizontal inset of the meta row tracks the bubble's text inset (new
+  `--ai-chat-bubble-inset-x`, default 14px, from which `--ai-chat-bubble-padding`
+  derives its horizontal value) — so the label sits directly above the first line
+  of text for both the user bubble and the assistant bubble.
 - The Plain-HTML example now **pins the `esm.sh` CDN URL** to a specific version
   (`ai-chat-element@0.2.0`) so a future release can't change a consumer's page
   unannounced, with a note on how to opt back into `latest`.
 
 ### Fixed
 
+- **Jump-to-latest button no longer sticks after New chat.** Clearing the
+  conversation while scrolled up left the scroll-to-bottom arrow visible (and
+  inert — the empty chat had nothing to scroll); `clear()` now resets the
+  scroll-follow state so a fresh chat starts pinned with no jump button.
 - Corrected 3 broken `#custom-backend` anchor links in the README (an emoji in
   the heading had poisoned the generated slug).
 
@@ -287,7 +369,8 @@ Initial public release.
 - Accessibility: ARIA live region, keyboard support, reduced-motion.
 - Licensed under MPL-2.0.
 
-[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.3...v0.1.5
 [0.1.3]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.2...v0.1.3

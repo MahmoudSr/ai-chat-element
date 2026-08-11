@@ -367,6 +367,11 @@
           </button>`,
         'send-icon': '<span slot="send-icon" style="font-size:13px;font-weight:700">GO</span>',
         'empty-icon': '<span slot="empty-icon" style="font-size:30px">💬</span>',
+        'attach-icon': '<span slot="attach-icon" style="font-size:15px">➕</span>',
+        // A slotted action icon projects into the FIRST matching button only
+        // (one live node = one slot), so hover the newest message to see it.
+        'copy-icon': '<span slot="copy-icon" style="font-size:13px">⧉</span>',
+        'edit-icon': '<span slot="edit-icon" style="font-size:13px">✎</span>',
       };
 
       function renderSlots() {
@@ -439,6 +444,12 @@
           const r = await fetch('http://localhost:11434/api/tags');
           const { models } = await r.json();
           const names = models.map((m) => m.model);
+          // Feed the real installed list into the model pick-list, then rebuild
+          // the panel so the <select> shows exactly what's installed.
+          if (typeof PANEL_CTX !== 'undefined') {
+            PANEL_CTX.installedModels = names;
+            buildPanel($('panel'), PANEL_CTX);
+          }
           setStatus(names.length ? `Online — ${names.join(', ')}` : 'Online, but no models pulled.', 'ok');
         } catch {
           setStatus(
@@ -565,6 +576,18 @@
         commit(); drawHist();
       });
 
+      // Edit demo: the component fires ai-chat:message-edit but does NOT mutate
+      // messages — the consumer owns that. Here we do the ChatGPT behaviour:
+      // overwrite the edited user turn, drop everything after it, and resend to
+      // get a fresh reply. (A consumer could instead branch, edit-in-place, etc.)
+      chat.addEventListener('ai-chat:message-edit', (e) => {
+        const { index, newContent } = e.detail;
+        // Keep messages up to (not including) the edited one; resend its new text.
+        chat.messages = chat.messages.slice(0, index);
+        commit(); drawHist();
+        chat.send(newContent);
+      });
+
       /* =====================================================================
          EVENT LOG — see what your app would receive.
          ===================================================================== */
@@ -572,7 +595,8 @@
       function logEvent(name, detail) {
         const t = new Date().toLocaleTimeString([], { hour12: false });
         let d = '';
-        if (detail?.content) d = JSON.stringify(detail.content.slice(0, 40));
+        if (typeof detail?.newContent === 'string') d = `#${detail.index} → ${JSON.stringify(detail.newContent.slice(0, 30))}`;
+        else if (detail?.content) d = JSON.stringify(detail.content.slice(0, 40));
         else if (detail?.message) {
           const m = detail.message;
           const extra = [
@@ -583,33 +607,30 @@
         }
         else if (detail?.error) d = JSON.stringify(String(detail.error).slice(0, 40));
         else if (detail?.messages) d = `${detail.messages.length} messages`;
+        // attach / attach-rejected
+        if (detail?.attachments) {
+          const names = detail.attachments.map((a) => `${a.name}(${a.kind})`).join(', ');
+          d = (d ? d + ' ' : '') + `[${names}]`;
+        } else if (detail?.file) {
+          d = `${detail.reason}: ${detail.file.name || '(unnamed)'}`;
+        }
         logLines.unshift(`${t}  ${name}  ${d}`);
         logLines.length = Math.min(logLines.length, 40);
         const el = $('eventLog');
         if (el) el.textContent = logLines.join('\n') || 'No events yet.';
       }
-      for (const n of ['submit', 'message', 'error', 'new-chat']) {
+      for (const n of ['submit', 'message', 'error', 'new-chat', 'attach', 'attach-rejected', 'message-edit']) {
         chat.addEventListener('ai-chat:' + n, (e) => logEvent('ai-chat:' + n, e.detail));
       }
 
       /* =====================================================================
          BOOT
          ===================================================================== */
-      buildPanel($('panel'), {
-        state, get, set, isSet, DEFAULTS,
-        onAction: (id) => ACTIONS[id]?.(),
-        onPreset: (p) => {
-          for (const k of Object.keys(state)) delete state[k];
-          Object.assign(state, p.values);
-          apply();
-          buildPanel($('panel'), PANEL_CTX);   // re-sync the widgets
-        },
-        onScenario: (v) => { scenario = v; },
-        onTransport: setTransport,
-        getStatus: () => transportStatus,
-      });
       const PANEL_CTX = {
         state, get, set, isSet, DEFAULTS,
+        // Filled by probeOllama() from /api/tags — the models actually installed,
+        // so the Ollama model control is a pick-list, not a free-text box.
+        installedModels: [],
         onAction: (id) => ACTIONS[id]?.(),
         onPreset: (p) => {
           for (const k of Object.keys(state)) delete state[k];
@@ -621,6 +642,7 @@
         onTransport: setTransport,
         getStatus: () => transportStatus,
       };
+      buildPanel($('panel'), PANEL_CTX);
 
       const ACTIONS = {
         seed: () => {
@@ -653,6 +675,13 @@
         $('copyCode').textContent = 'Copied';
         setTimeout(() => ($('copyCode').textContent = 'Copy'), 1200);
       };
+
+      // The playground opens with attachments and message-editing ON so both are
+      // visible immediately — they're seeded as ordinary non-default state (the
+      // same as clicking their toggles), so the generated code reflects them and
+      // the component's own defaults stay off.
+      state['allow-attachments'] = true;
+      state['show-edit'] = true;
 
       apply();
       setTransport();
