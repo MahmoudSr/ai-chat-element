@@ -58,8 +58,8 @@ chat.transport = functionAdapter(async function* (messages, signal) {
    objects/functions that don't serialize to strings.
 2. **Everything else is an attribute:** `theme`, `placeholder`, `empty-heading`,
    `empty-body`, `show-names`, `show-timestamps`, `assistant-bubble`,
-   `show-header`, `show-clear`, `show-retry`, `show-aside`, `aside-side`,
-   `system-prompt`, `disabled`.
+   `show-header`, `show-clear`, `show-retry`, `show-copy`, `show-edit`,
+   `show-aside`, `aside-side`, `system-prompt`, `disabled`.
 3. **Boolean attributes turn off with `="false"`**, e.g. `show-timestamps="false"`.
 4. **Never put a raw API key in browser-shipped code** for production. Point an
    adapter's `baseURL` at your own server (which holds the key), or use
@@ -125,7 +125,9 @@ The `done` chunk may carry `finishReason` (`FinishReason`) and `usage`
 
 **Attributes:** `theme` (`auto`|`light`|`dark`), `placeholder`, `empty-heading`,
 `empty-body`, `show-names`, `show-timestamps`, `assistant-bubble`, `show-header`,
-`show-clear`, `show-retry` (default on), `show-aside`, `aside-side`
+`show-clear`, `show-retry` (default on), `show-copy` (default on — per-message
+copy button), `show-edit` (user messages only; fires `ai-chat:message-edit`),
+`show-aside`, `aside-side`
 (`left`|`right`), `system-prompt`, `disabled`, `allow-attachments`, `hide-attach-button` (keep
 paste/drag but hide the built-in button), `accept` (default `image/*`),
 `max-attachments` (default 5), `max-attachment-size` (bytes, 0 = no cap).
@@ -150,7 +152,14 @@ conversation, and `messages` is what's about to be cleared), `ai-chat:attach`
 `{attachments}` (cancelable — fired after picked/dropped/pasted files pass
 validation; `preventDefault()` drops them from the tray; mutate `attachment.url`
 to swap in an uploaded URL before send), `ai-chat:attach-rejected`
-`{file, reason, message}` (reason = `type`|`size`|`too-many`).
+`{file, reason, message}` (reason = `type`|`size`|`too-many`),
+`ai-chat:message-edit` `{index, message, newContent}` (fired when the user
+confirms an inline edit with `show-edit`; the component does NOT mutate
+`.messages` — the consumer decides. ChatGPT behaviour =
+`chat.messages = chat.messages.slice(0, index); chat.send(newContent)`),
+`ai-chat:preview` `{attachment}` (cancelable — fired when an image is clicked,
+staged or sent; `preventDefault()` suppresses the built-in overlay so you can
+open your own lightbox).
 
 ```js
 chat.addEventListener('ai-chat:message', (e) => console.log(e.detail.message));
@@ -213,13 +222,17 @@ fields to their own `done` chunk.
 - **i18n / all strings:** override any subset via the `.labels` object
   (`userName`, `assistantName`, `emptyHeading`, `emptyBody`, `copy`, `copied`,
   `typing`, `send`, `stop`, `jumpToLatest`, `inputLabel`, `messagesRegion`,
-  `headerTitle`, `clearChat`, `retry`, `emptyResponse`, `attach`,
+  `headerTitle`, `clearChat`, `retry`, `emptyResponse`, `copyMessage`, `edit`,
+  `saveEdit`, `cancelEdit`, `previewImage` (uses `{name}`), `closePreview`, `attach`,
   `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
   three `attach*` messages use `{name}` as a filename placeholder).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
   `header`, `header-slot`, `header-title`, `clear-button`, `messages`, `message`,
   `message-user`, `message-assistant`, `message-system`, `bubble`, `avatar`,
-  `meta`, `name`, `time`, `message-attachments`, `message-attachment`, `composer`,
+  `meta`, `name`, `time`, `message-attachments`, `message-attachment`,
+  `message-actions`, `action-button`, `copy-button`, `edit-button`,
+  `message-edit`, `edit-input`, `edit-actions`, `edit-save-button`,
+  `edit-cancel-button`, `preview`, `preview-image`, `preview-close`, `composer`,
   `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
   `composer-actions`, `composer-actions-start`, `composer-actions-end`,
   `attach-button`, `input`, `send-button`, `stop-button`, `jump-button`,
@@ -242,6 +255,12 @@ Colors: `--ai-chat-bg` (#fff), `--ai-chat-fg` (#1a1a1a), `--ai-chat-muted`
 (=accent-fg), `--ai-chat-assistant-bg` (#f3f4f6), `--ai-chat-assistant-fg`
 (#1a1a1a), `--ai-chat-code-bg` (#0d1117), `--ai-chat-code-fg` (#e6edf3),
 `--ai-chat-error` (#dc2626). Dark mode auto-swaps bg/fg/muted/border/assistant-*.
+Per-message action buttons: `--ai-chat-action-color` (= muted),
+`--ai-chat-action-hover-color` (= fg), `--ai-chat-action-hover-bg` (fg 8%).
+Image preview overlay: `--ai-chat-preview-backdrop` (subtle black 35%; `0` for
+none, darker for a classic lightbox). Images carry a hairline edge so a light
+screenshot reads on a light chat: `--ai-chat-image-border-width` (1px, `0`
+removes) and `--ai-chat-image-border-color` (fg 14%).
 
 Keyboard focus ring (`:focus-visible` only, subtle by default):
 `--ai-chat-focus-color` (softened accent), `--ai-chat-focus-width` (2px, 0 removes),
@@ -255,7 +274,8 @@ Radius (all = --ai-chat-radius): `--ai-chat-radius` (8px), `--ai-chat-outer-radi
 (= radius; 0 for square), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,
 `--ai-chat-send-radius`, `--ai-chat-new-chat-radius` (= button-radius),
 `--ai-chat-jump-radius` (50%), `--ai-chat-code-radius`,
-`--ai-chat-avatar-radius`, `--ai-chat-attachment-radius`, `--ai-chat-radius-sm`.
+`--ai-chat-avatar-radius`, `--ai-chat-attachment-radius`,
+`--ai-chat-action-radius` (= button-radius), `--ai-chat-radius-sm`.
 Note: `--ai-chat-button-radius: 50%` gives circular icon buttons but turns the
 sidebar's full-width New-chat button into a pill — set `--ai-chat-new-chat-radius`
 (e.g. to the master radius) to keep that button rectangular.
@@ -267,6 +287,7 @@ Fonts/size: `--ai-chat-font`, `--ai-chat-font-mono`, `--ai-chat-font-size` (15px
 (36px), `--ai-chat-input-max-height` (200px),
 `--ai-chat-attachment-thumb-size` (32px),
 `--ai-chat-attachment-image-max-width` (320px),
+`--ai-chat-action-size` (28px; per-message action buttons),
 `--ai-chat-show-avatars` (grid; `none` hides).
 
 Padding: `--ai-chat-bubble-inset-x` (14px; horizontal text inset — the name/time
@@ -278,7 +299,7 @@ Sidebar (with show-aside): `--ai-chat-aside-width` (260px), `--ai-chat-aside-bg`
 (transparent), `--ai-chat-aside-padding` (12px).
 
 - **Icon slots:** `send-icon`, `stop-icon`, `jump-icon`, `clear-icon`,
-  `retry-icon`, `error-icon`, `empty-icon`.
+  `retry-icon`, `copy-icon`, `edit-icon`, `error-icon`, `empty-icon`.
 - **Composer action slots:** `composer-actions-start`, `composer-actions-end`.
 
 ## React type shim (React < 19)

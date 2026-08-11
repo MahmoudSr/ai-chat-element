@@ -52,6 +52,20 @@ export interface ChatLabels {
   attachWrongType: string;
   /** Shown/announced when adding a file would exceed `max-attachments`. */
   attachTooMany: string;
+  /** aria-label for the per-message copy button (when `show-copy` is set). */
+  copyMessage: string;
+  /** aria-label for the per-message edit button (when `show-edit` is set,
+   *  user messages only). */
+  edit: string;
+  /** Label + aria-label for the confirm button while editing a message. */
+  saveEdit: string;
+  /** Label + aria-label for the cancel button while editing a message. */
+  cancelEdit: string;
+  /** aria-label for an image that opens a full-size preview when clicked.
+   *  `{name}` is replaced with the file name. */
+  previewImage: string;
+  /** aria-label for the close button on the image preview overlay. */
+  closePreview: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -76,4 +90,10 @@ export const DEFAULT_LABELS: ChatLabels = {
   attachTooLarge: '{name} is too large.',
   attachWrongType: "{name} isn't an allowed file type.",
   attachTooMany: 'Too many attachments.',
+  copyMessage: 'Copy message',
+  edit: 'Edit',
+  saveEdit: 'Save',
+  cancelEdit: 'Cancel',
+  previewImage: 'Preview {name}',
+  closePreview: 'Close preview',
 };

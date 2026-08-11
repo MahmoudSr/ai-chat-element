@@ -8,6 +8,49 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Added
 
+- **Per-message actions (copy & edit).** Hovering a message reveals an actions
+  row beneath it, keyboard-reachable and hidden until needed.
+  - **Copy** is built in and **on by default** on both roles (`show-copy`). It
+    copies the message's text and flashes the accent color to confirm.
+  - **Edit** is opt-in (`show-edit`) and appears on **user messages only** — the
+    bubble itself becomes editable (Enter saves, Shift+Enter newlines, Esc
+    cancels) rather than opening a separate input. On confirm the component
+    fires cancelable **`ai-chat:message-edit`** `{ index, message, newContent }`
+    and **does not mutate `.messages`**: the consumer owns what an edit means.
+    The conventional ChatGPT behaviour is
+    `chat.messages = chat.messages.slice(0, index); chat.send(newContent)`, which
+    is what the playground demonstrates.
+  - New parts: `message-actions`, `action-button`, `copy-button`, `edit-button`,
+    `message-edit`, `edit-input`, `edit-actions`, `edit-save-button`,
+    `edit-cancel-button`. New slots: `copy-icon`, `edit-icon`. New labels:
+    `copyMessage`, `edit`, `saveEdit`, `cancelEdit`. New vars:
+    `--ai-chat-action-radius` / `-size` / `-color` / `-hover-color` / `-hover-bg`.
+- **Click an image to preview it full size** — works on both a staged
+  composer thumbnail and an image already sent. Closes on the ✕, a backdrop
+  click, or Esc. Fires cancelable **`ai-chat:preview`** `{ attachment }` first,
+  so a consumer can suppress the built-in overlay and open their own lightbox.
+  New parts `preview`, `preview-image`, `preview-close`; new labels
+  `previewImage` / `closePreview`; new var `--ai-chat-preview-backdrop`
+  (a subtle scrim by default; `0` removes it).
+- **A hairline edge on images** so a light screenshot still reads as an object on
+  a light chat, via `--ai-chat-image-border-width` (1px, `0` removes) and
+  `--ai-chat-image-border-color`.
+
+### Changed
+
+- **Sent images now render outside the bubble** (the iMessage/ChatGPT treatment):
+  the image floats on its own rounded corners above the turn, any accompanying
+  text gets its own bubble below it, and an image-only turn renders **no bubble
+  at all** instead of an empty colored rectangle behind the picture.
+
+### Fixed
+
+- **A screenshot-sized image sat on the left of a user turn instead of hugging
+  the right.** A real pasted screenshot has a huge natural width, which stretches
+  every `fit-content` wrapper to the full column while only the `<img>` itself is
+  width-capped — so the image needed the auto margin, not its wrappers. Tiny test
+  fixtures never reproduced it; the regression test now uses a 1600×900 image.
+
 - **File & image attachments** (opt-in via `allow-attachments`). Adds a built-in
   attach button to the composer plus **drag-drop** and **paste** (paste a
   screenshot straight into the input) — all three funnel through one pipeline.

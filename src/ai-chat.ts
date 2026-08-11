@@ -23,6 +23,8 @@ import {
   attachIcon,
   closeIcon,
   fileIcon,
+  copyIcon,
+  editIcon,
 } from './icons.js';
 
 let idCounter = 0;
@@ -43,6 +45,10 @@ const nextId = () =>
  * @fires ai-chat:submit    { content: string }          when the user sends
  * @fires ai-chat:new-chat  { messages: ChatMessage[] }  when New-chat is clicked
  *                          (cancelable: preventDefault to keep the conversation)
+ * @fires ai-chat:message-edit { index, message, newContent }  when a user
+ *                          confirms an edit (show-edit). Cancelable — the
+ *                          component does NOT mutate messages; the consumer owns
+ *                          what edit means (truncate-after + resend, etc.).
  */
 @customElement('ai-chat')
 export class AiChat extends LitElement {
@@ -126,6 +132,24 @@ export class AiChat extends LitElement {
   showRetry = true;
 
   /**
+   * Show a built-in copy button in the per-message actions row (both roles).
+   * On by default. Set `show-copy="false"` to hide it; the row still renders
+   * for any consumer actions slotted via `message-actions-start` / `-end`.
+   */
+  @property({ type: Boolean, attribute: 'show-copy' })
+  showCopy = true;
+
+  /**
+   * Show a built-in edit button on USER messages only. Off by default. When the
+   * user confirms an edit the component fires a cancelable `ai-chat:message-edit`
+   * event `{ index, message, newContent }` — the CONSUMER owns what "edit" means
+   * (truncate-after + resend, edit-in-place, branch, ...). The component does not
+   * mutate `.messages` itself. No-op on assistant messages.
+   */
+  @property({ type: Boolean, attribute: 'show-edit' })
+  showEdit = false;
+
+  /**
    * Show the optional sidebar column (for a conversation-history list). Off by
    * default — when off, the column isn't rendered and a plain chat is entirely
    * unaffected. Fill it via the `aside` slot; drive it with the `ai-chat:new-chat`
@@ -205,6 +229,12 @@ export class AiChat extends LitElement {
   @state() private _dragging = false;
   /** Shown when the user has scrolled up away from the latest message. */
   @state() private _showJump = false;
+  /** The image attachment shown in the full-size preview overlay (null = none). */
+  @state() private _preview: Attachment | null = null;
+  /** id of the user message currently being edited inline (null = none). */
+  @state() private _editingId: string | null = null;
+  /** Live text of the in-progress edit, mirrored from the inline textarea. */
+  @state() private _editDraft = '';
   /**
    * Text pushed to a visually-hidden aria-live region so screen readers hear the
    * assistant's reply ONCE, when it settles — not token-by-token. The message
@@ -748,7 +778,14 @@ export class AiChat extends LitElement {
   }
 
   private _onHostKeydown = (e: KeyboardEvent): void => {
-    if (e.key === 'Escape' && this._busy) {
+    if (e.key !== 'Escape') return;
+    // The preview overlay is the topmost surface, so Esc closes it first.
+    if (this._preview) {
+      e.preventDefault();
+      this._closePreview();
+      return;
+    }
+    if (this._busy) {
       e.preventDefault();
       this.stop();
     }
@@ -944,6 +981,7 @@ export class AiChat extends LitElement {
           </div>
           ${this._renderComposer()}
         </div>
+        ${this._renderPreview()}
       </div>
     `;
   }
@@ -1115,6 +1153,9 @@ export class AiChat extends LitElement {
       message: true,
       [`message--${m.role}`]: true,
       'message--streaming': !!m.streaming,
+      // Lets the bubble stretch for a comfortable editing width (CSS scopes the
+      // widening to this message only).
+      'message--editing': this._editingId === m.id,
     });
     const isAssistant = m.role === 'assistant';
     // Avatars are opt-in: provide an `assistant-avatar` / `user-avatar` slot to
@@ -1156,14 +1197,26 @@ export class AiChat extends LitElement {
               </div>`
               : nothing
           }
-        <div class="message__body" part="bubble">
-          ${this._renderMessageAttachments(m)}
+        ${
+          // Attachments render OUTSIDE the bubble: an image shouldn't sit on a
+          // colored bubble background (it looks boxed-in). The image floats on
+          // its own with rounded corners, and any accompanying text gets its own
+          // bubble BELOW it — the iMessage/ChatGPT/Claude treatment.
+          this._renderMessageAttachments(m)
+        }
+        ${
+          // No bubble at all for an image-only turn — an empty colored rectangle
+          // under the image is exactly the "looks bad" case.
+          this._hasBubbleContent(m)
+            ? html`<div class="message__body" part="bubble">
           ${
-            isAssistant
-              ? html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`
-              : m.content
-                ? html`<div class="plain">${m.content}</div>`
-                : nothing
+            this._editingId === m.id
+              ? this._renderEditForm(m)
+              : isAssistant
+                ? html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`
+                : m.content
+                  ? html`<div class="plain">${m.content}</div>`
+                  : nothing
           }
           ${
             m.streaming && !m.content
@@ -1196,10 +1249,209 @@ export class AiChat extends LitElement {
               </div>`
               : nothing
           }
-        </div>
+        </div>`
+            : nothing
+        }
+        ${this._renderMessageActions(m)}
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Does this message need a bubble at all? An image-only turn shouldn't render
+   * an empty colored rectangle under the image — the attachments render on their
+   * own, outside the bubble. A bubble is needed for text, the typing indicator,
+   * the empty-response placeholder, an error, or while editing.
+   */
+  private _hasBubbleContent(m: ChatMessage): boolean {
+    if (this._editingId === m.id) return true;
+    if (m.content) return true;
+    if (m.error) return true;
+    if (m.streaming) return true; // typing indicator lives in the bubble
+    // Settled assistant turn with no content/error shows the empty-response note.
+    return m.role === 'assistant';
+  }
+
+  /**
+   * Per-message actions row (copy, edit, and consumer-slotted actions). Rendered
+   * under the bubble, revealed on hover/focus. Skipped while streaming and for
+   * messages with no content (an error-only or empty turn has nothing to act on).
+   * The row still renders when built-ins are off if the consumer has slotted
+   * custom actions — that check happens in slice 2.
+   */
+  private _renderMessageActions(m: ChatMessage) {
+    // No actions row while this message is in edit mode (Save/Cancel take over).
+    if (m.streaming || !m.content || this._editingId === m.id) return nothing;
+    const isUser = m.role === 'user';
+    const showCopy = this.showCopy;
+    const showEdit = this.showEdit && isUser;
+    if (!showCopy && !showEdit) return nothing;
+    return html`
+      <div class="message__actions" part="message-actions" role="group"
+           aria-label=${this._labels.copyMessage}>
+        ${
+          showCopy
+            ? html`<button class="message__action" part="action-button copy-button"
+                     type="button" title=${this._labels.copyMessage}
+                     aria-label=${this._labels.copyMessage}
+                     @click=${(e: Event) => this._onCopyMessage(e, m)}>
+                     <slot name="copy-icon">${copyIcon}</slot>
+                   </button>`
+            : nothing
+        }
+        ${
+          showEdit
+            ? html`<button class="message__action" part="action-button edit-button"
+                     type="button" title=${this._labels.edit}
+                     aria-label=${this._labels.edit}
+                     @click=${() => this._startEdit(m)}>
+                     <slot name="edit-icon">${editIcon}</slot>
+                   </button>`
+            : nothing
+        }
+      </div>
+    `;
+  }
+
+  /** Begin editing a user message (implemented in the edit slice). */
+  /**
+   * Inline edit form shown in place of a user bubble's text. Enter saves,
+   * Shift+Enter inserts a newline, Esc cancels — mirroring the composer's
+   * keyboard model so it feels native.
+   */
+  private _renderEditForm(m: ChatMessage) {
+    const onKeydown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this._confirmEdit(m);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        this._cancelEdit();
+      }
+    };
+    return html`
+      <div class="message__edit" part="message-edit">
+        <textarea
+          class="message__edit-input" part="edit-input"
+          .value=${this._editDraft}
+          aria-label=${this._labels.edit}
+          @input=${(e: Event) => {
+            const ta = e.target as HTMLTextAreaElement;
+            this._editDraft = ta.value;
+            this._autosize(ta);
+          }}
+          @keydown=${onKeydown}
+        ></textarea>
+        <div class="message__edit-actions" part="edit-actions">
+          <button type="button" class="message__edit-btn message__edit-btn--cancel"
+                  part="edit-cancel-button"
+                  @click=${() => this._cancelEdit()}>
+            ${this._labels.cancelEdit}
+          </button>
+          <button type="button" class="message__edit-btn message__edit-btn--save"
+                  part="edit-save-button"
+                  @click=${() => this._confirmEdit(m)}>
+            ${this._labels.saveEdit}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Open the full-size preview for an image attachment. Fires a cancelable
+   * `ai-chat:preview` first, so a consumer can take over with their own
+   * lightbox/gallery (`e.preventDefault()`) instead of the built-in overlay.
+   */
+  private _openPreview(a: Attachment): void {
+    const ev = new CustomEvent('ai-chat:preview', {
+      detail: { attachment: a },
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+    });
+    if (!this.dispatchEvent(ev)) return; // consumer handled it
+    this._preview = a;
+  }
+
+  /** Close the image preview overlay. */
+  private _closePreview(): void {
+    this._preview = null;
+  }
+
+  /** Full-size image preview overlay. Click the backdrop or press Esc to close. */
+  private _renderPreview() {
+    const a = this._preview;
+    if (!a) return nothing;
+    return html`
+      <div class="preview" part="preview" role="dialog" aria-modal="true"
+           aria-label=${this._fill(this._labels.previewImage, a.name)}
+           @click=${this._closePreview}>
+        <img class="preview__img" part="preview-image" src=${a.url} alt=${a.name} />
+        <button type="button" class="preview__close" part="preview-close"
+                aria-label=${this._labels.closePreview}
+                @click=${this._closePreview}>${closeIcon}</button>
+      </div>
+    `;
+  }
+
+  /** Enter inline-edit mode for a user message: swap its bubble for a textarea. */
+  private _startEdit(m: ChatMessage): void {
+    if (m.role !== 'user') return;
+    this._editingId = m.id;
+    this._editDraft = m.content;
+    // Focus + select the textarea once it renders.
+    void this.updateComplete.then(() => {
+      const ta = this.shadowRoot?.querySelector<HTMLTextAreaElement>(
+        '.message__edit textarea',
+      );
+      if (!ta) return;
+      this._autosize(ta);
+      ta.focus();
+      ta.select();
+    });
+  }
+
+  /** Leave edit mode without saving, returning focus to the message's edit button. */
+  private _cancelEdit(): void {
+    this._editingId = null;
+    this._editDraft = '';
+  }
+
+  /**
+   * Confirm an edit. Fires the cancelable `ai-chat:message-edit` event and then
+   * leaves edit mode. The component does NOT mutate `.messages` — the consumer
+   * owns what "edit" means (typically: overwrite this turn, drop everything
+   * after it, and resend). Empty edits and no-op edits are ignored.
+   */
+  private _confirmEdit(m: ChatMessage): void {
+    const newContent = this._editDraft.trim();
+    const index = this.messages.indexOf(m);
+    // Nothing to do for an empty edit, an unchanged edit, or a stale message.
+    if (!newContent || newContent === m.content || index === -1) {
+      this._cancelEdit();
+      return;
+    }
+    this.dispatchEvent(
+      new CustomEvent('ai-chat:message-edit', {
+        detail: { index, message: m, newContent },
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      }),
+    );
+    this._cancelEdit();
+  }
+
+  /** Copy a whole message's text to the clipboard, with brief button feedback. */
+  private _onCopyMessage(e: Event, m: ChatMessage): void {
+    const btn = (e.currentTarget as HTMLElement) ?? null;
+    void navigator.clipboard?.writeText(m.content).then(() => {
+      if (!btn) return;
+      btn.classList.add('message__action--done');
+      window.setTimeout(() => btn.classList.remove('message__action--done'), 1200);
+    });
   }
 
   /** Format a timestamp as a short local time, e.g. "3:45 PM". */
@@ -1307,7 +1559,11 @@ export class AiChat extends LitElement {
             <div class="attachment-chip" part="attachment-chip" title=${a.name}>
               ${
                 a.kind === 'image'
-                  ? html`<img class="attachment-chip__thumb" src=${a.url} alt=${a.name} />`
+                  ? html`<button type="button" class="attachment-chip__thumb-btn"
+                           aria-label=${this._fill(this._labels.previewImage, a.name)}
+                           @click=${() => this._openPreview(a)}>
+                           <img class="attachment-chip__thumb" src=${a.url} alt=${a.name} />
+                         </button>`
                   : html`<span class="attachment-chip__icon" aria-hidden="true">${fileIcon}</span>`
               }
               <span class="attachment-chip__name">${a.name}</span>
@@ -1344,10 +1600,16 @@ export class AiChat extends LitElement {
                 ${repeat(
                   images,
                   (a) => a.id,
-                  (a) => html`<img
-                    class="message__attachment message__attachment--image"
-                    part="message-attachment" src=${a.url} alt=${a.name}
-                    loading="lazy" />`,
+                  (a) => html`<button type="button"
+                    class="message__image-btn"
+                    title=${a.name}
+                    aria-label=${this._fill(this._labels.previewImage, a.name)}
+                    @click=${() => this._openPreview(a)}>
+                    <img
+                      class="message__attachment message__attachment--image"
+                      part="message-attachment" src=${a.url} alt=${a.name}
+                      loading="lazy" />
+                  </button>`,
                 )}
               </div>`
             : nothing

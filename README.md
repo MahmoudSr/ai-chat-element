@@ -327,6 +327,8 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `show-header`      | boolean                     | `false` | Show the built-in header bar (title + new-chat button).                           |
 | `show-clear`       | boolean                     | `false` | Show the New/Clear-chat button (in the header, or floating top-right).            |
 | `show-retry`       | boolean                     | `true`  | Show a Retry button on a failed message that re-sends the last user turn.         |
+| `show-copy`        | boolean                     | `true`  | Show a Copy button in the per-message actions row (both roles).                    |
+| `show-edit`        | boolean                     | `false` | Show an Edit button on **user** messages; confirming fires `ai-chat:message-edit`. |
 | `show-aside`       | boolean                     | `false` | Show the sidebar column (fill the `aside` slot with your history list).           |
 | `aside-side`       | `left` \| `right`           | `left`  | Which side the sidebar sits on.                                                   |
 | `system-prompt`    | string                      | —       | Prepended to every request (not shown in UI).                                     |
@@ -368,6 +370,8 @@ Set via JS only (they hold objects/arrays):
 | `ai-chat:new-chat`| `{ messages: ChatMessage[] }` | Fires when the New-chat button is clicked, **before** clearing. **Cancelable** — call `e.preventDefault()` to keep the current conversation. `messages` is the conversation about to be cleared. |
 | `ai-chat:attach`  | `{ attachments: Attachment[] }` | Fires when files are picked/dropped/pasted, after they pass validation. **Cancelable** — `e.preventDefault()` removes them from the tray (you're handling them yourself). Mutate `attachment.url` here to swap in an uploaded URL before send. |
 | `ai-chat:attach-rejected` | `{ file: File, reason: 'type' \| 'size' \| 'too-many', message: string }` | Fires when a picked file is rejected by `accept` / `max-attachment-size` / `max-attachments`. |
+| `ai-chat:message-edit` | `{ index: number, message: ChatMessage, newContent: string }` | Fires when the user confirms an inline edit (`show-edit`, user messages only). **The component does not change `.messages`** — you decide what edit means. The usual ChatGPT behaviour is to truncate from `index` and resend `newContent`. |
+| `ai-chat:preview` | `{ attachment: Attachment }` | Fires when an image (staged in the composer or already sent) is clicked. **Cancelable** — `e.preventDefault()` suppresses the built-in overlay so you can open your own lightbox/gallery. |
 
 `ai-chat:message` fires once per completed assistant turn — but **only when the
 reply has content**. Empty responses and failed turns don't fire it, so if you
@@ -496,6 +500,37 @@ The **Retry button** appears on a failed message and re-sends the last user turn
 (also callable as `chat.retry()`); turn it off with `show-retry="false"`.
 
 Rename the built-in strings via `labels`: `headerTitle`, `clearChat`, `retry`.
+
+### Message actions (copy / edit)
+
+Hovering a message reveals an actions row under it. **Copy** is built in and on
+by default (both roles); **Edit** is opt-in via `show-edit` and appears on **user
+messages only** — you never edit the assistant's words.
+
+```html
+<ai-chat show-edit></ai-chat>
+```
+
+Editing turns the bubble itself into an input. On confirm the component fires
+`ai-chat:message-edit` and **does not touch `.messages`** — the conversation is
+your data, so you decide what an edit means. The conventional behaviour (what
+ChatGPT/Claude do) is to drop everything from that turn onward and resend:
+
+```js
+chat.addEventListener('ai-chat:message-edit', (e) => {
+  const { index, newContent } = e.detail;
+  chat.messages = chat.messages.slice(0, index); // drop the edited turn + all after
+  chat.send(newContent);                          // resend → fresh reply
+});
+```
+
+Prefer editing in place, or branching the conversation instead? Handle the event
+however you like — that's the point of it being a hook rather than a behaviour.
+
+Turn copy off with `show-copy="false"`; restyle both via the `action-button`,
+`copy-button` and `edit-button` parts, swap the icons with the `copy-icon` /
+`edit-icon` slots, and rename the strings via the `copyMessage`, `edit`,
+`saveEdit` and `cancelEdit` labels.
 
 ---
 
@@ -686,6 +721,14 @@ chat.labels = {
   clearChat: 'Nuevo chat',
   retry: 'Reintentar',
   emptyResponse: 'Sin respuesta.',
+  // Per-message action buttons (copy / edit):
+  copyMessage: 'Copiar mensaje',
+  edit: 'Editar',
+  saveEdit: 'Guardar',
+  cancelEdit: 'Cancelar',
+  // Image preview ({name} is replaced with the file name):
+  previewImage: 'Ver {name}',
+  closePreview: 'Cerrar vista previa',
   // Attachment strings ({name} is replaced with the filename):
   attach: 'Adjuntar archivos',
   removeAttachment: 'Quitar adjunto',
@@ -820,6 +863,7 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-code-radius`   | `= radius`        | Code blocks                                  |
 | `--ai-chat-avatar-radius` | `= radius`        | Avatars                                      |
 | `--ai-chat-attachment-radius` | `= radius`    | Attachment chips + inline images             |
+| `--ai-chat-action-radius` | `= button-radius` | Per-message action buttons (copy/edit)       |
 | `--ai-chat-radius-sm`     | `= radius`        | Small inner corners                          |
 
 > Setting `--ai-chat-button-radius: 50%` for circular icon buttons also reaches
@@ -844,6 +888,13 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-input-max-height` | `200px`           | Input grows to here, then scrolls              |
 | `--ai-chat-attachment-thumb-size` | `32px`       | Attachment thumbnail size in the composer tray |
 | `--ai-chat-attachment-image-max-width` | `320px` | Max width of an inline image in a sent message |
+| `--ai-chat-action-size`      | `28px`            | Per-message action button (copy/edit) size     |
+| `--ai-chat-action-color`     | `= muted`         | Resting color of the action buttons            |
+| `--ai-chat-action-hover-color` | `= fg`          | Action button color on hover                    |
+| `--ai-chat-action-hover-bg`  | `fg 8%`           | Action button background on hover              |
+| `--ai-chat-preview-backdrop` | `#000 35%`        | Scrim behind the full-size image preview (`0` = none, darker = classic lightbox) |
+| `--ai-chat-image-border-width` | `1px`           | Hairline edge on images so a light screenshot still reads on a light chat (`0` removes) |
+| `--ai-chat-image-border-color` | `fg 14%`        | Color of that hairline edge                    |
 | `--ai-chat-show-avatars`     | `grid`            | `none` force-hides avatars even if slotted     |
 
 **Spacing (padding)**
@@ -873,12 +924,21 @@ For styling that a variable can't reach, target the shadow parts with
 `layout`, `root`, `aside`, `aside-list`, `header`, `header-slot`, `header-title`,
 `clear-button`, `messages`, `message`, `message-user`, `message-assistant`,
 `message-system`, `bubble`, `avatar`, `meta`, `name`, `time`,
-`message-attachments`, `message-attachment`, `composer`,
+`message-attachments`, `message-attachment`,
+`message-actions`, `action-button`, `copy-button`, `edit-button`,
+`preview`, `preview-image`, `preview-close`, `composer`,
 `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
 `composer-actions`, `composer-actions-start`,
 `composer-actions-end`, `attach-button`, `input`, `send-button`, `stop-button`,
 `jump-button`, `retry-button`, `empty`, `empty-icon`, `empty-heading`,
 `empty-body`, `error`, `empty-response`.
+
+`message-actions` is the per-message actions row; `action-button` targets every
+button in it, with `copy-button` / `edit-button` for the built-ins specifically.
+While a user message is being edited (`show-edit`), the bubble swaps to an
+inline editor exposing `message-edit` (the wrapper), `edit-input` (the
+textarea), `edit-actions` (the Save/Cancel row), and `edit-save-button` /
+`edit-cancel-button`.
 
 Every message row carries `message` **and** a per-role part, so you can style one
 side without a `[data-role]` selector:
@@ -908,6 +968,7 @@ Put your own markup in any of these (`<x slot="name">`):
 | `composer-actions-end`             | Buttons at the right, before send                                     |
 | `send-icon` / `stop-icon`          | Send / stop button icons                                              |
 | `clear-icon` / `retry-icon`        | New-chat / retry button icons                                         |
+| `copy-icon` / `edit-icon`          | Per-message copy / edit action-button icons                          |
 | `jump-icon` / `error-icon`         | Jump-to-latest / error icons                                          |
 | `attach-icon`                      | Attach-button icon (with `allow-attachments`)                        |
 
