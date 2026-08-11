@@ -9,18 +9,18 @@ A reusable, framework-agnostic **AI chat UI** as a Web Component. Drop `<ai-chat
 
 ### ▶︎ [Try it in the playground](https://mahmoudsr.github.io/ai-chat-element/examples/playground.html)
 
-Every attribute, all 58 CSS variables, every label and slot — live. Pick a preset,
+Every attribute, all 66 CSS variables, every label and slot — live. Pick a preset,
 tweak it, and copy the generated code straight into your app.
 
-- 🎨 **Customizable to the corner** — **58 CSS variables, every one documented**; nothing is hardcoded. One line rebrands it (`--ai-chat-accent`); one knob rounds it (`--ai-chat-radius`); every surface has its own override when you need it.
+- 🎨 **Customizable to the corner** — **66 CSS variables, every one documented**; nothing is hardcoded. One line rebrands it (`--ai-chat-accent`); one knob rounds it (`--ai-chat-radius`); every surface has its own override when you need it.
 - 🔌 **Pluggable transport** — built-in adapters for OpenAI-compatible & Anthropic APIs, or bring your own backend
 - 🌊 **Streaming** token-by-token with a stop button and jump-to-latest
 - 📝 **Markdown + syntax-highlighted code** with copy buttons
-- 🧩 **Yours to shape** — 15 slots, 36 `::part()` hooks, sender names, timestamps, avatars, and every string (i18n-ready). No emoji by default.
+- 🧩 **Yours to shape** — 17 slots, 48 `::part()` hooks, sender names, timestamps, avatars, and every string (i18n-ready). No emoji by default.
 - ♿ **Accessible** — polite screen-reader announcement of each settled reply
   (no token-by-token spam), a keyboard focus ring, focus that never gets dropped,
   full keyboard support, and respects `prefers-reduced-motion`
-- 📦 **~80 KB gzipped**, zero peer dependencies
+- 📦 **~91 KB gzipped**, zero peer dependencies
 
 ---
 
@@ -99,9 +99,9 @@ server-backed pattern above. See [Transports](#transports).
 
 <script type="module">
   // Pin the version so a future release can't change your page unannounced.
-  // Drop the @0.2.0 to always get the latest (fine for a quick try, not prod).
-  import 'https://esm.sh/ai-chat-element@0.2.0';
-  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.2.0';
+  // Drop the @0.3.0 to always get the latest (fine for a quick try, not prod).
+  import 'https://esm.sh/ai-chat-element@0.3.0';
+  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.3.0';
 
   const chat = document.querySelector('ai-chat');
   // Local, keyless example: talk to Ollama running on your machine.
