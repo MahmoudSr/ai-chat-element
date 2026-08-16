@@ -199,6 +199,15 @@
         color: var(--ai-chat-fg); font: inherit; font-size: 12.5px;
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 7px;
       }
+      /* Marks a conversation whose reply is still generating in the background.
+         A dot, not text — no layout shift, and it reads at a glance. */
+      .h-dot {
+        display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+        background: var(--ai-chat-accent); margin-right: 6px; vertical-align: middle;
+        animation: h-pulse 1.4s ease-in-out infinite;
+      }
+      @keyframes h-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+      @media (prefers-reduced-motion: reduce) { .h-dot { animation: none; } }
       .h-del {
         flex: none; border: none; background: none; cursor: pointer;
         color: var(--ai-chat-muted); padding: 4px; margin-right: 4px;
@@ -239,19 +248,85 @@
       }
       .dlg__btn--danger:hover { background: #b91c1c; border-color: #b91c1c; }
 
+      /* ---------- controls drawer (mobile) ----------
+         The desktop layout is panel-beside-chat. That doesn't fit a phone: the
+         old rule just stacked them, which squeezed the chat into a few dead
+         pixels with no way to scroll to it. On small screens the panel becomes
+         an off-canvas DRAWER instead, so the chat gets the whole viewport and
+         the controls slide in over it. */
+      .drawer-btn { display: none; }
+      .scrim { display: none; }
+
       @media (max-width: 900px) {
-        .wrap { flex-direction: column; }
-        .panel { width: 100%; max-height: 44vh; border-right: none; border-bottom: 1px solid var(--pg-line); }
+        .drawer-btn {
+          display: inline-flex; align-items: center; gap: 6px;
+          flex: none; white-space: nowrap;
+        }
+        /* The bar is a fixed 50px and the drawer is positioned against it, so
+           nothing in here may wrap. Drop the descriptive text, keep the title
+           and the two buttons, and stop the h1 from line-breaking. */
+        .bar { gap: 8px; }
+        .bar__note { display: none; }
+        .bar h1 code { display: none; }
+        .bar h1 {
+          font-size: 13px; white-space: nowrap;
+          overflow: hidden; text-overflow: ellipsis; min-width: 0;
+        }
+        .bar .act { flex: none; white-space: nowrap; }
+        .wrap { position: relative; }
+        .panel {
+          position: fixed; z-index: 40;
+          top: 50px;                       /* below the top bar */
+          bottom: 0; left: 0;
+          width: min(86vw, 340px);
+          border-right: 1px solid var(--pg-line);
+          transform: translateX(-100%);
+          transition: transform 0.22s ease;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: touch;
+          box-shadow: 0 0 40px rgba(0, 0, 0, 0.28);
+        }
+        body.drawer-open .panel { transform: translateX(0); }
+        .scrim {
+          display: block; position: fixed; inset: 50px 0 0 0; z-index: 30;
+          background: rgba(0, 0, 0, 0.45);
+          opacity: 0; pointer-events: none;
+          transition: opacity 0.22s ease;
+        }
+        body.drawer-open .scrim { opacity: 1; pointer-events: auto; }
+        /* The chat now owns the full width AND a real height, so it's reachable. */
+        .stage { padding: 10px; }
+        .frame { min-height: 0; }
+      }
+
+      /* Very short viewports (landscape phones): let the page scroll rather than
+         crushing the chat to nothing. */
+      @media (max-height: 480px) and (max-width: 900px) {
+        .stage { min-height: 380px; }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .panel, .scrim { transition: none; }
       }
     </style>
   </head>
   <body>
     <div class="bar">
+      <button class="act drawer-btn" id="drawerBtn" aria-expanded="false" aria-controls="panel"
+              title="Show the controls panel">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" aria-hidden="true">
+          <path d="M3 6h18M3 12h18M3 18h18"/>
+        </svg>
+        Controls
+      </button>
       <h1><code>&lt;ai-chat&gt;</code> playground</h1>
       <span class="bar__note" id="pkgNote">every attribute, CSS variable, label &amp; slot — live</span>
       <div class="bar__spacer"></div>
       <button class="act" id="pgTheme" title="Toggle the page theme (not the component's)">Page theme</button>
     </div>
+    <!-- Tap-outside-to-close for the mobile controls drawer. -->
+    <div class="scrim" id="scrim"></div>
 
     <!-- Confirm dialog for deleting a conversation. Native <dialog> gives us the
          backdrop, Esc-to-close and focus trapping for free — no library. This is
@@ -515,10 +590,17 @@
       const histList = $('histList');
       let convos = [{ id: 1, title: 'Getting started', messages: [] }];
       let activeId = 1;
+      chat.conversationId = '1';
 
       const titleOf = (msgs) => {
         const f = msgs.find((m) => m.role === 'user');
         return f ? (f.content.length > 30 ? f.content.slice(0, 30).trim() + '…' : f.content) : 'New chat';
+      };
+      // Keep the component's conversation tag in sync with the active row, so a
+      // reply that outlives a switch can be routed back to the right chat.
+      const setActive = (id) => {
+        activeId = id;
+        chat.conversationId = id == null ? null : String(id);
       };
       const commit = () => {
         const c = convos.find((x) => x.id === activeId);
@@ -538,9 +620,20 @@
           row.className = 'h-item';
           row.setAttribute('aria-current', String(c.id === activeId));
           const open = document.createElement('button');
-          open.type = 'button'; open.className = 'h-open'; open.textContent = c.title;
+          open.type = 'button'; open.className = 'h-open';
+          // A conversation still generating in the background gets a marker, so
+          // you can watch a reply finish for a chat you're not looking at.
+          // A conversation generating in the background gets a small pulsing
+          // dot — no text, no layout shift. Ask the component, which knows.
+          open.textContent = c.title;
+          if (chat.isGenerating?.(String(c.id))) {
+            const dot = document.createElement('span');
+            dot.className = 'h-dot';
+            dot.setAttribute('aria-label', 'still generating');
+            open.prepend(dot);
+          }
           open.onclick = () => {
-            commit(); activeId = c.id;
+            commit(); setActive(c.id);
             chat.messages = [...(convos.find((x) => x.id === c.id)?.messages ?? [])];
             drawHist();
           };
@@ -552,7 +645,7 @@
             if (!(await confirmDelete(c.title))) return;
             convos = convos.filter((x) => x.id !== c.id);
             if (activeId === c.id) {
-              activeId = convos[0]?.id ?? null;
+              setActive(convos[0]?.id ?? null);
               chat.messages = activeId ? [...convos[0].messages] : [];
             }
             drawHist();
@@ -567,13 +660,30 @@
         if (c) { c.messages = e.detail.messages; if (c.title === 'New chat') c.title = titleOf(c.messages); }
         const id = Date.now();
         convos.unshift({ id, title: 'New chat', messages: [] });
-        activeId = id;
+        setActive(id);
         drawHist();
       });
       chat.addEventListener('ai-chat:message', () => { commit(); drawHist(); });
       chat.addEventListener('ai-chat:submit', () => {
-        if (!activeId) { const id = Date.now(); convos.unshift({ id, title: 'New chat', messages: [] }); activeId = id; }
+        if (!activeId) { const id = Date.now(); convos.unshift({ id, title: 'New chat', messages: [] }); setActive(id); }
         commit(); drawHist();
+      });
+
+      // A reply that kept generating after the user switched away. The component
+      // hands it to us because its conversation is no longer on screen — we
+      // append it to the conversation it actually belongs to.
+      // A reply that kept generating after the user switched away. The component
+      // renders it live if you switch BACK — this handler is only about STORAGE:
+      // keeping our copy of that conversation current so it survives a reload.
+      chat.addEventListener('ai-chat:background-message', (e) => {
+        const { conversationId, message, done } = e.detail;
+        const c = convos.find((x) => String(x.id) === String(conversationId));
+        if (!c) return;
+        if (!done) { drawHist(); return; }   // repaint so the dot clears/appears
+        const i = c.messages.findIndex((m) => m.id === message.id);
+        if (i >= 0) c.messages[i] = message; else c.messages = [...c.messages, message];
+        if (c.title === 'New chat') c.title = titleOf(c.messages);
+        drawHist();
       });
 
       // Edit demo: the component fires ai-chat:message-edit but does NOT mutate
@@ -595,7 +705,8 @@
       function logEvent(name, detail) {
         const t = new Date().toLocaleTimeString([], { hour12: false });
         let d = '';
-        if (typeof detail?.newContent === 'string') d = `#${detail.index} → ${JSON.stringify(detail.newContent.slice(0, 30))}`;
+        if (typeof detail?.text === 'string') d = detail.text.slice(0, 80);
+        else if (typeof detail?.newContent === 'string') d = `#${detail.index} → ${JSON.stringify(detail.newContent.slice(0, 30))}`;
         else if (detail?.content) d = JSON.stringify(detail.content.slice(0, 40));
         else if (detail?.message) {
           const m = detail.message;
@@ -622,6 +733,13 @@
       for (const n of ['submit', 'message', 'error', 'new-chat', 'attach', 'attach-rejected', 'message-edit']) {
         chat.addEventListener('ai-chat:' + n, (e) => logEvent('ai-chat:' + n, e.detail));
       }
+      // Only the SETTLE event — the per-token ones would flood the log.
+      chat.addEventListener('ai-chat:background-message', (e) => {
+        if (!e.detail.done) return;
+        logEvent('ai-chat:background-message', {
+          text: `conv ${e.detail.conversationId} settled: ${e.detail.message.error ? 'ERROR ' + e.detail.message.error : e.detail.message.content}`,
+        });
+      });
 
       /* =====================================================================
          BOOT
@@ -670,6 +788,33 @@
         const el = document.documentElement;
         el.dataset.pg = el.dataset.pg === 'dark' ? 'light' : 'dark';
       };
+
+      /* ---------- controls drawer (mobile) ----------
+         On a phone the controls panel is an off-canvas drawer so the chat gets
+         the full viewport. Desktop is unaffected (the button is display:none and
+         the panel is statically positioned). */
+      const drawer = {
+        open: () => {
+          document.body.classList.add('drawer-open');
+          $('drawerBtn').setAttribute('aria-expanded', 'true');
+        },
+        close: () => {
+          document.body.classList.remove('drawer-open');
+          $('drawerBtn').setAttribute('aria-expanded', 'false');
+        },
+        toggle: () =>
+          document.body.classList.contains('drawer-open') ? drawer.close() : drawer.open(),
+      };
+      $('drawerBtn').onclick = drawer.toggle;
+      $('scrim').onclick = drawer.close;
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') drawer.close();
+      });
+      // Growing past the breakpoint puts the panel back in the flow; drop the
+      // open state so it doesn't linger as a stuck class.
+      matchMedia('(max-width: 900px)').addEventListener('change', (e) => {
+        if (!e.matches) drawer.close();
+      });
       $('copyCode').onclick = async () => {
         await navigator.clipboard.writeText($('codeOut').textContent);
         $('copyCode').textContent = 'Copied';

@@ -150,6 +150,30 @@ export class AiChat extends LitElement {
   showEdit = false;
 
   /**
+   * Identifies the conversation currently displayed. Purely a tag the component
+   * hands back to you: set it to your own storage key whenever you swap
+   * `.messages`, and any reply still streaming for the conversation you left
+   * arrives on `ai-chat:background-message` carrying the id it started under, so
+   * you know which conversation to persist it to. Optional — `null` when unset.
+   */
+  @property({ type: String, attribute: 'conversation-id' })
+  conversationId: string | null = null;
+
+  /**
+   * Abort an in-flight reply when the conversation is switched or cleared,
+   * instead of letting it finish in the background. Off by default: like every
+   * real chat app, switching away from a generating conversation lets it keep
+   * generating (see `ai-chat:background-message`). Turn this on to get the
+   * pre-0.4.0 behavior back — the request is cancelled the moment you leave.
+   *
+   * Note this only governs the IMPLICIT orphaning of a stream. An explicit
+   * `stop()` (the Stop button, or Esc) always aborts, because that's the user
+   * saying they don't want the reply at all.
+   */
+  @property({ type: Boolean, attribute: 'abort-on-switch' })
+  abortOnSwitch = false;
+
+  /**
    * Show the optional sidebar column (for a conversation-history list). Off by
    * default — when off, the column isn't rendered and a plain chat is entirely
    * unaffected. Fill it via the `aside` slot; drive it with the `ai-chat:new-chat`
@@ -245,6 +269,102 @@ export class AiChat extends LitElement {
   @state() private _announcement = '';
 
   private _abort?: AbortController;
+
+  /**
+   * Replies that are still generating for a conversation that isn't on screen
+   * (the consumer switched conversations or hit New-chat mid-reply). Keyed by
+   * the `conversationId` that was active when the turn was SENT.
+   *
+   * The component still owns only ONE visible conversation — the consumer owns
+   * history and storage, as always. This map is the narrow exception: a stream
+   * outlives the view it started in, so we hold its live message here until it
+   * settles. That's what lets a switch BACK to that conversation resume
+   * rendering it, tokens still arriving, instead of showing a frozen snapshot.
+   *
+   * A detached stream can't write through `_patch` (its message object is no
+   * longer in the visible array, so the map would silently no-op and the tokens
+   * would evaporate); the send loop updates `message` here instead, and
+   * `_syncDetachedIntoView` mirrors it into `this.messages` whenever the matching
+   * conversation is the one being displayed.
+   *
+   * We keep the controllers so `disconnectedCallback` can abort them: a removed
+   * element must not leave requests running.
+   */
+  private _detached = new Map<
+    string,
+    { controller: AbortController; message: ChatMessage }
+  >();
+
+  /**
+   * Bumped whenever a detached stream produces a token, purely to trigger a
+   * re-render while we're viewing that conversation. The message content itself
+   * lives in `_detached`; `messages` is only rewritten when the stream is
+   * actually visible (see `_syncDetachedIntoView`).
+   */
+  @state() private _detachedVersion = 0;
+
+  /**
+   * Detached streams from a conversation with no `conversation-id` set. They
+   * can't be switched back to (nothing identifies them), so they just run to
+   * completion and report via the event — but we still hold their controllers
+   * so disconnect can abort them.
+   */
+  private _untagged = new Set<AbortController>();
+
+  /**
+   * Detaches the CURRENT send, if one is running. Set by `send()` for the
+   * lifetime of its stream so a conversation switch can push it to the
+   * background immediately (see `willUpdate`). Undefined when nothing is
+   * streaming, or once the stream has already detached.
+   */
+  private _detachActive?: () => void;
+
+  /**
+   * Mirror a still-generating background reply into the visible conversation,
+   * but ONLY when the conversation it belongs to is the one on screen. This is
+   * what makes switching back to a generating chat show it still streaming
+   * rather than frozen at the moment you left.
+   *
+   * Appends the message if the view doesn't have it yet (the usual case right
+   * after a switch), otherwise updates it in place.
+   */
+  private _syncDetachedIntoView(
+    conversationId: string | null,
+    message: ChatMessage,
+  ): void {
+    if (conversationId == null || conversationId !== this.conversationId) return;
+    const i = this.messages.findIndex((m) => m.id === message.id);
+    if (i === -1) {
+      this.messages = [...this.messages, message];
+    } else {
+      this.messages = this.messages.map((m) => (m.id === message.id ? message : m));
+    }
+    this._detachedVersion++;
+  }
+
+  /**
+   * Called after the consumer swaps `.messages` / `conversationId`. If the
+   * conversation now on screen has a reply still generating, put it back in the
+   * list so it keeps painting live. The consumer's stored copy of that
+   * conversation is a snapshot from when they left, so it either lacks the
+   * streaming turn entirely or holds a stale, partial version — both are fixed
+   * by re-mirroring the live message.
+   */
+  private _resumeDetachedForView(): void {
+    if (this.conversationId == null) return;
+    const entry = this._detached.get(this.conversationId);
+    if (!entry) return;
+    this._syncDetachedIntoView(this.conversationId, entry.message);
+    // The composer must show Stop again: this conversation IS generating, and
+    // the user needs to be able to interrupt it now that they're looking at it.
+    this._abort = entry.controller;
+    this._busy = true;
+  }
+
+  /** True when the given conversation has a reply generating in the background. */
+  isGenerating(conversationId: string): boolean {
+    return this._detached.has(conversationId);
+  }
   /**
    * While true, new content keeps the view pinned to the bottom. Driven by an
    * IntersectionObserver watching a sentinel element at the very bottom of the
@@ -276,11 +396,33 @@ export class AiChat extends LitElement {
     return msg;
   }
 
-  /** Clear the conversation and cancel any in-flight generation. Also clears any
-   *  half-typed draft in the composer so a new chat starts truly empty. */
+  /**
+   * Clear the conversation and start a fresh one. Also clears any half-typed
+   * draft in the composer so a new chat starts truly empty.
+   *
+   * An in-flight reply is NOT cancelled: it keeps generating in the background
+   * and settles on `ai-chat:background-message` so you can persist it to the
+   * conversation it belongs to. Set `abort-on-switch` to cancel it instead.
+   */
   clear(): void {
     const hadFocus = this._focusIsInside();
-    this.stop();
+    const wasStreaming = this._busy && this.messages.some((m) => m.streaming);
+    if (this.abortOnSwitch) {
+      this.stop();
+    } else {
+      // Detach the running reply BEFORE we drop the id below, so it's filed
+      // under the conversation it actually belongs to and can be returned to.
+      if (wasStreaming) this._detachActive?.();
+      this._busy = false;
+      this._abort = undefined;
+      // A NEW chat is a different conversation, so it must not keep the outgoing
+      // one's id — otherwise the reply we're detaching would be re-adopted on the
+      // next render and start painting into the empty chat. The consumer normally
+      // assigns their own id on `ai-chat:new-chat`; this is the right default
+      // until they do. (`wasStreaming` because the stream detaches lazily on its
+      // next chunk, so `_detached` usually isn't populated yet at this point.)
+      if (wasStreaming) this.conversationId = null;
+    }
     this.messages = [];
     this._input = '';
     this._pending = [];
@@ -356,6 +498,17 @@ export class AiChat extends LitElement {
     // The Stop button is about to be replaced by the Send button; if focus was
     // on it, move it to the composer so keyboard users keep their place.
     const hadFocus = this._focusIsInside();
+    // If we're viewing a conversation whose reply was generating in the
+    // background, stopping it must also drop it from the detached registry —
+    // otherwise it would look "still generating" and get resumed on the next
+    // switch back, despite the user having explicitly stopped it.
+    if (this.conversationId != null) {
+      const entry = this._detached.get(this.conversationId);
+      if (entry) {
+        entry.controller.abort();
+        this._detached.delete(this.conversationId);
+      }
+    }
     this._abort?.abort();
     this._abort = undefined;
     this._busy = false;
@@ -420,6 +573,82 @@ export class AiChat extends LitElement {
     const controller = new AbortController();
     this._abort = controller;
     const signal = controller.signal;
+    // The conversation this reply belongs to, captured at send time. If the
+    // consumer switches conversations mid-stream this is what tells them which
+    // one the finished reply should be saved under.
+    const conversationId = this.conversationId;
+    // Our running copy of the assistant turn. While the message is on screen
+    // this mirrors what's in `this.messages`; once detached it becomes the only
+    // copy, since the visible array no longer holds it.
+    let working: ChatMessage = assistant;
+    let detached = false;
+
+    /**
+     * Has our message been swapped out from under us? That happens when the
+     * consumer assigns a new `.messages` array (conversation switch) or calls
+     * `clear()` — in both cases the object we're growing is simply gone.
+     */
+    const isOrphaned = () => !this.messages.some((m) => m.id === assistant.id);
+
+    /** Move this stream to the background: stop writing straight into the
+     *  visible list and hand the composer's busy state back. The request keeps
+     *  running, and the message stays live in `_detached` so switching back to
+     *  this conversation resumes rendering it.
+     *
+     *  Registered on the element so a conversation switch can detach us EAGERLY
+     *  (see `willUpdate`). Waiting for our next chunk isn't good enough: a
+     *  stream that goes quiet right as the user switches would never register,
+     *  and switching back would find nothing to resume. */
+    const detach = () => {
+      detached = true;
+      // Keyed by conversation, not message id: that's what a switch back is
+      // matched on. An untagged conversation (no `conversation-id` set) can't be
+      // returned to, so it streams to completion purely via the event.
+      if (conversationId != null) {
+        this._detached.set(conversationId, { controller, message: working });
+      } else {
+        this._untagged.add(controller);
+      }
+      // We no longer own the composer's busy state — the visible conversation
+      // is idle even though this request is still running. Guarded so we don't
+      // clobber a NEWER send that already took over.
+      if (this._abort === controller) {
+        this._abort = undefined;
+        this._busy = false;
+      }
+      this._detachActive = undefined;
+    };
+    // Expose it so a `.messages` / `conversationId` swap can detach us the
+    // moment it happens, rather than whenever the next token shows up.
+    this._detachActive = () => {
+      if (!detached) detach();
+    };
+
+    /** Apply a change to the assistant turn, wherever it currently lives. */
+    const update = (fn: (m: ChatMessage) => ChatMessage) => {
+      working = fn(working);
+      if (!detached) {
+        this._patch(assistant.id, fn);
+        return;
+      }
+      // Keep the detached record current, then mirror it into the visible list
+      // if the user is looking at this conversation right now.
+      if (conversationId != null) {
+        const entry = this._detached.get(conversationId);
+        if (entry) entry.message = working;
+      }
+      this._syncDetachedIntoView(conversationId, working);
+    };
+
+    const emitBackground = (done: boolean) => {
+      this.dispatchEvent(
+        new CustomEvent('ai-chat:background-message', {
+          detail: { conversationId, message: working, done },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    };
 
     const outbound: ChatMessage[] = this.systemPrompt
       ? [
@@ -436,17 +665,18 @@ export class AiChat extends LitElement {
     try {
       for await (const chunk of this.transport.send(outbound, signal)) {
         if (signal.aborted) break;
+        // Detect an orphaning as soon as it happens. Unless the consumer opted
+        // into `abort-on-switch`, the request keeps running and simply changes
+        // where its output goes.
+        if (!detached && isOrphaned()) {
+          if (this.abortOnSwitch) break;
+          detach();
+        }
         if (chunk.type === 'delta') {
-          this._patch(assistant.id, (m) => ({
-            ...m,
-            content: m.content + chunk.delta,
-          }));
+          update((m) => ({ ...m, content: m.content + chunk.delta }));
+          if (detached) emitBackground(false);
         } else if (chunk.type === 'error') {
-          this._patch(assistant.id, (m) => ({
-            ...m,
-            streaming: false,
-            error: chunk.error,
-          }));
+          update((m) => ({ ...m, streaming: false, error: chunk.error }));
           this._emitError(chunk.error);
           break;
         } else if (chunk.type === 'done') {
@@ -454,7 +684,7 @@ export class AiChat extends LitElement {
           // message so it flows out on `ai-chat:message`. Only patch fields the
           // transport actually reported.
           if (chunk.finishReason || chunk.usage) {
-            this._patch(assistant.id, (m) => ({
+            update((m) => ({
               ...m,
               ...(chunk.finishReason
                 ? { finishReason: chunk.finishReason }
@@ -468,18 +698,47 @@ export class AiChat extends LitElement {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (!signal.aborted) {
-        this._patch(assistant.id, (m) => ({
-          ...m,
-          streaming: false,
-          error: message,
-        }));
-        this._emitError(message);
+        // The stream may have been orphaned before it blew up; a background
+        // failure still has to reach the consumer, so route it the same way.
+        if (!detached && isOrphaned() && !this.abortOnSwitch) detach();
+        update((m) => ({ ...m, streaming: false, error: message }));
+        if (!detached) this._emitError(message);
       }
     } finally {
+      // A stream that ended while detached settles entirely through the event —
+      // it must not touch the visible conversation, announce to the live region,
+      // or fire `ai-chat:message` (that would look to the consumer like a reply
+      // in the conversation they're currently LOOKING at).
+      if (detached) {
+        if (conversationId != null) this._detached.delete(conversationId);
+        this._untagged.delete(controller);
+        if (!signal.aborted) {
+          working = { ...working, streaming: false };
+          // Land the finished reply in the view if the user is looking at this
+          // conversation (they switched back mid-stream and watched it finish),
+          // and release the composer, which we re-claimed on their return.
+          if (conversationId != null && conversationId === this.conversationId) {
+            this._syncDetachedIntoView(conversationId, working);
+            if (this._abort === controller) {
+              this._abort = undefined;
+              this._busy = false;
+            }
+          }
+          emitBackground(true);
+        }
+      } else if (!detached && isOrphaned() && this.abortOnSwitch) {
+        // Opted out: the stream was abandoned mid-flight. Nothing to clean up in
+        // the visible list (the message is gone), but the controller may still
+        // be ours, so release the busy state.
+        if (this._abort === controller) {
+          this._abort = undefined;
+          this._busy = false;
+        }
+      }
       // Only run cleanup if THIS send still owns the current stream. If a newer
       // send/clear replaced our controller (e.g. New-chat mid-stream), leave the
       // shared _busy/_abort alone — they now belong to the newer stream.
-      if (this._abort === controller) {
+      if (!detached && this._abort === controller) {
         this._patch(assistant.id, (m) => ({ ...m, streaming: false }));
         this._busy = false;
         this._abort = undefined;
@@ -774,6 +1033,13 @@ export class AiChat extends LitElement {
     document.removeEventListener('keydown', this._onHostKeydown);
     this._bottomObserver?.disconnect();
     this._bottomObserver = undefined;
+    // A background stream outlives the conversation it started in, but it must
+    // not outlive the ELEMENT — nobody is listening for its events any more, so
+    // letting it run would just burn tokens. Cancel every detached request.
+    for (const { controller } of this._detached.values()) controller.abort();
+    for (const controller of this._untagged) controller.abort();
+    this._detached.clear();
+    this._untagged.clear();
     super.disconnectedCallback();
   }
 
@@ -867,6 +1133,35 @@ export class AiChat extends LitElement {
     if (changed.has('messages') && this._stickToBottom) {
       this._scrollToBottom();
     }
+
+  }
+
+  /**
+   * A `.messages` swap can orphan a streaming turn (conversation switch). The
+   * send loop detaches itself on its next chunk, but that may be a while off —
+   * or never, if the stream has gone quiet. Release the composer as part of THIS
+   * update so the conversation you just switched TO is immediately usable rather
+   * than stuck showing a Stop button for a reply that isn't yours any more.
+   *
+   * Done in `willUpdate` rather than `updated` so the state change lands before
+   * the render, instead of scheduling a second one.
+   */
+  protected override willUpdate(changed: PropertyValues): void {
+    if (this.abortOnSwitch) return;
+    if (!changed.has('messages') && !changed.has('conversationId')) return;
+
+    // The visible conversation changed. If the turn we were streaming is no
+    // longer on screen, push it to the background NOW (so switching back can
+    // resume it) and release the composer — otherwise it'd be stuck showing
+    // Stop for a reply that isn't in this conversation any more.
+    if (this._busy && !this.messages.some((m) => m.streaming)) {
+      this._detachActive?.();
+      this._busy = false;
+      this._abort = undefined;
+    }
+    // ...and if the conversation we just switched TO has a reply still
+    // generating, put it back on screen so it keeps streaming live.
+    this._resumeDetachedForView();
   }
 
   /**

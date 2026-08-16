@@ -6,6 +6,55 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-16
+
+### Added
+
+- **Background streaming on conversation switch.** Switching conversations (or
+  hitting New-chat) while the AI is still replying no longer throws the reply
+  away — the request keeps running, and **switching back shows it still
+  streaming live**, tokens arriving in the chat as if you'd never left. This is
+  the ChatGPT/Claude behaviour.
+  - New attribute **`conversation-id`** — your own storage key for the
+    conversation on screen. Set it whenever you swap `.messages` and everything
+    else is automatic: the component recognizes a conversation with a reply in
+    flight, re-attaches the live message, and re-arms the Stop button so the
+    user can interrupt it now that it's visible.
+  - New event **`ai-chat:background-message`**
+    `{ conversationId, message, done }`, for **persisting** a reply that settles
+    while the user is looking elsewhere. Fires per token with `done: false` and
+    once with `done: true` when it settles (including on failure, with
+    `message.error` set). `conversationId` is the id captured when the turn was
+    *sent*, so it's always the right storage key.
+  - New method **`isGenerating(conversationId)`** → `boolean`, for marking a row
+    in your own history list (the playground shows a small pulsing dot).
+  - `stop()` (and the Stop button / Esc) still aborts unconditionally: pressing
+    Stop means you don't want the reply at all, which is different from
+    navigating away. Removing the element also aborts every detached stream, so
+    a background reply never outlives the component.
+  - The component still owns exactly **one visible conversation** — you still own
+    history and storage. It holds a background reply only until it settles.
+
+### Changed
+
+- **`clear()` no longer cancels an in-flight reply** — it detaches it (see
+  above) instead of calling `stop()`. This is a behavior change: previously a
+  New-chat mid-stream silently discarded a reply you'd already paid for, with no
+  way for the consumer to recover it.
+  - New attribute **`abort-on-switch`** restores the old behavior, cancelling
+    the request the moment the conversation is switched or cleared.
+- **`clear()` also clears `conversation-id`** when it detaches a running reply,
+  so the fresh chat doesn't adopt the outgoing conversation's stream. Assign
+  your own id on `ai-chat:new-chat`.
+
+### Fixed
+
+- **The playground is usable on a phone.** The controls panel used to stack on
+  top of the chat, squeezing it into a few unreachable pixels with no way to
+  scroll to it. Below 900px it's now an off-canvas drawer (hamburger in the top
+  bar, tap-the-scrim or Esc to close) and the chat gets the full viewport. The
+  top bar no longer wraps to three lines at phone width either.
+
 ## [0.3.0] - 2026-08-11
 
 ### Added
@@ -369,7 +418,8 @@ Initial public release.
 - Accessibility: ARIA live region, keyboard support, reduced-motion.
 - Licensed under MPL-2.0.
 
-[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.3...v0.1.5
