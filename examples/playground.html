@@ -208,10 +208,23 @@
       }
       @keyframes h-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
       @media (prefers-reduced-motion: reduce) { .h-dot { animation: none; } }
-      .h-del {
+      .h-ren, .h-del {
         flex: none; border: none; background: none; cursor: pointer;
-        color: var(--ai-chat-muted); padding: 4px; margin-right: 4px;
+        color: var(--ai-chat-muted); padding: 4px;
         border-radius: 4px; opacity: 0; display: grid; place-items: center;
+      }
+      .h-del { margin-right: 4px; }
+      .h-ren:hover { color: var(--ai-chat-accent); }
+      .h-item:hover .h-ren, .h-ren:focus-visible { opacity: 1; }
+      /* The inline rename field replaces the row's contents in place, sized to
+         match the button it stands in for so the list does not jump. */
+      .h-rename {
+        flex: 1; min-width: 0; margin: 1px 4px;
+        padding: 6px 8px; font: inherit; font-size: 12.5px;
+        color: var(--ai-chat-fg);
+        background: var(--ai-chat-bg);
+        border: 1px solid var(--ai-chat-accent); border-radius: 7px;
+        outline: none;
       }
       .h-item:hover .h-del, .h-del:focus-visible { opacity: 1; }
       .h-del:hover { color: #dc2626; }
@@ -609,6 +622,26 @@
         if (c.title === 'New chat') c.title = titleOf(c.messages);
       };
 
+      /* Inline rename: the row becomes a text input in place (ChatGPT-style)
+         instead of opening a dialog. Enter saves, Esc cancels, blur saves —
+         and an empty title falls back to the generated one rather than
+         leaving a nameless row. `renamingId` drives it so drawHist() stays
+         the single source of truth for the list. */
+      let renamingId = null;
+      function startRename(id) {
+        renamingId = id;
+        drawHist();
+      }
+      function finishRename(id, value, save) {
+        const c = convos.find((x) => x.id === id);
+        renamingId = null;
+        if (c && save) {
+          const next = value.trim();
+          c.title = next || titleOf(c.messages);
+        }
+        drawHist();
+      }
+
       function drawHist() {
         histList.innerHTML = '';
         if (!convos.length) {
@@ -619,6 +652,32 @@
           const row = document.createElement('div');
           row.className = 'h-item';
           row.setAttribute('aria-current', String(c.id === activeId));
+          // This row is being renamed: swap it for an input and skip the rest.
+          if (c.id === renamingId) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'h-rename';
+            input.value = c.title;
+            input.setAttribute('aria-label', 'Conversation name');
+            let settled = false;
+            const done = (save) => {
+              if (settled) return;      // blur fires after Enter/Esc too
+              settled = true;
+              finishRename(c.id, input.value, save);
+            };
+            input.onkeydown = (e) => {
+              if (e.key === 'Enter') { e.preventDefault(); done(true); }
+              else if (e.key === 'Escape') { e.preventDefault(); done(false); }
+              e.stopPropagation();      // Esc must not reach the widget
+            };
+            input.onblur = () => done(true);
+            row.appendChild(input);
+            histList.appendChild(row);
+            // Focus after it is in the DOM; select all so typing replaces.
+            requestAnimationFrame(() => { input.focus(); input.select(); });
+            continue;
+          }
+
           const open = document.createElement('button');
           open.type = 'button'; open.className = 'h-open';
           // A conversation still generating in the background gets a marker, so
@@ -637,9 +696,23 @@
             chat.messages = [...(convos.find((x) => x.id === c.id)?.messages ?? [])];
             drawHist();
           };
+          // Double-click (or the pencil) renames IN PLACE — the row turns into
+          // an input rather than opening a dialog, the same way ChatGPT/Claude
+          // do it. Consumer-side entirely: the component never knew about
+          // titles, since it owns one conversation and not the list.
+          open.ondblclick = (e) => { e.stopPropagation(); startRename(c.id); };
+
+          const ren = document.createElement('button');
+          ren.type = 'button'; ren.className = 'h-ren';
+          ren.setAttribute('aria-label', `Rename ${c.title}`);
+          ren.title = 'Rename';
+          ren.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+          ren.onclick = (e) => { e.stopPropagation(); startRename(c.id); };
+
           const del = document.createElement('button');
           del.type = 'button'; del.className = 'h-del';
           del.setAttribute('aria-label', `Delete ${c.title}`);
+          del.title = 'Delete';
           del.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
           del.onclick = async () => {
             if (!(await confirmDelete(c.title))) return;
@@ -650,7 +723,7 @@
             }
             drawHist();
           };
-          row.append(open, del);
+          row.append(open, ren, del);
           histList.appendChild(row);
         }
       }
