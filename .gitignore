@@ -41,3 +41,8 @@ test/*.png
 .claude/
 skills-lock.json
 AGENTS.md
+
+# Local consumer demo app (Atlas Research) — a REAL consumer app used to find
+# bugs the playground cannot. Not shipped; vendor/ is a copy of dist/.
+local-demo/vendor
+local-demo/*.log
