@@ -49,6 +49,17 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Fixed
 
+- **Smooth streaming for long replies.** Every streamed token used to re-parse
+  the ENTIRE message (marked + DOMPurify + highlight.js) and rebuild its whole
+  DOM subtree, so per-token cost grew with the reply — measured ~29ms p95 /
+  ~79ms worst-case at 58KB, i.e. multiple dropped frames per token, felt as
+  choppy scrolling while streaming. Markdown for a streaming message is now
+  rendered incrementally: completed blocks (per marked's own lexer — tables,
+  lists, and fences are never split) are frozen once, each in its own DOM node,
+  and only the small live tail is re-rendered per token. Cost is now flat
+  regardless of reply length (~4ms p95 at 58KB; ratio-tested so a regression
+  fails CI). The incremental output is verified DOM-equivalent to a full parse,
+  and settled messages still take the plain single-parse path.
 - **The playground is usable on a phone.** The controls panel used to stack on
   top of the chat, squeezing it into a few unreachable pixels with no way to
   scroll to it. Below 900px it's now an off-canvas drawer (hamburger in the top

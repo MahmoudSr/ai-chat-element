@@ -678,6 +678,16 @@ export const chatStyles = css`
   /* ---- Markdown ---- */
   .markdown > :first-child { margin-top: 0; }
   .markdown > :last-child { margin-bottom: 0; }
+  /* While a message streams, its markdown renders as two sibling parts (frozen
+     head + live tail) so each token only touches the tail's DOM. display:
+     contents removes the wrappers from layout: blocks flow, and margins
+     collapse, exactly as if they were direct children of .markdown. The
+     first/last-child margin trims above match the wrappers, not the blocks
+     inside them, so re-target them here. An empty part is not rendered, which
+     is what keeps first/last accurate. */
+  .markdown__part { display: contents; }
+  .markdown > .markdown__part:first-child > :first-child { margin-top: 0; }
+  .markdown > .markdown__part:last-child > :last-child { margin-bottom: 0; }
   .markdown p { margin: 0.5em 0; }
   .markdown a { color: var(--ai-chat-accent); }
   .markdown ul, .markdown ol { padding-left: 1.4em; margin: 0.5em 0; }

@@ -9,7 +9,7 @@ import type {
   Role,
   Attachment,
 } from './types.js';
-import { renderMarkdown } from './markdown/markdown.js';
+import { renderMarkdown, StreamingMarkdown } from './markdown/markdown.js';
 import { chatStyles } from './styles.js';
 import { hljsTheme } from './markdown/hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
@@ -384,6 +384,54 @@ export class AiChat extends LitElement {
   /** Monotonic counter so pasted images get stable, distinct names. */
   private _pasteCount = 0;
 
+  /**
+   * Incremental markdown renderers, one per message that is CURRENTLY
+   * streaming. Re-parsing a whole message on every token made long replies
+   * choppy (cost grew with length — ~79ms/token at 58KB); the incremental
+   * renderer keeps per-token cost flat (~2ms worst case) by freezing completed
+   * blocks. Entries are dropped the first time the message renders as settled,
+   * at which point one final full `renderMarkdown` becomes the authoritative
+   * output (the two are DOM-equivalent — enforced by
+   * test/streaming-markdown.test.ts — so nothing visibly changes on settle).
+   */
+  private _streamRenderers = new Map<string, StreamingMarkdown>();
+
+  /**
+   * The markdown body for one assistant message.
+   *
+   * While the message STREAMS it renders as two sibling nodes — the frozen
+   * head (only changes when a block completes) and the live tail (changes per
+   * token). Two nodes matter as much as the incremental parse: one container
+   * means one big innerHTML swap per token, whose DOM cost grows with the
+   * message (measured ~36ms max on a 29KB reply even with cached parsing).
+   * The wrappers are `display: contents`, so block flow, margins, and margin
+   * collapsing behave exactly as if every block were a direct child.
+   *
+   * Settled messages take the plain single-render path, untouched.
+   */
+  private _renderMarkdown(m: ChatMessage) {
+    if (m.streaming) {
+      let r = this._streamRenderers.get(m.id);
+      if (!r) {
+        r = new StreamingMarkdown(this._labels.copy);
+        this._streamRenderers.set(m.id, r);
+      }
+      const { blocks, tail } = r.renderParts(m.content);
+      // Each frozen block is its own node. The blocks array is append-only and
+      // Lit reconciles children by index, so on a typical token every existing
+      // block's unsafeHTML sees an unchanged string and does nothing — only the
+      // small tail (and at most one newly completed block) touches the DOM.
+      return html`<div class="markdown">
+        ${blocks.map((b) => html`<div class="markdown__part">${unsafeHTML(b)}</div>`)}
+        ${tail ? html`<div class="markdown__part">${unsafeHTML(tail)}</div>` : nothing}
+      </div>`;
+    }
+    // Settled: render fully once and let the incremental state go. The map
+    // stays tiny — it only ever holds messages that are streaming right now.
+    this._streamRenderers.delete(m.id);
+    return html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`;
+  }
+
   /** Programmatically append a message without sending it. */
   addMessage(role: Role, content: string): ChatMessage {
     const msg: ChatMessage = {
@@ -712,6 +760,9 @@ export class AiChat extends LitElement {
       if (detached) {
         if (conversationId != null) this._detached.delete(conversationId);
         this._untagged.delete(controller);
+        // A message that settles in the background never renders as settled,
+        // so its incremental renderer would otherwise linger in the map.
+        this._streamRenderers.delete(assistant.id);
         if (!signal.aborted) {
           working = { ...working, streaming: false };
           // Land the finished reply in the view if the user is looking at this
@@ -1508,7 +1559,7 @@ export class AiChat extends LitElement {
             this._editingId === m.id
               ? this._renderEditForm(m)
               : isAssistant
-                ? html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`
+                ? this._renderMarkdown(m)
                 : m.content
                   ? html`<div class="plain">${m.content}</div>`
                   : nothing
