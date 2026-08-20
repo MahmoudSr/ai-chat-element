@@ -338,6 +338,8 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `accept`           | string                      | `image/*` | Which file types the picker/drop/paste accepts (standard `accept` form). |
 | `max-attachments`  | number                      | `5`     | Max attachments per message.                                                      |
 | `max-attachment-size` | number (bytes)           | `0`     | Max size per file; `0` = no cap.                                                  |
+| `conversation-id`  | string                      | —       | Your key for the conversation on screen. Echoed back on `ai-chat:background-message` so you know which conversation a background reply belongs to. See [Background streaming](#background-streaming). |
+| `abort-on-switch`  | boolean                     | `false` | Cancel an in-flight reply when the conversation is switched or cleared, instead of letting it finish in the background. |
 
 To turn a boolean attribute off, set it to `"false"` (e.g. `show-timestamps="false"`).
 
@@ -356,9 +358,10 @@ Set via JS only (they hold objects/arrays):
 | `send(text, attachments?)` | `Promise<boolean>`  | Sends a user turn and streams the reply. Resolves `true` when the turn ran, `false` if it was a no-op (empty text **and** no attachments, or no transport set). Resolves only **after** the stream settles. |
 | `retry()`                 | `Promise<boolean>`   | Re-sends the last user turn (e.g. after an error). Same resolution semantics as `send`. |
 | `addMessage(role, content)` | `ChatMessage`      | Appends a message to `.messages` **without** sending it — returns the created message (with its generated `id`). Use it to seed history. |
-| `stop()`                  | `void`               | Aborts the in-flight stream, if any.                           |
-| `clear()`                 | `void`               | Empties the conversation and the composer draft (also calls `stop()`). |
+| `stop()`                  | `void`               | Aborts the in-flight stream, if any. Always cancels — unlike a conversation switch, this is the user saying they don't want the reply. |
+| `clear()`                 | `void`               | Empties the conversation and the composer draft. An in-flight reply keeps generating in the background (see [Background streaming](#background-streaming)) unless `abort-on-switch` is set. |
 | `openFilePicker()`        | `void`               | Opens the native file picker (for use with `hide-attach-button` + your own trigger). No-op unless `allow-attachments` is set. |
+| `isGenerating(id)`        | `boolean`            | Whether the conversation with that `conversation-id` has a reply still generating in the background. Use it to mark a row in your history list. |
 
 **Events** (all `bubbles: true, composed: true`; read `e.detail`):
 
@@ -372,6 +375,7 @@ Set via JS only (they hold objects/arrays):
 | `ai-chat:attach-rejected` | `{ file: File, reason: 'type' \| 'size' \| 'too-many', message: string }` | Fires when a picked file is rejected by `accept` / `max-attachment-size` / `max-attachments`. |
 | `ai-chat:message-edit` | `{ index: number, message: ChatMessage, newContent: string }` | Fires when the user confirms an inline edit (`show-edit`, user messages only). **The component does not change `.messages`** — you decide what edit means. The usual ChatGPT behaviour is to truncate from `index` and resend `newContent`. |
 | `ai-chat:preview` | `{ attachment: Attachment }` | Fires when an image (staged in the composer or already sent) is clicked. **Cancelable** — `e.preventDefault()` suppresses the built-in overlay so you can open your own lightbox/gallery. |
+| `ai-chat:background-message` | `{ conversationId: string \| null, message: ChatMessage, done: boolean }` | A reply is still streaming for a conversation you've switched away from. Fires per token with `done: false`, then once with `done: true` when it settles (including on error — check `message.error`). `conversationId` is whatever `conversation-id` held when that turn was sent. See [Background streaming](#background-streaming). |
 
 `ai-chat:message` fires once per completed assistant turn — but **only when the
 reply has content**. Empty responses and failed turns don't fire it, so if you
@@ -580,6 +584,7 @@ chat.addEventListener('ai-chat:new-chat', (e) => {
   const id = Date.now();
   conversations.unshift({ id, title: 'New chat', messages: [] });
   activeId = id;
+  chat.conversationId = String(id);   // tag it, so a background reply can find its way home
   render();
 });
 
@@ -588,6 +593,7 @@ function switchTo(id) {
   const current = conversations.find((c) => c.id === activeId);
   if (current) current.messages = [...chat.messages];
   activeId = id;
+  chat.conversationId = String(id);
   chat.messages = [...conversations.find((c) => c.id === id).messages];
   render();
 }
@@ -598,6 +604,69 @@ render();
 See `examples/playground.html` for a complete, working version (with titles
 generated from the first message). Use `aside-side="right"` to put it on the
 right, and `--ai-chat-aside-width` / `--ai-chat-aside-bg` to size and color it.
+
+---
+
+## Background streaming
+
+Switching conversations while the AI is still answering does **not** cancel the
+answer — same as ChatGPT and Claude. The request keeps running, and **switching
+back shows it still streaming**, tokens arriving live, as if you'd never left.
+
+All you have to do is tell the component which conversation is on screen, by
+setting `conversation-id` whenever you swap `.messages`:
+
+```js
+function switchTo(id) {
+  chat.conversationId = id;             // ← the one line that makes this work
+  chat.messages = load(id);
+}
+```
+
+That's it. If `id` has a reply in flight, the component re-attaches it and keeps
+rendering into the chat; the Stop button comes back too, so the user can
+interrupt it now that they can see it.
+
+To **persist** a reply that finishes while the user is elsewhere, listen for
+`ai-chat:background-message`:
+
+```js
+chat.addEventListener('ai-chat:background-message', (e) => {
+  const { conversationId, message, done } = e.detail;
+  if (!done) return;                    // per-token progress; ignore for storage
+  save(conversationId, message);        // the finished reply (check message.error)
+});
+```
+
+Use `chat.isGenerating(id)` to mark a row in your history list as still working —
+the playground shows a small pulsing dot.
+
+Details worth knowing:
+
+- **`conversationId` is the id that was active when that turn was *sent***, not
+  the one on screen now — that's what makes it usable as a storage key.
+- The event fires **only** for replies whose conversation you left. A reply in
+  the conversation you're looking at settles normally via `ai-chat:message`.
+- **Errors still settle**: a background stream that fails fires `done: true` with
+  `message.error` set. It does *not* fire `ai-chat:error`, since there's no
+  visible conversation for that error to belong to.
+- **`stop()` always cancels** (so do the Stop button and <kbd>Esc</kbd>). Only an
+  implicit switch or `clear()` detaches — pressing Stop means you don't want the
+  reply at all, and it cancels a background reply too when you're viewing it.
+- **New-chat drops the id.** `clear()` starts a genuinely new conversation, so it
+  clears `conversationId` rather than letting the empty chat adopt the outgoing
+  conversation's stream. Assign your own id on `ai-chat:new-chat`.
+- **Removing the element cancels everything.** Detached streams are aborted on
+  disconnect, so a background reply never outlives the component.
+- The component still owns exactly **one visible conversation** — you own history
+  and storage, as always. It holds a background reply only until it settles.
+
+To get the old behavior — cancel the request the moment you switch away — set
+`abort-on-switch`:
+
+```html
+<ai-chat abort-on-switch></ai-chat>
+```
 
 ---
 
