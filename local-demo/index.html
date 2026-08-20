@@ -1,0 +1,623 @@
+<!doctype html>
+<html lang="en" data-app-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Atlas Research — ai-chat-element demo</title>
+    <style>
+      /* ==========================================================
+         A REAL consumer app, not a control panel. Everything here is
+         the kind of code someone would actually write around the
+         component: their own shell, their own storage, their own
+         history list. The component is just the chat.
+         ========================================================== */
+      :root {
+        --bg: #0e1117;
+        --surface: #161b22;
+        --surface-2: #1c2230;
+        --line: #262d3a;
+        --fg: #e6edf3;
+        --muted: #8b949e;
+        --brand: #6d5efc;
+        --ok: #2ea043;
+        --warn: #d29922;
+        --danger: #da3633;
+        --font: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      [data-app-theme='light'] {
+        --bg: #f6f7f9;
+        --surface: #ffffff;
+        --surface-2: #f0f2f5;
+        --line: #e2e6eb;
+        --fg: #12151a;
+        --muted: #62707f;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0; background: var(--bg); color: var(--fg);
+        font-family: var(--font); overflow: hidden;
+      }
+
+      .app { display: flex; height: 100vh; }
+
+      /* ---------- sidebar ---------- */
+      .side {
+        width: 264px; flex: none; background: var(--surface);
+        border-right: 1px solid var(--line);
+        display: flex; flex-direction: column;
+      }
+      .side__brand {
+        display: flex; align-items: center; gap: 9px;
+        padding: 14px 14px 12px; font-weight: 680; letter-spacing: -0.01em;
+      }
+      .logo {
+        width: 24px; height: 24px; border-radius: 7px; flex: none;
+        background: linear-gradient(135deg, var(--brand), #a78bfa);
+        display: grid; place-items: center; color: #fff; font-size: 12px; font-weight: 800;
+      }
+      .side__new {
+        margin: 0 12px 10px; padding: 9px 12px; width: calc(100% - 24px);
+        background: var(--brand); color: #fff; border: none; border-radius: 8px;
+        font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+        display: flex; align-items: center; gap: 8px; justify-content: center;
+      }
+      .side__new:hover { filter: brightness(1.08); }
+      .side__label {
+        padding: 6px 16px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .side__list { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
+      .conv {
+        display: flex; align-items: center; gap: 8px;
+        padding: 8px 10px; border-radius: 8px; cursor: pointer;
+        font-size: 13px; color: var(--fg); margin-bottom: 2px;
+        border: 1px solid transparent;
+      }
+      .conv:hover { background: var(--surface-2); }
+      .conv[aria-current='true'] { background: var(--surface-2); border-color: var(--line); }
+      .conv__title {
+        flex: 1; min-width: 0; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap;
+      }
+      /* The "still generating" dot — this is the affordance that makes
+         background streaming legible to a user. */
+      .conv__dot {
+        width: 7px; height: 7px; border-radius: 50%; flex: none;
+        background: var(--brand); animation: pulse 1.3s ease-in-out infinite;
+      }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+      @media (prefers-reduced-motion: reduce) { .conv__dot { animation: none; } }
+      .conv__act {
+        flex: none; opacity: 0; border: none; background: none; cursor: pointer;
+        color: var(--muted); padding: 2px; border-radius: 4px; display: grid;
+        place-items: center;
+      }
+      .conv:hover .conv__act, .conv__act:focus-visible { opacity: 1; }
+      .conv__ren:hover { color: var(--brand); }
+      .conv__del:hover { color: var(--danger); }
+      /* Inline rename field: replaces the row's content in place, sized so the
+         list doesn't jump while editing. */
+      .conv__rename {
+        flex: 1; min-width: 0; margin: -3px 0;
+        padding: 5px 8px; font: inherit; font-size: 13px;
+        color: var(--fg); background: var(--bg);
+        border: 1px solid var(--brand); border-radius: 6px; outline: none;
+      }
+      /* Delete-confirm dialog (native dialog, app-styled). */
+      dialog#confirmDlg {
+        background: var(--surface); color: var(--fg);
+        border: 1px solid var(--line); border-radius: 12px;
+        padding: 18px 20px; max-width: 340px;
+        font-family: var(--font);
+      }
+      dialog#confirmDlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+      dialog#confirmDlg h3 { margin: 0 0 6px; font-size: 14.5px; }
+      dialog#confirmDlg p { margin: 0 0 14px; font-size: 12.5px; color: var(--muted); }
+      .dlg__row { display: flex; gap: 8px; justify-content: flex-end; margin: 0; }
+      .btn-danger {
+        border: 1px solid var(--danger); background: var(--danger); color: #fff;
+        font: inherit; font-size: 12px; padding: 6px 12px; border-radius: 7px;
+        cursor: pointer;
+      }
+      .btn-danger:hover { filter: brightness(1.1); }
+
+      .side__foot {
+        border-top: 1px solid var(--line); padding: 10px 14px;
+        font-size: 11.5px; color: var(--muted);
+        display: flex; align-items: center; gap: 8px;
+      }
+      .dot-status { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+      .dot-status.on { background: var(--ok); }
+      .dot-status.off { background: var(--danger); }
+
+      /* ---------- main ---------- */
+      .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+      .top {
+        height: 52px; flex: none; border-bottom: 1px solid var(--line);
+        display: flex; align-items: center; gap: 10px; padding: 0 14px;
+        background: var(--surface);
+      }
+      .top h2 {
+        margin: 0; font-size: 14px; font-weight: 620; min-width: 0;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .spacer { flex: 1; }
+      .pill {
+        font-size: 11.5px; color: var(--muted); background: var(--surface-2);
+        border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px;
+        display: flex; align-items: center; gap: 6px;
+      }
+      .btn-ghost {
+        border: 1px solid var(--line); background: var(--surface-2); color: var(--fg);
+        font: inherit; font-size: 12px; padding: 6px 11px; border-radius: 7px;
+        cursor: pointer;
+      }
+      .btn-ghost:hover { border-color: var(--brand); }
+      select.btn-ghost { padding-right: 6px; }
+
+      .chat-wrap { flex: 1; min-height: 0; padding: 14px; display: flex; }
+
+      /* The component. One accent variable rebrands the whole thing. */
+      ai-chat {
+        flex: 1; min-height: 0;
+        --ai-chat-accent: var(--brand);
+        --ai-chat-bg: var(--surface);
+        --ai-chat-fg: var(--fg);
+        --ai-chat-muted: var(--muted);
+        --ai-chat-border: var(--line);
+        --ai-chat-radius: 10px;
+        --ai-chat-outer-radius: 12px;
+        --ai-chat-input-bg: var(--surface-2);
+      }
+
+      /* ---------- mobile: sidebar becomes a drawer ---------- */
+      .hamburger { display: none; }
+      .scrim { display: none; }
+      @media (max-width: 820px) {
+        .hamburger { display: grid; place-items: center; }
+        .side {
+          position: fixed; z-index: 40; top: 0; bottom: 0; left: 0;
+          transform: translateX(-100%); transition: transform 0.22s ease;
+          box-shadow: 0 0 40px rgba(0,0,0,0.4);
+        }
+        body.nav-open .side { transform: translateX(0); }
+        .scrim {
+          display: block; position: fixed; inset: 0; z-index: 30;
+          background: rgba(0,0,0,0.5); opacity: 0; pointer-events: none;
+          transition: opacity 0.22s ease;
+        }
+        body.nav-open .scrim { opacity: 1; pointer-events: auto; }
+        .chat-wrap { padding: 8px; }
+        .pill--model { display: none; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .side, .scrim { transition: none; }
+      }
+
+      .toast {
+        position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+        background: var(--surface-2); border: 1px solid var(--line);
+        color: var(--fg); font-size: 12.5px; padding: 9px 14px; border-radius: 9px;
+        z-index: 60; opacity: 0; pointer-events: none; transition: opacity 0.2s;
+        max-width: 90vw;
+      }
+      .toast.show { opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <div class="scrim" id="scrim"></div>
+    <div class="app">
+      <aside class="side" id="side">
+        <div class="side__brand"><span class="logo">A</span> Atlas Research</div>
+        <button class="side__new" id="newChat">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          New chat
+        </button>
+        <div class="side__label">Conversations</div>
+        <div class="side__list" id="convList"></div>
+        <div class="side__foot">
+          <span class="dot-status" id="ollamaDot"></span>
+          <span id="ollamaText">checking Ollama…</span>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div class="top">
+          <button class="btn-ghost hamburger" id="hamburger" aria-label="Show conversations">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+          </button>
+          <h2 id="topTitle">New chat</h2>
+          <div class="spacer"></div>
+          <span class="pill pill--model">
+            model
+            <select class="btn-ghost" id="modelSel" style="border:none;background:none;padding:0">
+              <option>loading…</option>
+            </select>
+          </span>
+          <button class="btn-ghost" id="themeBtn">Theme</button>
+        </div>
+        <div class="chat-wrap">
+          <ai-chat
+            id="chat"
+            show-names
+            show-timestamps
+            show-copy
+            show-edit
+            show-retry
+            allow-attachments
+            accept="image/*"
+            assistant-bubble="false"
+            placeholder="Ask anything — or drop an image in (llava can see it)"
+          ></ai-chat>
+        </div>
+      </main>
+    </div>
+    <div class="toast" id="toast"></div>
+
+    <!-- Delete confirmation. A native <dialog>: backdrop, focus trap, and
+         Esc-to-close come for free, and it styles like the app — never
+         window.confirm(), which cannot be styled and blocks the thread. -->
+    <dialog id="confirmDlg">
+      <h3 id="dlgTitle">Delete conversation?</h3>
+      <p id="dlgBody"></p>
+      <form method="dialog" class="dlg__row">
+        <button value="cancel" class="btn-ghost">Cancel</button>
+        <button value="ok" class="btn-danger" id="dlgOk">Delete</button>
+      </form>
+    </dialog>
+
+    <script type="module">
+      import './vendor/ai-chat-element.js';
+      import { openAIAdapter } from './vendor/adapters/index.js';
+
+      const $ = (id) => document.getElementById(id);
+      const chat = $('chat');
+      const OLLAMA = 'http://localhost:11434/v1';
+
+      const toast = (msg, ms = 2600) => {
+        const t = $('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        clearTimeout(toast._t);
+        toast._t = setTimeout(() => t.classList.remove('show'), ms);
+      };
+
+      /* ============================================================
+         STORAGE — the consumer owns this. The component holds ONE
+         conversation; the list and its persistence are our problem.
+         ============================================================ */
+      const KEY = 'atlas.convos.v1';
+      let convos = [];
+      let activeId = null;
+      /** id of the conversation being renamed inline (null = none). */
+      let renamingId = null;
+
+      const load = () => {
+        try { convos = JSON.parse(localStorage.getItem(KEY)) || []; }
+        catch { convos = []; }
+      };
+      const save = () => localStorage.setItem(KEY, JSON.stringify(convos));
+      const find = (id) => convos.find((c) => String(c.id) === String(id));
+      const titleOf = (msgs) => {
+        const f = msgs.find((m) => m.role === 'user');
+        if (!f) return 'New chat';
+        const t = (f.content || '').trim() || 'Image';
+        return t.length > 34 ? t.slice(0, 34) + '…' : t;
+      };
+
+      function newConversation() {
+        const c = { id: Date.now(), title: 'New chat', messages: [] };
+        convos.unshift(c);
+        setActive(c.id);
+        chat.messages = [];
+        save(); draw();
+      }
+
+      /* THE key line for background streaming: the component needs to know
+         WHICH conversation is on screen. Set it every time we swap messages. */
+      function setActive(id) {
+        activeId = id == null ? null : String(id);
+        chat.conversationId = activeId;
+        const c = find(activeId);
+        $('topTitle').textContent = c ? c.title : 'New chat';
+      }
+
+      function switchTo(id) {
+        if (String(id) === activeId) return;   // already here — do nothing
+        commit(activeId);               // stash what's on screen, into the chat we're LEAVING
+        setActive(id);
+        chat.messages = [...(find(id)?.messages ?? [])];
+        // If THIS conversation still has a reply generating, the component
+        // re-attaches it automatically and it keeps streaming. Nothing to do.
+        closeNav(); draw();
+      }
+
+      /* Snapshot the visible conversation into storage. Takes the target id
+         EXPLICITLY: during a switch, `activeId` may already point at the chat
+         we're moving to, and writing the outgoing messages into it would
+         clobber the wrong conversation. */
+      function commit(id = activeId) {
+        const c = find(id);
+        if (!c) return;
+        c.messages = [...chat.messages];
+        if (c.title === 'New chat') c.title = titleOf(c.messages);
+        save();
+      }
+
+      /** Styled confirmation via the native dialog. Resolves true only on an
+       *  explicit Delete — Esc, backdrop, and Cancel all resolve false. */
+      function confirmDelete(title) {
+        const dlg = $('confirmDlg');
+        $('dlgBody').textContent = `"${title}" and its messages will be permanently removed.`;
+        dlg.returnValue = 'cancel';
+        dlg.showModal();
+        $('dlgOk').focus();
+        return new Promise((resolve) => {
+          dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok'), { once: true });
+        });
+      }
+
+      /* Update ONLY the generating-dots, leaving every row element in place.
+         Called on each streamed token. Rebuilding the list here (draw()) would
+         replace the DOM node the user is clicking, swallowing the click. */
+      function syncDots() {
+        for (const row of $('convList').children) {
+          const id = row.dataset?.id;
+          if (!id) continue;
+          // Never touch a row that's mid-rename — prepending a dot into the
+          // input row would shift focus targets under the user's cursor.
+          if (row.querySelector('.conv__rename')) continue;
+          const has = !!chat.isGenerating?.(id);
+          const dot = row.querySelector('.conv__dot');
+          if (has && !dot) {
+            const d = document.createElement('span');
+            d.className = 'conv__dot';
+            d.title = 'Still generating';
+            row.prepend(d);
+          } else if (!has && dot) {
+            dot.remove();
+          }
+        }
+      }
+
+      function draw() {
+        const list = $('convList');
+        list.innerHTML = '';
+        if (!convos.length) {
+          list.innerHTML =
+            '<div style="padding:10px 12px;font-size:12px;color:var(--muted)">No conversations yet.</div>';
+          return;
+        }
+        for (const c of convos) {
+          const row = document.createElement('div');
+          row.className = 'conv';
+          row.dataset.id = String(c.id);      // syncDots() finds rows by this
+          row.setAttribute('aria-current', String(String(c.id) === activeId));
+          row.onclick = (e) => {
+            if (!e.target.closest('.conv__act')) switchTo(c.id);
+          };
+
+          // Renaming this row: it becomes a text field in place (ChatGPT
+          // style) rather than opening a dialog for a one-word edit.
+          if (String(c.id) === renamingId) {
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'conv__rename';
+            input.value = c.title;
+            input.setAttribute('aria-label', 'Conversation name');
+            let settled = false;
+            const done = (keep) => {
+              if (settled) return;          // blur also fires after Enter/Esc
+              settled = true;
+              renamingId = null;
+              if (keep) {
+                const next = input.value.trim();
+                c.title = next || titleOf(c.messages);
+                if (String(c.id) === activeId) $('topTitle').textContent = c.title;
+                save();
+              }
+              draw();
+            };
+            input.onkeydown = (e) => {
+              e.stopPropagation();          // Esc must not reach the widget
+              if (e.key === 'Enter') { e.preventDefault(); done(true); }
+              else if (e.key === 'Escape') { e.preventDefault(); done(false); }
+            };
+            input.onblur = () => done(true);
+            input.onclick = (e) => e.stopPropagation();
+            row.appendChild(input);
+            list.appendChild(row);
+            requestAnimationFrame(() => { input.focus(); input.select(); });
+            continue;
+          }
+
+          // Ask the component whether this conversation is still generating.
+          if (chat.isGenerating?.(String(c.id))) {
+            const dot = document.createElement('span');
+            dot.className = 'conv__dot';
+            dot.title = 'Still generating';
+            row.appendChild(dot);
+          }
+
+          const title = document.createElement('span');
+          title.className = 'conv__title';
+          title.textContent = c.title;
+          title.ondblclick = (e) => { e.stopPropagation(); renamingId = String(c.id); draw(); };
+          row.appendChild(title);
+
+          const ren = document.createElement('button');
+          ren.className = 'conv__act conv__ren';
+          ren.setAttribute('aria-label', 'Rename conversation');
+          ren.title = 'Rename';
+          ren.innerHTML =
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+          ren.onclick = () => { renamingId = String(c.id); draw(); };
+          row.appendChild(ren);
+
+          const del = document.createElement('button');
+          del.className = 'conv__act conv__del';
+          del.setAttribute('aria-label', 'Delete conversation');
+          del.title = 'Delete';
+          del.innerHTML =
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+          del.onclick = async () => {
+            // A real <dialog>, never window.confirm: it matches the app's
+            // styling, traps focus, and closes on Esc/backdrop for free.
+            if (!(await confirmDelete(c.title))) return;
+            convos = convos.filter((x) => x.id !== c.id);
+            if (String(c.id) === activeId) {
+              if (convos.length) switchTo(convos[0].id);
+              else newConversation();
+            }
+            save(); draw();
+          };
+          row.appendChild(del);
+          list.appendChild(row);
+        }
+      }
+
+      /* ============================================================
+         COMPONENT EVENTS
+         ============================================================ */
+      /* The component's own New-chat button (show-clear) isn't enabled here —
+         the sidebar button is ours. If it were, this handler would run IN
+         ADDITION to it, creating two conversations per click. Guard against
+         double-creation by only acting when the active conversation has
+         actually been used. */
+      chat.addEventListener('ai-chat:new-chat', (e) => {
+        e.preventDefault();          // we drive the switch ourselves
+        const c = find(activeId);
+        if (c && !c.messages.length) return;   // already sitting on a blank one
+        commit();
+        newConversation();
+      });
+
+      chat.addEventListener('ai-chat:submit', () => {
+        // The turn lands in chat.messages after this event, so snapshot on the
+        // next frame. Capture the id NOW: the user may switch before it fires.
+        const id = activeId;
+        requestAnimationFrame(() => {
+          const c = find(id);
+          if (!c || id !== activeId) return;   // they moved on; don't clobber
+          c.messages = [...chat.messages];
+          if (c.title === 'New chat') c.title = titleOf(c.messages);
+          $('topTitle').textContent = c.title;
+          save(); draw();
+        });
+      });
+
+      chat.addEventListener('ai-chat:message', () => { commit(); draw(); });
+
+      /* A reply that finished while the user was looking at ANOTHER
+         conversation. The component already renders it live if they switch
+         back — this is purely about persisting it. */
+      chat.addEventListener('ai-chat:background-message', (e) => {
+        const { conversationId, message, done } = e.detail;
+        const c = find(conversationId);
+        if (!c) return;
+        // NOTE: do NOT call draw() here. This fires on every token, and draw()
+        // rebuilds the whole list with innerHTML='' — which destroys the row
+        // under the user's cursor mid-click, so clicks silently do nothing and
+        // you have to press two or three times. Just sync the dots in place.
+        if (!done) { syncDots(); return; }
+        const i = c.messages.findIndex((m) => m.id === message.id);
+        if (i >= 0) c.messages[i] = message;
+        else c.messages.push(message);
+        if (c.title === 'New chat') c.title = titleOf(c.messages);
+        save(); draw();
+        if (String(conversationId) !== activeId) {
+          toast(message.error ? `A reply failed in "${c.title}"` : `"${c.title}" finished replying`);
+        }
+      });
+
+      chat.addEventListener('ai-chat:error', (e) => toast(e.detail.error, 4000));
+
+      // ChatGPT-style edit: truncate from the edited turn and resend.
+      chat.addEventListener('ai-chat:message-edit', (e) => {
+        const { index, newContent } = e.detail;
+        chat.messages = chat.messages.slice(0, index);
+        chat.send(newContent);
+      });
+
+      /* ============================================================
+         TRANSPORT — Ollama (OpenAI-compatible endpoint).
+         llava is the vision model, so images actually work.
+         ============================================================ */
+      let model = 'llava';
+      function buildTransport() {
+        // baseURL is the FULL chat-completions endpoint, not a base path.
+        chat.transport = openAIAdapter({
+          baseURL: `${OLLAMA}/chat/completions`,
+          model,
+        });
+      }
+
+      async function probeOllama() {
+        const dot = $('ollamaDot'), txt = $('ollamaText'), sel = $('modelSel');
+        try {
+          const res = await fetch('http://localhost:11434/api/tags');
+          if (!res.ok) throw new Error('tags request failed');
+          const data = await res.json();
+          const names = (data.models || []).map((m) => m.name);
+          sel.innerHTML = '';
+          for (const n of names) {
+            const o = document.createElement('option');
+            o.value = n; o.textContent = n;
+            sel.appendChild(o);
+          }
+          // Prefer a vision model so image attachments work out of the box.
+          const vision = names.find((n) => n.startsWith('llava')) || names[0];
+          if (vision) { model = vision; sel.value = vision; }
+          buildTransport();
+          dot.className = 'dot-status on';
+          txt.textContent = `Ollama · ${names.length} model${names.length === 1 ? '' : 's'}`;
+        } catch {
+          dot.className = 'dot-status off';
+          txt.innerHTML = 'Ollama not reachable';
+          sel.innerHTML = '<option>llava</option>';
+          buildTransport();
+        }
+      }
+
+      $('modelSel').onchange = (e) => {
+        model = e.target.value;
+        buildTransport();               // rebuild, or the change never reaches the adapter
+        toast(`Model: ${model}`);
+      };
+
+      /* ============================================================
+         SHELL
+         ============================================================ */
+      $('newChat').onclick = () => {
+        const c = find(activeId);
+        // Already on an unused blank chat? Just focus it instead of stacking
+        // another identical empty conversation on top.
+        if (c && !c.messages.length && !chat.messages.length) { closeNav(); return; }
+        commit();
+        newConversation();
+        closeNav();
+      };
+      $('themeBtn').onclick = () => {
+        const el = document.documentElement;
+        const dark = el.dataset.appTheme === 'dark';
+        el.dataset.appTheme = dark ? 'light' : 'dark';
+        chat.setAttribute('theme', dark ? 'light' : 'dark');
+      };
+      const closeNav = () => document.body.classList.remove('nav-open');
+      $('hamburger').onclick = () => document.body.classList.toggle('nav-open');
+      $('scrim').onclick = closeNav;
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNav(); });
+
+      /* Boot */
+      chat.setAttribute('theme', 'dark');
+      load();
+      if (!convos.length) newConversation();
+      else { setActive(convos[0].id); chat.messages = [...convos[0].messages]; }
+      draw();
+      probeOllama();
+    </script>
+  </body>
+</html>
