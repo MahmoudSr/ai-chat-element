@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **Playground: sidebar clicks needed 3-4 presses while a reply streamed in the
+  background.** The history list was rebuilt on every
+  `ai-chat:background-message` token, which replaced the row under the cursor
+  between mousedown and mouseup so the click never fired. Per-token updates now
+  only sync the generating-dot in place (`syncDots()`); the list is rebuilt
+  only when a reply settles. If your own history sidebar does the same, don't
+  rebuild list DOM from a per-token event.
+
 ## [0.4.0] - 2026-08-20
 
 ### Added

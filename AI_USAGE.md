@@ -210,6 +210,8 @@ chat.addEventListener('ai-chat:background-message', (e) => {
 - `conversationId` is the id that was active when that turn was SENT — use it as
   your storage key.
 - `chat.isGenerating(id)` → boolean, for marking a row in your history list.
+  Toggle that marker IN PLACE on per-token events — never rebuild the list DOM
+  per token (it destroys the row mid-click; clicks then need several presses).
 - Fires ONLY for conversations the user left; a visible reply settles normally on
   `ai-chat:message`.
 - A failed background stream still fires `done:true` with `message.error` set, but

@@ -642,6 +642,28 @@
         drawHist();
       }
 
+      // Update ONLY the generating-dots, in place. Called per token while a
+      // background reply streams, so it must never rebuild the list: a click
+      // only fires if mousedown and mouseup hit the SAME element, and
+      // drawHist() replaces every row — a token landing mid-click destroyed
+      // the button under the cursor, so clicks needed 3-4 presses.
+      function syncDots() {
+        for (const row of histList.querySelectorAll('.h-item')) {
+          const open = row.querySelector('.h-open');
+          if (!open) continue;                 // row is mid-rename; leave it
+          const has = !!chat.isGenerating?.(String(row.dataset.id));
+          const dot = open.querySelector('.h-dot');
+          if (has && !dot) {
+            const d = document.createElement('span');
+            d.className = 'h-dot';
+            d.setAttribute('aria-label', 'still generating');
+            open.prepend(d);
+          } else if (!has && dot) {
+            dot.remove();
+          }
+        }
+      }
+
       function drawHist() {
         histList.innerHTML = '';
         if (!convos.length) {
@@ -651,6 +673,7 @@
         for (const c of convos) {
           const row = document.createElement('div');
           row.className = 'h-item';
+          row.dataset.id = String(c.id);      // syncDots() finds rows by this
           row.setAttribute('aria-current', String(c.id === activeId));
           // This row is being renamed: swap it for an input and skip the rest.
           if (c.id === renamingId) {
@@ -680,8 +703,6 @@
 
           const open = document.createElement('button');
           open.type = 'button'; open.className = 'h-open';
-          // A conversation still generating in the background gets a marker, so
-          // you can watch a reply finish for a chat you're not looking at.
           // A conversation generating in the background gets a small pulsing
           // dot — no text, no layout shift. Ask the component, which knows.
           open.textContent = c.title;
@@ -743,16 +764,14 @@
       });
 
       // A reply that kept generating after the user switched away. The component
-      // hands it to us because its conversation is no longer on screen — we
-      // append it to the conversation it actually belongs to.
-      // A reply that kept generating after the user switched away. The component
       // renders it live if you switch BACK — this handler is only about STORAGE:
       // keeping our copy of that conversation current so it survives a reload.
       chat.addEventListener('ai-chat:background-message', (e) => {
         const { conversationId, message, done } = e.detail;
         const c = convos.find((x) => String(x.id) === String(conversationId));
         if (!c) return;
-        if (!done) { drawHist(); return; }   // repaint so the dot clears/appears
+        // Per token: NEVER drawHist() here (see syncDots for why).
+        if (!done) { syncDots(); return; }
         const i = c.messages.findIndex((m) => m.id === message.id);
         if (i >= 0) c.messages[i] = message; else c.messages = [...c.messages, message];
         if (c.title === 'New chat') c.title = titleOf(c.messages);

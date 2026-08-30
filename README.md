@@ -639,7 +639,10 @@ chat.addEventListener('ai-chat:background-message', (e) => {
 ```
 
 Use `chat.isGenerating(id)` to mark a row in your history list as still working —
-the playground shows a small pulsing dot.
+the playground shows a small pulsing dot. Update that marker **in place** on the
+per-token events; don't rebuild the list DOM per token, or a token landing
+between mousedown and mouseup replaces the row under the cursor and the click is
+lost (the playground's `syncDots()` shows the pattern).
 
 Details worth knowing:
 
