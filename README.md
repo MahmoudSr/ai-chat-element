@@ -1011,7 +1011,27 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-composer-border-width` | `0`              | Divider above the composer        |
 | `--ai-chat-header-border-width`   | `= border-width` | Divider under the header          |
 | `--ai-chat-code-border-width`     | `= border-width` | Code block border                 |
-| `--ai-chat-table-border-width`    | `= border-width` | Markdown table borders            |
+| `--ai-chat-table-border-width`    | `= border-width` | Markdown table frame and row rules |
+
+**Reply content** (markdown in replies; defaults derive from the palette, so dark mode follows)
+
+| Variable                        | Default                     | Controls                                      |
+| ------------------------------- | --------------------------- | --------------------------------------------- |
+| `--ai-chat-table-header-bg`     | `fg 5%`                     | Table header row background                   |
+| `--ai-chat-table-header-fg`     | `= muted`                   | Table header text                             |
+| `--ai-chat-table-row-divider`   | `= border`                  | Rule between table rows (no vertical rules)   |
+| `--ai-chat-table-stripe-bg`     | `transparent`               | Every other body row (set a tint for stripes) |
+| `--ai-chat-table-cell-padding`  | `6px 12px`                  | Table cell padding                            |
+| `--ai-chat-table-radius`        | `= radius-sm`               | Table outer frame corners                     |
+| `--ai-chat-link-color`          | `= accent`                  | Links                                         |
+| `--ai-chat-link-hover-color`    | `accent 75% + fg`           | Links on hover                                |
+| `--ai-chat-strong-fg`           | `inherit`                   | **Bold** text                                 |
+| `--ai-chat-heading-fg`          | `inherit`                   | Headings (h1-h6, sized for a chat reply)      |
+| `--ai-chat-marker-color`        | `= muted`                   | List bullets and numbers                      |
+| `--ai-chat-blockquote-border`   | `= border`                  | Blockquote left rule                          |
+
+Tables use tabular numerals so money and counts line up, and honour markdown
+column alignment (`|--:|` right-aligns a number column).
 
 **Corner radius** (all inherit `--ai-chat-radius`)
 

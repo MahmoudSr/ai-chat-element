@@ -8,6 +8,19 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Added
 
+- **Reply content you can theme: tables, links, headings, lists.** Twelve new
+  variables, every default derived from the palette (so dark mode follows and
+  every app looks better without setting anything): `--ai-chat-table-header-bg`
+  / `-header-fg`, `--ai-chat-table-row-divider`, `--ai-chat-table-stripe-bg`,
+  `--ai-chat-table-cell-padding`, `--ai-chat-table-radius`,
+  `--ai-chat-link-color` / `-link-hover-color`, `--ai-chat-strong-fg`,
+  `--ai-chat-heading-fg`, `--ai-chat-marker-color`, `--ai-chat-blockquote-border`.
+  - **Behaviour change (visual):** tables now have a tinted header row, rules
+    between rows only (no vertical lines) inside a rounded frame, and tabular
+    numerals; markdown column alignment (`|--:|`) is honoured. Headings are
+    sized for a chat reply; `hr` is a thin rule. In dark mode links are lifted
+    off the accent so they stay readable (indigo on near-black was ~3:1).
+
 - **Dash-named events for framework templates.** Every `ai-chat:*` event also
   fires as `ai-chat-*` (`ai-chat-message`, `ai-chat-new-chat`, …) with the same
   detail; cancelling either cancels both. The README's Angular example was

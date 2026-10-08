@@ -48,6 +48,20 @@ export const chatStyles = css`
     --ai-chat-composer-border-width: 0px;   /* top divider above the input; off by default */
     --ai-chat-code-border-width: var(--ai-chat-border-width);
     --ai-chat-table-border-width: var(--ai-chat-border-width);
+    /* Reply content (markdown). Every default derives from the palette above,
+       so dark mode follows on its own. Tables: a tinted header row, rules
+       between rows only, a rounded outer frame. */
+    --ai-chat-table-header-bg: color-mix(in srgb, var(--ai-chat-fg) 5%, transparent);
+    --ai-chat-table-header-fg: var(--ai-chat-muted);
+    --ai-chat-table-row-divider: var(--ai-chat-border);
+    --ai-chat-table-stripe-bg: transparent;
+    --ai-chat-table-cell-padding: 6px 12px;
+    --ai-chat-link-color: var(--ai-chat-accent);
+    --ai-chat-link-hover-color: color-mix(in srgb, var(--ai-chat-accent) 75%, var(--ai-chat-fg));
+    --ai-chat-strong-fg: inherit;
+    --ai-chat-heading-fg: inherit;
+    --ai-chat-marker-color: var(--ai-chat-muted);
+    --ai-chat-blockquote-border: var(--ai-chat-border);
 
     /* ---- Corner rounding ----
        ONE knob controls every rounded corner: --ai-chat-radius. Change it and
@@ -56,6 +70,7 @@ export const chatStyles = css`
        individually if you want (e.g. circular buttons via --ai-chat-button-radius:50%). */
     --ai-chat-radius: 8px;
     --ai-chat-radius-sm: var(--ai-chat-radius);
+    --ai-chat-table-radius: var(--ai-chat-radius-sm);
     --ai-chat-bubble-radius: var(--ai-chat-radius);
     --ai-chat-input-radius: var(--ai-chat-radius);
     --ai-chat-code-radius: var(--ai-chat-radius);
@@ -165,6 +180,9 @@ export const chatStyles = css`
     --_dark-border: #262a35;
     --_dark-assistant-bg: #1b1e27;
     --_dark-assistant-fg: #e6e6e6;
+    /* The accent is tuned for a light page; on a dark one a link needs lifting
+       to stay readable (indigo on near-black is ~3:1). */
+    --_dark-link: color-mix(in srgb, var(--ai-chat-accent) 55%, #ffffff);
   }
   :host([theme='dark']) {
     --ai-chat-bg: var(--_dark-bg);
@@ -173,6 +191,7 @@ export const chatStyles = css`
     --ai-chat-border: var(--_dark-border);
     --ai-chat-assistant-bg: var(--_dark-assistant-bg);
     --ai-chat-assistant-fg: var(--_dark-assistant-fg);
+    --ai-chat-link-color: var(--_dark-link);
   }
   @media (prefers-color-scheme: dark) {
     :host(:not([theme='light']):not([theme='dark'])) {
@@ -182,6 +201,7 @@ export const chatStyles = css`
       --ai-chat-border: var(--_dark-border);
       --ai-chat-assistant-bg: var(--_dark-assistant-bg);
       --ai-chat-assistant-fg: var(--_dark-assistant-fg);
+      --ai-chat-link-color: var(--_dark-link);
     }
   }
 
@@ -721,8 +741,27 @@ export const chatStyles = css`
   .markdown > .markdown__part:first-child > :first-child { margin-top: 0; }
   .markdown > .markdown__part:last-child > :last-child { margin-bottom: 0; }
   .markdown p { margin: 0.5em 0; }
-  .markdown a { color: var(--ai-chat-accent); }
+  .markdown a { color: var(--ai-chat-link-color); text-underline-offset: 2px; }
+  .markdown a:hover { color: var(--ai-chat-link-hover-color); }
+  .markdown strong, .markdown b { color: var(--ai-chat-strong-fg); font-weight: 600; }
   .markdown ul, .markdown ol { padding-left: 1.4em; margin: 0.5em 0; }
+  .markdown li::marker { color: var(--ai-chat-marker-color); }
+  /* Headings sized for a chat reply, not a page: a step or two above body. */
+  .markdown h1, .markdown h2, .markdown h3, .markdown h4, .markdown h5, .markdown h6 {
+    margin: 0.9em 0 0.4em;
+    color: var(--ai-chat-heading-fg);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .markdown h1 { font-size: 1.25em; }
+  .markdown h2 { font-size: 1.15em; }
+  .markdown h3 { font-size: 1.05em; }
+  .markdown h4, .markdown h5, .markdown h6 { font-size: 1em; }
+  .markdown hr {
+    margin: 1em 0;
+    border: 0;
+    border-top: var(--ai-chat-table-border-width) solid var(--ai-chat-border);
+  }
   .markdown :not(pre) > code {
     font-family: var(--ai-chat-font-mono);
     font-size: 0.9em;
@@ -736,7 +775,12 @@ export const chatStyles = css`
      width:max-content lets it stay natural width and scroll, capped at 100% so a
      small table still fills nicely. */
   .markdown table {
-    border-collapse: collapse;
+    /* separate + 0 spacing, so the outer frame can be rounded. */
+    border-collapse: separate;
+    border-spacing: 0;
+    border: var(--ai-chat-table-border-width) solid var(--ai-chat-border);
+    border-radius: var(--ai-chat-table-radius);
+    font-variant-numeric: tabular-nums; /* money and counts line up */
     display: block;
     max-width: 100%;
     width: max-content;
@@ -746,13 +790,26 @@ export const chatStyles = css`
     scrollbar-color: var(--ai-chat-border) transparent;
   }
   .markdown th, .markdown td {
-    border: var(--ai-chat-table-border-width) solid var(--ai-chat-border);
-    padding: 6px 10px;
+    padding: var(--ai-chat-table-cell-padding);
     white-space: nowrap;
   }
+  /* Rules between rows only — no vertical lines. The first body row's rule
+     separates it from the header; a header-less table drops it (the frame is
+     already there). */
+  .markdown td { border-top: var(--ai-chat-table-border-width) solid var(--ai-chat-table-row-divider); }
+  .markdown table > tbody:first-child > tr:first-child > td { border-top: 0; }
+  .markdown th {
+    background: var(--ai-chat-table-header-bg);
+    color: var(--ai-chat-table-header-fg);
+    font-size: 0.9em;
+    font-weight: 600;
+  }
+  /* Start-aligned unless the markdown asked otherwise (|--:| sets align). */
+  .markdown th:not([align]), .markdown td:not([align]) { text-align: start; }
+  .markdown tbody tr:nth-child(even) > td { background: var(--ai-chat-table-stripe-bg); }
   .markdown blockquote {
     margin: 0.5em 0; padding-left: 12px;
-    border-left: 3px solid var(--ai-chat-border);
+    border-left: 3px solid var(--ai-chat-blockquote-border);
     color: var(--ai-chat-muted);
   }
 

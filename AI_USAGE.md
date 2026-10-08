@@ -342,6 +342,16 @@ Borders (0 removes): `--ai-chat-border-width` (1px), `--ai-chat-input-border-wid
 `--ai-chat-composer-border-width` (0), `--ai-chat-header-border-width`,
 `--ai-chat-code-border-width`, `--ai-chat-table-border-width`.
 
+Reply content (markdown; defaults derive from the palette, dark mode follows):
+`--ai-chat-table-header-bg` (fg 5%), `--ai-chat-table-header-fg` (= muted),
+`--ai-chat-table-row-divider` (= border; rules between rows only),
+`--ai-chat-table-stripe-bg` (transparent), `--ai-chat-table-cell-padding`
+(6px 12px), `--ai-chat-table-radius` (= radius-sm), `--ai-chat-link-color`
+(= accent), `--ai-chat-link-hover-color`, `--ai-chat-strong-fg` (inherit),
+`--ai-chat-heading-fg` (inherit), `--ai-chat-marker-color` (= muted),
+`--ai-chat-blockquote-border` (= border). Tables use tabular numerals and honour
+markdown column alignment.
+
 Radius (all = --ai-chat-radius): `--ai-chat-radius` (8px), `--ai-chat-outer-radius`
 (= radius; 0 for square), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,
 `--ai-chat-send-radius`, `--ai-chat-new-chat-radius` (= button-radius),
