@@ -90,6 +90,14 @@ export const copyIcon = svg`
     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
   </svg>`;
 
+/** Tick — shown on the copy button for a moment after a copy lands. */
+export const checkIcon = svg`
+  <svg class="icon" viewBox=${base.viewBox} width="15" height="15"
+       fill=${base.fill} stroke=${base.stroke} stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M20 6 9 17l-5-5"></path>
+  </svg>`;
+
 /** Pencil — edit a user message. */
 export const editIcon = svg`
   <svg class="icon" viewBox=${base.viewBox} width="15" height="15"

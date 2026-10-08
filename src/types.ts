@@ -70,6 +70,13 @@ export interface Attachment {
    * upload the bytes without re-reading them.
    */
   file?: File;
+  /** A second line under a file's name on its card, e.g. "Excel · 42 rows". */
+  detail?: string;
+  /**
+   * The app is still making this file: its card reads the `preparingFile` label
+   * and cannot be opened until you clear it.
+   */
+  busy?: boolean;
 }
 
 export interface ChatMessage {

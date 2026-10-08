@@ -6,6 +6,39 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-08
+
+Files in a reply, a visible copy, and two fixes found in the admin dashboard.
+
+### Added
+
+- **Files in a reply, as cards.** A `kind: 'file'` attachment on an assistant
+  message renders as a card BELOW the text — icon, name, and a new optional
+  **`detail`** line ("CSV · 23 rows") — the way ChatGPT and Claude hand you a
+  file. With a URL it is a download link; without one it is a button and the new
+  cancelable **`ai-chat:attachment-click`** `{ attachment, message, index }` is
+  where you make the file. **`busy: true`** shows the new `preparingFile` label
+  and disables it. New parts `file-card`, `file-card-name`, `file-card-detail`;
+  new label `openFile`. Files on a sent message are cards too, still above the
+  text. Only `https:`, `http:`, `blob:` and `data:` URLs become links.
+
+### Changed
+
+- **Copying a message shows a tick.** The copy button swaps its icon for a tick
+  for 1.5s and its name to the `copied` label ("Copied!"), so the copy is
+  visible and announced; before, it only flashed the accent colour. Swap the
+  tick with the new **`copied-icon`** slot.
+
+### Fixed
+
+- **The drawer takes focus however it opens.** Opening it with your own button
+  (`aside-open`, e.g. with `hide-aside-toggle`) now moves keyboard focus into it,
+  like the built-in toggle, and closing hands focus back to whatever had it.
+- **Scrolling to the top always loads earlier messages.** A conversation that
+  overflowed the view by less than the 200px look-ahead never asked for more
+  (`load-earlier="scroll"`): its top was already in range while the chat opened
+  at the bottom, so reaching it reported nothing new.
+
 ## [0.5.0] - 2026-10-08
 
 Long conversations, safer replies, and the fixes found by using the component
@@ -541,7 +574,8 @@ Initial public release.
 - Accessibility: ARIA live region, keyboard support, reduced-motion.
 - Licensed under MPL-2.0.
 
-[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.2.0...v0.3.0

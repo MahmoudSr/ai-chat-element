@@ -100,8 +100,8 @@ server-backed pattern above. See [Transports](#transports).
 <script type="module">
   // Pin the version so a future release can't change your page unannounced.
   // Drop the @0.3.0 to always get the latest (fine for a quick try, not prod).
-  import 'https://esm.sh/ai-chat-element@0.5.0';
-  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.5.0';
+  import 'https://esm.sh/ai-chat-element@0.6.0';
+  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.6.0';
 
   const chat = document.querySelector('ai-chat');
   // Local, keyless example: talk to Ollama running on your machine.
@@ -393,6 +393,7 @@ framework templates (Angular can't bind a colon name).
 | `ai-chat:preview` | `{ attachment: Attachment }` | Fires when an image (staged in the composer or already sent) is clicked. **Cancelable** — `e.preventDefault()` suppresses the built-in overlay so you can open your own lightbox/gallery. |
 | `ai-chat:aside-toggle` | `{ open: boolean }` | The reader opened or closed the sidebar drawer (toggle, backdrop, Esc, or a conversation switch). |
 | `ai-chat:message-action` | `{ actionId: string, message: ChatMessage, index: number }` | One of your `messageActions` buttons was pressed. |
+| `ai-chat:attachment-click` | `{ attachment: Attachment, message: ChatMessage, index: number }` | A file card was pressed. **Cancelable** — on a card with a URL, `e.preventDefault()` stops the download. A card without a URL does nothing else, so this is where you make the file. See [Files in a reply](#files-in-a-reply). |
 | `ai-chat:load-earlier` | `{ conversationId: string \| null, oldest: ChatMessage }` | The reader asked for older messages (`has-earlier`): scrolled near the top, or pressed the button. Fires once until you call `prependMessages()`. `oldest` is your paging cursor. |
 | `ai-chat:background-message` | `{ conversationId: string \| null, message: ChatMessage, done: boolean }` | A reply is still streaming for a conversation you've switched away from. Fires per token with `done: false`, then once with `done: true` when it settles (including on error — check `message.error`). `conversationId` is whatever `conversation-id` held when that turn was sent. See [Background streaming](#background-streaming). |
 
@@ -591,7 +592,8 @@ changed. Style them with `::part(custom-action)`.
 Turn copy off with `show-copy="false"`; restyle both via the `action-button`,
 `copy-button` and `edit-button` parts, swap the icons with the `copy-icon` /
 `edit-icon` slots, and rename the strings via the `copyMessage`, `edit`,
-`saveEdit` and `cancelEdit` labels.
+`saveEdit` and `cancelEdit` labels. After a copy the button shows a tick for a
+moment and reads the `copied` label; swap the tick with the `copied-icon` slot.
 
 ---
 
@@ -716,7 +718,8 @@ phone, but also a narrow panel on a desktop — the sidebar would crush the
 conversation. It slides over it instead, opened by a built-in toggle in the
 header (or floating top-left without one). The backdrop, Esc, or switching
 conversation (`conversation-id` changing) closes it; keyboard focus moves into
-the drawer and back to the toggle.
+the drawer and back to whatever opened it — the toggle, or your own button when
+you drive it with `aside-open`.
 
 ```html
 <ai-chat show-aside show-header aside-breakpoint="640"></ai-chat>
@@ -910,6 +913,29 @@ an error. Style the tray and chips via the `composer-attachments`,
 `attachment-chip`, `attachment-remove`, `message-attachments`, and
 `message-attachment` parts; replace the button icon via the `attach-icon` slot.
 
+### Files in a reply
+
+A reply can hand the reader a file, the way ChatGPT and Claude do: give the
+assistant message a `kind: 'file'` attachment and it renders as a card BELOW the
+text — icon, name, and an optional `detail` line. With a `url` (`https:`, `http:`,
+`blob:` or `data:`) the card is a download link; without one it is a button, and
+`ai-chat:attachment-click` is where you make the file. Set `busy: true` while you
+do — the card reads the `preparingFile` label and can't be pressed — then clear it.
+
+```js
+const card = { id: 'export', kind: 'file', mimeType: 'text/csv', name: 'unpaid.csv',
+  size: 0, url: '', detail: 'CSV · 23 rows' };
+chat.addEventListener('ai-chat:attachment-click', async (e) => {
+  if (e.detail.attachment.id !== 'export') return;
+  setBusy(true);                     // re-assign .messages with busy: true on the card
+  try { await buildAndDownload(); } finally { setBusy(false); }
+});
+```
+
+Style it with the `file-card`, `file-card-name` and `file-card-detail` parts;
+`openFile` (uses `{name}`) is its accessible name. Files on a sent message stay
+above its text, as cards too.
+
 ---
 
 ## Labels & i18n
@@ -943,6 +969,9 @@ chat.labels = {
   cancelEdit: 'Cancelar',
   // Image preview ({name} is replaced with the file name):
   previewImage: 'Ver {name}',
+  // A file card in a reply ({name} is the file name):
+  openFile: 'Abrir {name}',
+  preparingFile: 'Preparando…',
   closePreview: 'Cerrar vista previa',
   // Top of a long conversation (has-earlier):
   loadEarlier: 'Cargar mensajes anteriores',
@@ -1170,7 +1199,8 @@ For styling that a variable can't reach, target the shadow parts with
 `layout`, `root`, `aside`, `aside-list`, `header`, `header-slot`, `header-title`,
 `clear-button`, `messages`, `message`, `message-user`, `message-assistant`,
 `message-system`, `bubble`, `avatar`, `meta`, `name`, `time`,
-`message-attachments`, `message-attachment`,
+`message-attachments`, `message-attachment`, `file-card`, `file-card-name`,
+`file-card-detail`,
 `message-actions`, `action-button`, `copy-button`, `edit-button`,
 `preview`, `preview-image`, `preview-close`, `composer`,
 `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
@@ -1216,6 +1246,7 @@ Put your own markup in any of these (`<x slot="name">`):
 | `send-icon` / `stop-icon`          | Send / stop button icons                                              |
 | `clear-icon` / `retry-icon`        | New-chat / retry button icons                                         |
 | `copy-icon` / `edit-icon`          | Per-message copy / edit action-button icons                          |
+| `copied-icon`                      | The tick a copy button shows for a moment after a copy               |
 | `jump-icon` / `error-icon`         | Jump-to-latest / error icons                                          |
 | `attach-icon`                      | Attach-button icon (with `allow-attachments`)                        |
 

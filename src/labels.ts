@@ -64,6 +64,10 @@ export interface ChatLabels {
   /** aria-label for an image that opens a full-size preview when clicked.
    *  `{name}` is replaced with the file name. */
   previewImage: string;
+  /** A file card's accessible name. `{name}` is the file name. */
+  openFile: string;
+  /** A file card while the app is still making the file. */
+  preparingFile: string;
   /** aria-label for the close button on the image preview overlay. */
   closePreview: string;
   /** The control at the top of a conversation with older messages (`has-earlier`). */
@@ -103,6 +107,8 @@ export const DEFAULT_LABELS: ChatLabels = {
   saveEdit: 'Save',
   cancelEdit: 'Cancel',
   previewImage: 'Preview {name}',
+  openFile: 'Open {name}',
+  preparingFile: 'Preparing…',
   closePreview: 'Close preview',
   loadEarlier: 'Load earlier messages',
   loadingEarlier: 'Loading earlier messages…',

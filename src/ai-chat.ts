@@ -25,6 +25,7 @@ import {
   closeIcon,
   fileIcon,
   copyIcon,
+  checkIcon,
   editIcon,
   asideIcon,
 } from './icons.js';
@@ -59,10 +60,35 @@ const nextId = () =>
  * in an Angular or Vue template — used to switch the feature ON. Reflection is
  * unchanged: true writes a bare attribute, false removes it.
  */
+/** The focused element, looking through shadow roots (document.activeElement stops at the host). */
+function deepActiveElement(): HTMLElement | null {
+  let el = document.activeElement;
+  while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
+  // <body> holds focus when nothing does — that is no one to hand it back to.
+  return el instanceof HTMLElement && el !== document.body ? el : null;
+}
+
 const booleanAttribute = {
   fromAttribute: (value: string | null): boolean => value !== null && value.trim().toLowerCase() !== 'false',
   toAttribute: (value: boolean): string | null => (value ? '' : null),
 };
+
+/** A file card links only to a URL that fetches a file — never script. */
+function safeFileHref(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const { protocol } = new URL(url, location.href);
+    return ['https:', 'http:', 'blob:', 'data:'].includes(protocol) ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Older messages start loading this far before the top comes into view. */
+const EARLIER_LOOKAHEAD_PX = 200;
+
+/** How long the copy button shows its tick after a copy. */
+const COPIED_TICK_MS = 1500;
 
 @customElement('ai-chat')
 export class AiChat extends LitElement {
@@ -354,6 +380,9 @@ export class AiChat extends LitElement {
   @state() private _dragging = false;
   /** Shown when the user has scrolled up away from the latest message. */
   @state() private _showJump = false;
+  /** The message whose copy just landed — its copy button shows a tick for a moment. */
+  @state() private _copiedId: string | null = null;
+  private _copiedTimer?: number;
   /** The missing-transport warning has been printed for this element. */
   private _warnedNoTransport = false;
   /** The chat is narrower than `aside-breakpoint`: the sidebar is a drawer. */
@@ -492,6 +521,9 @@ export class AiChat extends LitElement {
   @query('.layout') private _layoutEl?: HTMLElement;
   @query('.aside') private _asideEl?: HTMLElement;
   @query('.aside-toggle') private _asideToggle?: HTMLButtonElement;
+  /** Who had focus when the drawer opened; closing hands it back. */
+  private _asideOpener: HTMLElement | null = null;
+  private _asideReturnFocus = false;
   @query('.earlier__button') private _earlierButton?: HTMLButtonElement;
   /** Watches the top of the list so older messages load as the reader nears it. */
   private _topObserver?: IntersectionObserver;
@@ -593,20 +625,41 @@ export class AiChat extends LitElement {
     }
   }
 
-  /** Open or close the drawer; `returnFocus` sends keyboard focus back to the toggle. */
-  private async _setAsideOpen(open: boolean, returnFocus: boolean): Promise<void> {
+  /** Open or close the drawer; `returnFocus` hands keyboard focus back to whoever opened it. */
+  private _setAsideOpen(open: boolean, returnFocus: boolean): void {
     if (this.asideOpen === open) return;
     this.asideOpen = open;
+    this._asideReturnFocus = returnFocus;
     this.dispatchEvent(
       new CustomEvent('ai-chat:aside-toggle', { detail: { open }, bubbles: true, composed: true }),
     );
-    await this.updateComplete;
-    if (open) this._asideEl?.focus();
-    else if (returnFocus) this._asideToggle?.focus();
+  }
+
+  /**
+   * Focus follows the drawer whoever opened it — the built-in toggle or the app's
+   * own button via `aside-open`. Opening moves focus in and remembers where it
+   * was; closing hands it back when asked to, or when it was inside the drawer
+   * (which is about to hide).
+   */
+  private _moveAsideFocus(): void {
+    if (!this._narrow) return;
+    const active = deepActiveElement();
+    if (this.asideOpen) {
+      this._asideOpener = active;
+      this._asideEl?.focus();
+      return;
+    }
+    const inside = !!active && (this._asideEl?.contains(active) || (this.contains(active) && !!active.closest('[slot="aside"]')));
+    if (this._asideReturnFocus || inside) {
+      const back = this._asideOpener?.isConnected ? this._asideOpener : this._asideToggle;
+      back?.focus();
+    }
+    this._asideOpener = null;
+    this._asideReturnFocus = false;
   }
 
   private _toggleAside(): void {
-    void this._setAsideOpen(!this.asideOpen, true);
+    this._setAsideOpen(!this.asideOpen, true);
   }
 
   /** Programmatically append a message without sending it. */
@@ -1307,7 +1360,7 @@ export class AiChat extends LitElement {
         (entries) => {
           if (entries.some((e) => e.isIntersecting)) this._autoLoadEarlier();
         },
-        { root: this._scrollEl, rootMargin: '200px 0px 0px 0px', threshold: 0 },
+        { root: this._scrollEl, rootMargin: `${EARLIER_LOOKAHEAD_PX}px 0px 0px 0px`, threshold: 0 },
       );
     }
   }
@@ -1351,6 +1404,7 @@ export class AiChat extends LitElement {
   }
 
   override disconnectedCallback(): void {
+    window.clearTimeout(this._copiedTimer);
     document.removeEventListener('keydown', this._onHostKeydown);
     this._bottomObserver?.disconnect();
     this._bottomObserver = undefined;
@@ -1446,6 +1500,9 @@ export class AiChat extends LitElement {
   private _observedSentinel?: Element;
 
   protected override updated(changed: PropertyValues): void {
+    // Not on first render: a drawer that starts open must not steal the page's focus.
+    if (changed.has('asideOpen') && changed.get('asideOpen') !== undefined) this._moveAsideFocus();
+
     // The sentinel only exists while there are messages; (re)observe it as it
     // appears or disappears so the bottom-detection observer stays wired up.
     if (this._bottomObserver && this._sentinel !== this._observedSentinel) {
@@ -1485,7 +1542,7 @@ export class AiChat extends LitElement {
   protected override willUpdate(changed: PropertyValues): void {
     // Picking a conversation in the drawer is the reader done with it.
     if (changed.has('conversationId') && changed.get('conversationId') !== undefined && this._narrow && this.asideOpen) {
-      void this._setAsideOpen(false, false);
+      this._setAsideOpen(false, false);
     }
     if (changed.has('asideBreakpoint') || changed.has('showAside')) queueMicrotask(() => this._measureNarrow());
     // A load that was out for a conversation no longer on screen will never be
@@ -1540,6 +1597,10 @@ export class AiChat extends LitElement {
     if (!grew && !atBottom && top < this._lastScrollTop - 1) {
       this._stickToBottom = false;
     }
+    // The top observer only reports CHANGES: on a chat that overflows by less
+    // than the look-ahead, the top is "in view" from the start (skipped then,
+    // while pinned) and never reported again. Judge by where the reader is.
+    if (!this._stickToBottom && top <= EARLIER_LOOKAHEAD_PX) this._autoLoadEarlier();
     this._lastScrollTop = top;
     this._lastScrollHeight = el.scrollHeight;
   }
@@ -1942,6 +2003,12 @@ export class AiChat extends LitElement {
         </div>`
             : nothing
         }
+        ${
+          // A reply's files come after its text: the answer hands you the file.
+          isAssistant
+            ? this._renderFileCards(m, (m.attachments ?? []).filter((a) => a.kind !== 'image'))
+            : nothing
+        }
         ${this._renderMessageActions(m)}
         </div>
       </div>
@@ -1983,12 +2050,19 @@ export class AiChat extends LitElement {
            aria-label=${this._labels.copyMessage}>
         ${
           showCopy
-            ? html`<button class="message__action" part="action-button copy-button"
-                     type="button" title=${this._labels.copyMessage}
-                     aria-label=${this._labels.copyMessage}
-                     @click=${(e: Event) => this._onCopyMessage(e, m)}>
-                     <slot name="copy-icon">${copyIcon}</slot>
-                   </button>`
+            ? this._copiedId === m.id
+              ? html`<button class="message__action message__action--done"
+                       part="action-button copy-button" type="button"
+                       title=${this._labels.copied} aria-label=${this._labels.copied}
+                       @click=${() => this._onCopyMessage(m)}>
+                       <slot name="copied-icon">${checkIcon}</slot>
+                     </button>`
+              : html`<button class="message__action" part="action-button copy-button"
+                       type="button" title=${this._labels.copyMessage}
+                       aria-label=${this._labels.copyMessage}
+                       @click=${() => this._onCopyMessage(m)}>
+                       <slot name="copy-icon">${copyIcon}</slot>
+                     </button>`
             : nothing
         }
         ${
@@ -2167,12 +2241,15 @@ export class AiChat extends LitElement {
   }
 
   /** Copy a whole message's text to the clipboard, with brief button feedback. */
-  private _onCopyMessage(e: Event, m: ChatMessage): void {
-    const btn = (e.currentTarget as HTMLElement) ?? null;
+  /**
+   * Copy a message, then swap its copy icon for a tick for a moment. Held in state
+   * (not a class on the button) so a re-render while it shows cannot drop it.
+   */
+  private _onCopyMessage(m: ChatMessage): void {
     void navigator.clipboard?.writeText(m.content).then(() => {
-      if (!btn) return;
-      btn.classList.add('message__action--done');
-      window.setTimeout(() => btn.classList.remove('message__action--done'), 1200);
+      window.clearTimeout(this._copiedTimer);
+      this._copiedId = m.id;
+      this._copiedTimer = window.setTimeout(() => (this._copiedId = null), COPIED_TICK_MS);
     });
   }
 
@@ -2306,7 +2383,9 @@ export class AiChat extends LitElement {
   private _renderMessageAttachments(m: ChatMessage) {
     if (!m.attachments?.length) return nothing;
     const images = m.attachments.filter((a) => a.kind === 'image');
-    const files = m.attachments.filter((a) => a.kind !== 'image');
+    // A reply's files render below its text (see the message template).
+    const files = m.role === 'assistant' ? [] : m.attachments.filter((a) => a.kind !== 'image');
+    if (!images.length && !files.length) return nothing;
     // Grid sizing keys off the image count: 1 shows larger, 2+ tile into fixed
     // square cells so a wide screenshot can't stretch the bubble to full width.
     const gridClass =
@@ -2336,17 +2415,62 @@ export class AiChat extends LitElement {
               </div>`
             : nothing
         }
-        ${repeat(
-          files,
-          (a) => a.id,
-          (a) => html`<span class="message__attachment message__attachment--file"
-                       part="message-attachment" title=${a.name}>
-                       <span class="message__attachment-icon" aria-hidden="true">${fileIcon}</span>
-                       <span class="message__attachment-name">${a.name}</span>
-                     </span>`,
-        )}
+        ${this._renderFileCards(m, files)}
       </div>
     `;
+  }
+
+  /**
+   * File attachments as cards: icon, name, an optional detail line, a busy state.
+   * On a reply they sit BELOW the text (the answer hands you the file); on a
+   * sent message they stay above it, with its images.
+   */
+  private _renderFileCards(m: ChatMessage, files: readonly Attachment[]) {
+    if (!files.length) return nothing;
+    return html`<div class="file-cards">
+      ${repeat(files, (a) => a.id, (a) => this._renderFileCard(m, a))}
+    </div>`;
+  }
+
+  private _renderFileCard(m: ChatMessage, a: Attachment) {
+    const body = html`
+      <span class="file-card__icon" aria-hidden="true">${fileIcon}</span>
+      <span class="file-card__text">
+        <span class="file-card__name" part="file-card-name">${a.name}</span>
+        ${
+          a.busy
+            ? html`<span class="file-card__detail" part="file-card-detail">${this._labels.preparingFile}</span>`
+            : a.detail
+              ? html`<span class="file-card__detail" part="file-card-detail">${a.detail}</span>`
+              : nothing
+        }
+      </span>`;
+    const label = this._fill(this._labels.openFile, a.name);
+    const href = a.busy ? undefined : safeFileHref(a.url);
+    // A real link when there is a file to fetch; otherwise a button the app answers.
+    return href
+      ? html`<a class="message__attachment message__attachment--file file-card"
+               part="message-attachment file-card" href=${href} download=${a.name}
+               target="_blank" rel="noopener noreferrer" title=${a.name} aria-label=${label}
+               @click=${(e: Event) => this._onAttachmentClick(e, m, a)}>${body}</a>`
+      : html`<button type="button"
+               class="message__attachment message__attachment--file file-card"
+               part="message-attachment file-card" title=${a.name} aria-label=${label}
+               aria-busy=${a.busy ? 'true' : 'false'} ?disabled=${a.busy ?? false}
+               @click=${(e: Event) => this._onAttachmentClick(e, m, a)}>${body}</button>`;
+  }
+
+  /** `ai-chat:attachment-click` — cancel it to stop a link card from downloading. */
+  private _onAttachmentClick(e: Event, message: ChatMessage, attachment: Attachment): void {
+    const allowed = this.dispatchEvent(
+      new CustomEvent('ai-chat:attachment-click', {
+        detail: { message, attachment, index: this.messages.indexOf(message) },
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      }),
+    );
+    if (!allowed) e.preventDefault();
   }
 }
 

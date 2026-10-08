@@ -1197,6 +1197,36 @@ export const chatStyles = css`
   }
   .preview__close:hover { background: var(--ai-chat-bg); }
 
+  /* ---- File cards: a file the message carries, clickable ---- */
+  .file-cards { display: flex; flex-direction: column; gap: 6px; }
+  .message--assistant .file-cards { margin-top: 8px; align-items: flex-start; }
+  .message--user .file-cards { align-items: flex-end; }
+  .message__attachment--file.file-card {
+    display: flex; align-items: center; gap: 10px;
+    width: 260px; max-width: 100%;
+    padding: 8px 12px;
+    font: inherit; font-size: 0.9em; text-align: start;
+    color: var(--ai-chat-fg); text-decoration: none;
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease;
+  }
+  .file-card:hover:not(:disabled) {
+    border-color: var(--ai-chat-accent);
+    background: color-mix(in srgb, var(--ai-chat-accent) 6%, var(--ai-chat-bg));
+  }
+  .file-card:disabled { cursor: progress; opacity: 0.7; }
+  .file-card__icon {
+    display: grid; place-items: center; flex: 0 0 auto;
+    width: 32px; height: 32px;
+    border-radius: calc(var(--ai-chat-attachment-radius) - 4px);
+    background: color-mix(in srgb, var(--ai-chat-accent) 12%, var(--ai-chat-bg));
+    color: var(--ai-chat-accent);
+  }
+  .file-card__text { display: flex; flex-direction: column; min-width: 0; }
+  .file-card__name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-card__detail { color: var(--ai-chat-muted); font-size: 0.9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { .file-card { transition: none; } }
+
   .message__attachment-icon { display: grid; place-items: center; color: var(--ai-chat-muted); flex: 0 0 auto; }
   .message__attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1215,6 +1245,7 @@ export const chatStyles = css`
   .code-block__copy:focus-visible,
   .attachment-chip__remove:focus-visible,
   .message__action:focus-visible,
+  .file-card:focus-visible,
   .message__edit-input:focus-visible,
   .message__edit-btn:focus-visible,
   .composer__box:focus-within {
