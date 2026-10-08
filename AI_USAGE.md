@@ -134,7 +134,8 @@ paste/drag but hide the built-in button), `accept` (default `image/*`),
 `conversation-id` (your storage key for the conversation on screen; echoed back on
 `ai-chat:background-message`), `abort-on-switch` (cancel an in-flight reply on
 conversation switch/clear instead of finishing it in the background),
-`has-earlier` (older messages exist: shows "Load earlier messages" at the top and
+`assistant-avatar-src` / `user-avatar-src` (avatar image URLs; win over the
+slots), `has-earlier` (older messages exist: shows "Load earlier messages" at the top and
 fires `ai-chat:load-earlier`; clear it at the first message), `load-earlier`
 (`scroll` default — loads as the reader nears the top, button too — or `button`
 — only on click), `allow-images` (render images in replies — off by default because a model-written
@@ -251,8 +252,12 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `show-timestamps`.
 - **Message style:** AI messages are borderless plain text by default; add
   `assistant-bubble` to wrap them in a bubble.
-- **Avatars:** opt-in via slots — `<img slot="assistant-avatar">`,
-  `<span slot="user-avatar">ME</span>`. No emoji by default.
+- **Avatars:** opt-in. Simplest: `assistant-avatar-src="/bot.png"` /
+  `user-avatar-src="/me.png"` (image URLs; win over the slots). Or slots —
+  `<img slot="assistant-avatar">`, `<span slot="user-avatar">ME</span>`. Slotted
+  avatars are CLONED into each message inside the shadow DOM, so page CSS can't
+  reach them: a framework component styled by page CSS renders blank — use the
+  `-src` attributes for those. No emoji by default.
 - **Header & new-chat button:** `show-header` renders a title bar; `show-clear`
   adds a New-chat button. Replace the whole bar via the `header` slot.
 - **Retry:** on by default (`show-retry`); a failed message shows a Retry button

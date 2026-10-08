@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Added
 
+- **`assistant-avatar-src` / `user-avatar-src`** — set an avatar from an image
+  URL, no slot needed. Slotted avatars are cloned into each message inside the
+  shadow DOM, so a framework component styled by page CSS rendered blank there;
+  the README now says so plainly.
+
 - **`--ai-chat-avatar-bg`** — the avatar tile on its own (it used to always
   take the assistant bubble colour, so a transparent picture sat on a grey
   square). Defaults to `--ai-chat-assistant-bg`, so nothing changes unless set.

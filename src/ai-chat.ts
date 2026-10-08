@@ -279,6 +279,19 @@ export class AiChat extends LitElement {
   imageHosts: readonly string[] = [];
 
   /**
+   * An image URL for the assistant's avatar on every reply — the simple way to
+   * set one. Wins over an `assistant-avatar` slot. A slot is CLONED into each
+   * message inside the shadow DOM, so a framework component styled by page CSS
+   * renders blank there; a URL never has that problem.
+   */
+  @property({ type: String, attribute: 'assistant-avatar-src' })
+  assistantAvatarSrc = '';
+
+  /** An image URL for the user's avatar on every user message. Wins over a `user-avatar` slot. */
+  @property({ type: String, attribute: 'user-avatar-src' })
+  userAvatarSrc = '';
+
+  /**
    * There are older messages than the ones in `.messages`. Shows a "Load
    * earlier messages" control at the top of the list; asking for them fires
    * `ai-chat:load-earlier`, and you answer with `prependMessages(older)`. The
@@ -1700,9 +1713,13 @@ export class AiChat extends LitElement {
     // projected light-DOM nodes never become children of <slot>, so a
     // `:has(slot > *)` rule never matches — hence the JS check below.
     const avatarSlot = isAssistant ? 'assistant-avatar' : 'user-avatar';
-    const hasAvatar = this._hasSlotted(avatarSlot);
-    // A clone, not a <slot>: one slotted node can't project into every message.
-    const avatar = this._avatarClone(avatarSlot);
+    const avatarSrc = isAssistant ? this.assistantAvatarSrc : this.userAvatarSrc;
+    const hasAvatar = Boolean(avatarSrc) || this._hasSlotted(avatarSlot);
+    // A URL is a plain <img>; a slot is cloned, not projected — one slotted
+    // node can't project into every message.
+    const avatar = avatarSrc
+      ? html`<img src=${avatarSrc} alt="" decoding="async">`
+      : this._avatarClone(avatarSlot);
     const name = isAssistant
       ? this._labels.assistantName
       : this._labels.userName;

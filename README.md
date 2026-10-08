@@ -341,6 +341,8 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `conversation-id`  | string                      | —       | Your key for the conversation on screen. Echoed back on `ai-chat:background-message` so you know which conversation a background reply belongs to. See [Background streaming](#background-streaming). |
 | `abort-on-switch`  | boolean                     | `false` | Cancel an in-flight reply when the conversation is switched or cleared, instead of letting it finish in the background. |
 | `allow-images`     | boolean                     | `false` | Render images inside replies. Off, an image shows as its alt text and nothing in a reply loads a URL. See [Images in replies](#images-in-replies). |
+| `assistant-avatar-src` | string (URL)            | —       | Image for the assistant's avatar on every reply. Wins over the `assistant-avatar` slot. |
+| `user-avatar-src`  | string (URL)                | —       | Image for the user's avatar on every user message. Wins over the `user-avatar` slot. |
 | `has-earlier`      | boolean                     | `false` | There are older messages than `.messages` holds: shows "Load earlier messages" at the top and fires `ai-chat:load-earlier`. See [Long conversations](#long-conversations-load-earlier). |
 | `load-earlier`     | `scroll` \| `button`        | `scroll` | With `has-earlier`: `scroll` loads as the reader nears the top (the button is there too, for keyboard users); `button` loads only on a click. |
 | `image-hosts`      | string (space-separated)    | —       | With `allow-images`, the URL prefixes images may load from (e.g. `https://cdn.example.com/`). Only `https:` ever loads. Also settable as an array property `.imageHosts`. |
@@ -450,6 +452,20 @@ chat.labels = { userName: 'You', assistantName: 'Acme Assistant' };
   <span slot="user-avatar">ME</span>
 </ai-chat>
 ```
+
+For a picture, the simplest is a URL — no slot needed:
+
+```html
+<ai-chat assistant-avatar-src="/bot.png" user-avatar-src="/me.png"></ai-chat>
+```
+
+> **Slotted avatars are cloned.** One slotted node can't appear in every
+> message, so each message gets a **copy** inside the shadow DOM — where your
+> page's CSS can't reach. Plain `<img>`, initials and self-styled inline SVG
+> work; a framework component styled by page CSS (an Angular/React avatar
+> component) renders **blank**. Use `assistant-avatar-src` / `user-avatar-src`
+> for those, or slot an `<img>` of it. The tile behind the picture is
+> `--ai-chat-avatar-bg` (`transparent` for a shaped picture).
 
 Other slots: `send-icon`, `stop-icon`, `jump-icon`, `clear-icon`, `retry-icon`,
 `error-icon`, `empty-icon`, `empty` (replace the whole empty state), `header`
