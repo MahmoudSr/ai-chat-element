@@ -22,7 +22,7 @@ plain HTML because it is a standard custom element. It ships its own styles
 - Main import: `import 'ai-chat-element'` (registers `<ai-chat>`)
 - Named exports: `openAIAdapter`, `anthropicAdapter`, `functionAdapter`, `AiChat`
 - Types: `ChatMessage`, `ChatTransport`, `StreamChunk`, `Role`, `FinishReason`,
-  `TokenUsage`, `Attachment`, `ChatLabels`, `OpenAIAdapterOptions`,
+  `TokenUsage`, `Attachment`, `MessageAction`, `ChatLabels`, `OpenAIAdapterOptions`,
   `AnthropicAdapterOptions`
 
 ## The two-step mental model (do NOT skip step 2)
@@ -143,7 +143,11 @@ image URL can leak data; off, images show as alt text), `image-hosts`
 (space-separated URL prefixes images may load from with `allow-images`; only
 `https:`; array property `.imageHosts`).
 
-**Properties (JS only):** `.transport` (required), `.messages`, `.labels`.
+**Properties (JS only):** `.transport` (required), `.messages`, `.labels`,
+`.messageActions` (`(message) => MessageAction[]` — your own buttons in a
+message's actions row, `{ id, label, icon?, disabled? }`; `icon` is SVG markup,
+sanitized; pressing one fires `ai-chat:message-action`; assign a new function
+when its result depends on changed state), `.imageHosts`.
 
 **Methods:** `send(text, attachments?)` → `Promise<boolean>` (resolves after the
 stream settles; `false` = no-op, e.g. empty text AND no attachments, or no
@@ -158,7 +162,9 @@ answer to `ai-chat:load-earlier`; call with `[]` on failure/no results to
 re-enable the control), `isGenerating(conversationId)` →
 `boolean` (is a reply still streaming for that conversation?).
 
-**Events** (all bubble + composed; read `e.detail`; each ALSO fires as
+**Events** (all bubble + composed; read `e.detail`; `ai-chat:message-action`
+`{actionId, message, index}` fires when one of your `messageActions` buttons is
+pressed; each ALSO fires as
 `ai-chat-<name>` with a dash — same detail, cancelling either cancels both. In an
 Angular template bind the dash form, `(ai-chat-message)="…"`: Angular reads
 `(ai-chat:message)` as a global target and fails to compile): `ai-chat:load-earlier`
@@ -308,7 +314,7 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
   `composer-actions`, `composer-actions-start`, `composer-actions-end`,
   `attach-button`, `input`, `send-button`, `stop-button`, `jump-button`,
-  `retry-button`, `load-earlier`, `load-earlier-row`, `empty`, `empty-icon`,
+  `retry-button`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`, `empty-icon`,
   `empty-heading`, `empty-body`, `error`, `empty-response`.
   (`header` = the built-in bar; `header-slot` = the wrapper that also holds your
   `header` slot content and keeps the bar's padding/divider when you fill it.

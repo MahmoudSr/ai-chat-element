@@ -8,6 +8,15 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Added
 
+- **Your own buttons in a message's actions row.** Set `messageActions` to a
+  function `(message) => MessageAction[]` (`{ id, label, icon?, disabled? }`)
+  and pressing one fires **`ai-chat:message-action`** `{ actionId, message,
+  index }` — e.g. "Download as Excel" only on answers that hold a table. A
+  callback, not a slot: a slotted node can't appear under every message, and
+  clones lose their listeners. Icons are SVG markup, sanitized; a callback that
+  throws shows no actions instead of breaking the chat. New part
+  `custom-action`; new exported type `MessageAction`.
+
 - **Reply content you can theme: tables, links, headings, lists.** Twelve new
   variables, every default derived from the palette (so dark mode follows and
   every app looks better without setting anything): `--ai-chat-table-header-bg`

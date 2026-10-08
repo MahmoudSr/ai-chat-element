@@ -8,8 +8,9 @@ import type {
   ChatTransport,
   Role,
   Attachment,
+  MessageAction,
 } from './types.js';
-import { renderMarkdown, StreamingMarkdown, type ImagePolicy } from './markdown/markdown.js';
+import { renderMarkdown, sanitizeIcon, StreamingMarkdown, type ImagePolicy } from './markdown/markdown.js';
 import { chatStyles } from './styles.js';
 import { hljsTheme } from './markdown/hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
@@ -277,6 +278,16 @@ export class AiChat extends LitElement {
     },
   })
   imageHosts: readonly string[] = [];
+
+  /**
+   * Your own buttons in a message's actions row, beside Copy/Edit — e.g.
+   * "Download as Excel" on an answer that holds a table. Called per message
+   * (settled ones with content); return `[]` for none. Pressing one fires
+   * `ai-chat:message-action` `{ actionId, message, index }`.
+   * Usage: `chat.messageActions = (m) => m.role === 'assistant' ? [{ id: 'xlsx', label: 'Download Excel', icon: '<svg…>' }] : []`.
+   */
+  @property({ attribute: false })
+  messageActions?: (message: ChatMessage) => readonly MessageAction[];
 
   /**
    * An image URL for the assistant's avatar on every reply — the simple way to
@@ -1861,7 +1872,8 @@ export class AiChat extends LitElement {
     const isUser = m.role === 'user';
     const showCopy = this.showCopy;
     const showEdit = this.showEdit && isUser;
-    if (!showCopy && !showEdit) return nothing;
+    const custom = this._customActions(m);
+    if (!showCopy && !showEdit && custom.length === 0) return nothing;
     return html`
       <div class="message__actions" part="message-actions" role="group"
            aria-label=${this._labels.copyMessage}>
@@ -1885,8 +1897,39 @@ export class AiChat extends LitElement {
                    </button>`
             : nothing
         }
+        ${custom.map(
+          (a) => html`<button class="message__action ${a.icon ? '' : 'message__action--text'}"
+                       part="action-button custom-action" type="button"
+                       data-action=${a.id} title=${a.label} aria-label=${a.label}
+                       ?disabled=${a.disabled ?? false}
+                       @click=${() => this._onCustomAction(a, m)}>
+                       ${a.icon ? unsafeHTML(sanitizeIcon(a.icon)) : a.label}
+                     </button>`,
+        )}
       </div>
     `;
+  }
+
+  /** The app's actions for one message; a throwing or malformed callback shows none. */
+  private _customActions(m: ChatMessage): readonly MessageAction[] {
+    if (!this.messageActions) return [];
+    try {
+      const list = this.messageActions(m);
+      return Array.isArray(list) ? list.filter((a) => a && typeof a.id === 'string' && typeof a.label === 'string') : [];
+    } catch (error) {
+      console.error('<ai-chat>: messageActions threw for a message; showing none.', error);
+      return [];
+    }
+  }
+
+  private _onCustomAction(action: MessageAction, message: ChatMessage): void {
+    this.dispatchEvent(
+      new CustomEvent('ai-chat:message-action', {
+        detail: { actionId: action.id, message, index: this.messages.indexOf(message) },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   /** Begin editing a user message (implemented in the edit slice). */

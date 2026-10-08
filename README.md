@@ -357,6 +357,8 @@ Set via JS only (they hold objects/arrays):
 | `.transport` | `ChatTransport`       | **Required.** The backend to talk to.              |
 | `.messages`  | `ChatMessage[]`       | The conversation (read or seed it).                |
 | `.labels`    | `Partial<ChatLabels>` | Override any UI/accessibility strings (see below). |
+| `.messageActions` | `(message: ChatMessage) => MessageAction[]` | Your own buttons in each message's actions row. See [Message actions](#message-actions-copy--edit). |
+| `.imageHosts` | `string[]`           | Same as the `image-hosts` attribute. |
 
 **Methods:**
 
@@ -386,6 +388,7 @@ framework templates (Angular can't bind a colon name).
 | `ai-chat:attach-rejected` | `{ file: File, reason: 'type' \| 'size' \| 'too-many', message: string }` | Fires when a picked file is rejected by `accept` / `max-attachment-size` / `max-attachments`. |
 | `ai-chat:message-edit` | `{ index: number, message: ChatMessage, newContent: string }` | Fires when the user confirms an inline edit (`show-edit`, user messages only). **The component does not change `.messages`** — you decide what edit means. The usual ChatGPT behaviour is to truncate from `index` and resend `newContent`. |
 | `ai-chat:preview` | `{ attachment: Attachment }` | Fires when an image (staged in the composer or already sent) is clicked. **Cancelable** — `e.preventDefault()` suppresses the built-in overlay so you can open your own lightbox/gallery. |
+| `ai-chat:message-action` | `{ actionId: string, message: ChatMessage, index: number }` | One of your `messageActions` buttons was pressed. |
 | `ai-chat:load-earlier` | `{ conversationId: string \| null, oldest: ChatMessage }` | The reader asked for older messages (`has-earlier`): scrolled near the top, or pressed the button. Fires once until you call `prependMessages()`. `oldest` is your paging cursor. |
 | `ai-chat:background-message` | `{ conversationId: string \| null, message: ChatMessage, done: boolean }` | A reply is still streaming for a conversation you've switched away from. Fires per token with `done: false`, then once with `done: true` when it settles (including on error — check `message.error`). `conversationId` is whatever `conversation-id` held when that turn was sent. See [Background streaming](#background-streaming). |
 
@@ -556,6 +559,30 @@ chat.addEventListener('ai-chat:message-edit', (e) => {
 
 Prefer editing in place, or branching the conversation instead? Handle the event
 however you like — that's the point of it being a hook rather than a behaviour.
+
+**Your own actions.** Add buttons to the row — "Download as Excel", "Regenerate",
+thumbs up/down — with `messageActions`, a function called per message that
+returns the buttons for it (or `[]`). Pressing one fires `ai-chat:message-action`:
+
+```js
+const excel = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>';
+
+chat.messageActions = (message) =>
+  message.role === 'assistant' && message.content.includes('|')
+    ? [{ id: 'excel', label: 'Download as Excel', icon: excel }]
+    : [];
+
+chat.addEventListener('ai-chat:message-action', (e) => {
+  const { actionId, message, index } = e.detail;
+  if (actionId === 'excel') downloadExcel(message);
+});
+```
+
+Each action is `{ id, label, icon?, disabled? }`: `label` is the tooltip and
+accessible name (and the visible text when there's no `icon`); `icon` is SVG
+markup (sanitized; `currentColor` follows the theme). The function runs on every
+render of the row, so assign a new one when what it returns depends on state that
+changed. Style them with `::part(custom-action)`.
 
 Turn copy off with `show-copy="false"`; restyle both via the `action-button`,
 `copy-button` and `edit-button` parts, swap the icons with the `copy-icon` /
@@ -1118,7 +1145,7 @@ For styling that a variable can't reach, target the shadow parts with
 `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
 `composer-actions`, `composer-actions-start`,
 `composer-actions-end`, `attach-button`, `input`, `send-button`, `stop-button`,
-`jump-button`, `retry-button`, `load-earlier`, `load-earlier-row`, `empty`,
+`jump-button`, `retry-button`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`,
 `empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`.
 
 `message-actions` is the per-message actions row; `action-button` targets every
@@ -1176,6 +1203,7 @@ import type {
   FinishReason,
   TokenUsage,
   Attachment,
+  MessageAction,
   ChatLabels,
 } from 'ai-chat-element';
 

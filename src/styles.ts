@@ -576,6 +576,10 @@ export const chatStyles = css`
   .message__action .icon { width: 15px; height: 15px; }
   /* Brief "copied" affirmation — the copy button flashes the accent color. */
   .message__action--done { color: var(--ai-chat-accent); }
+  /* An app action with no icon shows its label as text. */
+  .message__action--text { width: auto; padding: 0 8px; font: inherit; font-size: 12px; }
+  .message__action:disabled { opacity: 0.45; cursor: default; }
+  .message__action svg { width: 15px; height: 15px; }
   /* Consumer-slotted action content sits in the same pill treatment. */
   .message__action ::slotted(*) { display: inline-flex; }
 
