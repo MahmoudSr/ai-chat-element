@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **Copying a message shows a tick.** The copy button swaps its icon for a tick
+  for 1.5s and its name to the `copied` label ("Copied!"), so the copy is
+  visible and announced; before, it only flashed the accent colour. Swap the
+  tick with the new **`copied-icon`** slot.
+
 ## [0.5.0] - 2026-10-08
 
 Long conversations, safer replies, and the fixes found by using the component

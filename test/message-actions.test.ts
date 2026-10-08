@@ -71,6 +71,27 @@ describe('message actions — copy', () => {
     expect(writeText).toHaveBeenCalledWith('hello there');
   });
 
+  it('swaps the copy icon for a tick after copying, then swaps it back', async () => {
+    // Red-on-old: the button only flashed the accent colour; its icon and name
+    // never changed, so nothing said the copy had landed.
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: vi.fn().mockResolvedValue(undefined) },
+    });
+    const el = mount();
+    el.messages = two;
+    await tick(30);
+    const iconSlot = (b: Element) => b.querySelector('slot')!.getAttribute('name');
+    (copyButtons(el)[1] as HTMLButtonElement).click();
+    await until(() => iconSlot(copyButtons(el)[1]) === 'copied-icon');
+    const [user, assistant] = copyButtons(el);
+    expect(assistant.getAttribute('aria-label')).toBe('Copied!');
+    // Only the message that was copied shows the tick.
+    expect(iconSlot(user)).toBe('copy-icon');
+    await until(() => iconSlot(copyButtons(el)[1]) === 'copy-icon', 3000);
+    expect(copyButtons(el)[1].getAttribute('aria-label')).toBe('Copy message');
+  });
+
   it('aligns the user actions row flush under the bubble edge (right-aligned)', async () => {
     // The bug the user hit: on a right-aligned user bubble the actions row was
     // floating under the LEFT of the text instead of hugging the bubble's right

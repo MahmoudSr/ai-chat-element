@@ -591,7 +591,8 @@ changed. Style them with `::part(custom-action)`.
 Turn copy off with `show-copy="false"`; restyle both via the `action-button`,
 `copy-button` and `edit-button` parts, swap the icons with the `copy-icon` /
 `edit-icon` slots, and rename the strings via the `copyMessage`, `edit`,
-`saveEdit` and `cancelEdit` labels.
+`saveEdit` and `cancelEdit` labels. After a copy the button shows a tick for a
+moment and reads the `copied` label; swap the tick with the `copied-icon` slot.
 
 ---
 
@@ -1216,6 +1217,7 @@ Put your own markup in any of these (`<x slot="name">`):
 | `send-icon` / `stop-icon`          | Send / stop button icons                                              |
 | `clear-icon` / `retry-icon`        | New-chat / retry button icons                                         |
 | `copy-icon` / `edit-icon`          | Per-message copy / edit action-button icons                          |
+| `copied-icon`                      | The tick a copy button shows for a moment after a copy               |
 | `jump-icon` / `error-icon`         | Jump-to-latest / error icons                                          |
 | `attach-icon`                      | Attach-button icon (with `allow-attachments`)                        |
 

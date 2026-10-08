@@ -25,6 +25,7 @@ import {
   closeIcon,
   fileIcon,
   copyIcon,
+  checkIcon,
   editIcon,
   asideIcon,
 } from './icons.js';
@@ -63,6 +64,9 @@ const booleanAttribute = {
   fromAttribute: (value: string | null): boolean => value !== null && value.trim().toLowerCase() !== 'false',
   toAttribute: (value: boolean): string | null => (value ? '' : null),
 };
+
+/** How long the copy button shows its tick after a copy. */
+const COPIED_TICK_MS = 1500;
 
 @customElement('ai-chat')
 export class AiChat extends LitElement {
@@ -354,6 +358,9 @@ export class AiChat extends LitElement {
   @state() private _dragging = false;
   /** Shown when the user has scrolled up away from the latest message. */
   @state() private _showJump = false;
+  /** The message whose copy just landed — its copy button shows a tick for a moment. */
+  @state() private _copiedId: string | null = null;
+  private _copiedTimer?: number;
   /** The missing-transport warning has been printed for this element. */
   private _warnedNoTransport = false;
   /** The chat is narrower than `aside-breakpoint`: the sidebar is a drawer. */
@@ -1351,6 +1358,7 @@ export class AiChat extends LitElement {
   }
 
   override disconnectedCallback(): void {
+    window.clearTimeout(this._copiedTimer);
     document.removeEventListener('keydown', this._onHostKeydown);
     this._bottomObserver?.disconnect();
     this._bottomObserver = undefined;
@@ -1983,12 +1991,19 @@ export class AiChat extends LitElement {
            aria-label=${this._labels.copyMessage}>
         ${
           showCopy
-            ? html`<button class="message__action" part="action-button copy-button"
-                     type="button" title=${this._labels.copyMessage}
-                     aria-label=${this._labels.copyMessage}
-                     @click=${(e: Event) => this._onCopyMessage(e, m)}>
-                     <slot name="copy-icon">${copyIcon}</slot>
-                   </button>`
+            ? this._copiedId === m.id
+              ? html`<button class="message__action message__action--done"
+                       part="action-button copy-button" type="button"
+                       title=${this._labels.copied} aria-label=${this._labels.copied}
+                       @click=${() => this._onCopyMessage(m)}>
+                       <slot name="copied-icon">${checkIcon}</slot>
+                     </button>`
+              : html`<button class="message__action" part="action-button copy-button"
+                       type="button" title=${this._labels.copyMessage}
+                       aria-label=${this._labels.copyMessage}
+                       @click=${() => this._onCopyMessage(m)}>
+                       <slot name="copy-icon">${copyIcon}</slot>
+                     </button>`
             : nothing
         }
         ${
@@ -2167,12 +2182,15 @@ export class AiChat extends LitElement {
   }
 
   /** Copy a whole message's text to the clipboard, with brief button feedback. */
-  private _onCopyMessage(e: Event, m: ChatMessage): void {
-    const btn = (e.currentTarget as HTMLElement) ?? null;
+  /**
+   * Copy a message, then swap its copy icon for a tick for a moment. Held in state
+   * (not a class on the button) so a re-render while it shows cannot drop it.
+   */
+  private _onCopyMessage(m: ChatMessage): void {
     void navigator.clipboard?.writeText(m.content).then(() => {
-      if (!btn) return;
-      btn.classList.add('message__action--done');
-      window.setTimeout(() => btn.classList.remove('message__action--done'), 1200);
+      window.clearTimeout(this._copiedTimer);
+      this._copiedId = m.id;
+      this._copiedTimer = window.setTimeout(() => (this._copiedId = null), COPIED_TICK_MS);
     });
   }
 

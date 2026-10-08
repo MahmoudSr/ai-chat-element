@@ -396,7 +396,8 @@ Sidebar (with show-aside): `--ai-chat-aside-width` (260px), `--ai-chat-aside-bg`
 on a narrow chat), `--ai-chat-aside-scrim` (rgb(0 0 0 / 0.3); behind the drawer).
 
 - **Icon slots:** `send-icon`, `stop-icon`, `jump-icon`, `clear-icon`,
-  `retry-icon`, `copy-icon`, `edit-icon`, `error-icon`, `empty-icon`,
+  `retry-icon`, `copy-icon`, `copied-icon` (the tick after a copy), `edit-icon`,
+  `error-icon`, `empty-icon`,
   `aside-toggle-icon`.
 - **Composer action slots:** `composer-actions-start`, `composer-actions-end`.
 
