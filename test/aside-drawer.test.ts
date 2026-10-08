@@ -84,6 +84,39 @@ describe('sidebar drawer on a narrow chat', () => {
     expect(el.asideOpen).toBe(false);
   });
 
+  it("the app's own button opens it: focus moves in, then back to that button", async () => {
+    // Red-on-old: only the built-in toggle moved focus; an app trigger (aside-open
+    // + hide-aside-toggle) left it on the button behind the backdrop.
+    const el = chat(400, 'show-aside hide-aside-toggle');
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Chats';
+    el.parentElement!.before(trigger);
+    try {
+      await settle();
+      await el.updateComplete;
+      trigger.focus();
+      el.asideOpen = true;
+      await el.updateComplete;
+      await settle();
+      expect(root(el).activeElement).toBe(aside(el));
+
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      await el.updateComplete;
+      expect(el.asideOpen).toBe(false);
+      expect(document.activeElement).toBe(trigger);
+
+      // Closed by the app while focus is inside: it still comes back.
+      trigger.focus();
+      el.asideOpen = true;
+      await el.updateComplete;
+      el.asideOpen = false;
+      await el.updateComplete;
+      expect(document.activeElement).toBe(trigger);
+    } finally {
+      trigger.remove();
+    }
+  });
+
   it('aside-breakpoint="0" never collapses', async () => {
     const el = chat(300, 'show-aside aside-breakpoint="0"');
     await settle();

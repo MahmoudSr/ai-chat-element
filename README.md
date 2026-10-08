@@ -717,7 +717,8 @@ phone, but also a narrow panel on a desktop — the sidebar would crush the
 conversation. It slides over it instead, opened by a built-in toggle in the
 header (or floating top-left without one). The backdrop, Esc, or switching
 conversation (`conversation-id` changing) closes it; keyboard focus moves into
-the drawer and back to the toggle.
+the drawer and back to whatever opened it — the toggle, or your own button when
+you drive it with `aside-open`.
 
 ```html
 <ai-chat show-aside show-header aside-breakpoint="640"></ai-chat>

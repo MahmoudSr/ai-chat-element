@@ -60,6 +60,14 @@ const nextId = () =>
  * in an Angular or Vue template — used to switch the feature ON. Reflection is
  * unchanged: true writes a bare attribute, false removes it.
  */
+/** The focused element, looking through shadow roots (document.activeElement stops at the host). */
+function deepActiveElement(): HTMLElement | null {
+  let el = document.activeElement;
+  while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
+  // <body> holds focus when nothing does — that is no one to hand it back to.
+  return el instanceof HTMLElement && el !== document.body ? el : null;
+}
+
 const booleanAttribute = {
   fromAttribute: (value: string | null): boolean => value !== null && value.trim().toLowerCase() !== 'false',
   toAttribute: (value: boolean): string | null => (value ? '' : null),
@@ -499,6 +507,9 @@ export class AiChat extends LitElement {
   @query('.layout') private _layoutEl?: HTMLElement;
   @query('.aside') private _asideEl?: HTMLElement;
   @query('.aside-toggle') private _asideToggle?: HTMLButtonElement;
+  /** Who had focus when the drawer opened; closing hands it back. */
+  private _asideOpener: HTMLElement | null = null;
+  private _asideReturnFocus = false;
   @query('.earlier__button') private _earlierButton?: HTMLButtonElement;
   /** Watches the top of the list so older messages load as the reader nears it. */
   private _topObserver?: IntersectionObserver;
@@ -600,20 +611,41 @@ export class AiChat extends LitElement {
     }
   }
 
-  /** Open or close the drawer; `returnFocus` sends keyboard focus back to the toggle. */
-  private async _setAsideOpen(open: boolean, returnFocus: boolean): Promise<void> {
+  /** Open or close the drawer; `returnFocus` hands keyboard focus back to whoever opened it. */
+  private _setAsideOpen(open: boolean, returnFocus: boolean): void {
     if (this.asideOpen === open) return;
     this.asideOpen = open;
+    this._asideReturnFocus = returnFocus;
     this.dispatchEvent(
       new CustomEvent('ai-chat:aside-toggle', { detail: { open }, bubbles: true, composed: true }),
     );
-    await this.updateComplete;
-    if (open) this._asideEl?.focus();
-    else if (returnFocus) this._asideToggle?.focus();
+  }
+
+  /**
+   * Focus follows the drawer whoever opened it — the built-in toggle or the app's
+   * own button via `aside-open`. Opening moves focus in and remembers where it
+   * was; closing hands it back when asked to, or when it was inside the drawer
+   * (which is about to hide).
+   */
+  private _moveAsideFocus(): void {
+    if (!this._narrow) return;
+    const active = deepActiveElement();
+    if (this.asideOpen) {
+      this._asideOpener = active;
+      this._asideEl?.focus();
+      return;
+    }
+    const inside = !!active && (this._asideEl?.contains(active) || (this.contains(active) && !!active.closest('[slot="aside"]')));
+    if (this._asideReturnFocus || inside) {
+      const back = this._asideOpener?.isConnected ? this._asideOpener : this._asideToggle;
+      back?.focus();
+    }
+    this._asideOpener = null;
+    this._asideReturnFocus = false;
   }
 
   private _toggleAside(): void {
-    void this._setAsideOpen(!this.asideOpen, true);
+    this._setAsideOpen(!this.asideOpen, true);
   }
 
   /** Programmatically append a message without sending it. */
@@ -1454,6 +1486,9 @@ export class AiChat extends LitElement {
   private _observedSentinel?: Element;
 
   protected override updated(changed: PropertyValues): void {
+    // Not on first render: a drawer that starts open must not steal the page's focus.
+    if (changed.has('asideOpen') && changed.get('asideOpen') !== undefined) this._moveAsideFocus();
+
     // The sentinel only exists while there are messages; (re)observe it as it
     // appears or disappears so the bottom-detection observer stays wired up.
     if (this._bottomObserver && this._sentinel !== this._observedSentinel) {
@@ -1493,7 +1528,7 @@ export class AiChat extends LitElement {
   protected override willUpdate(changed: PropertyValues): void {
     // Picking a conversation in the drawer is the reader done with it.
     if (changed.has('conversationId') && changed.get('conversationId') !== undefined && this._narrow && this.asideOpen) {
-      void this._setAsideOpen(false, false);
+      this._setAsideOpen(false, false);
     }
     if (changed.has('asideBreakpoint') || changed.has('showAside')) queueMicrotask(() => this._measureNarrow());
     // A load that was out for a conversation no longer on screen will never be

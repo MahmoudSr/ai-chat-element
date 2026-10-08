@@ -13,6 +13,12 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
   visible and announced; before, it only flashed the accent colour. Swap the
   tick with the new **`copied-icon`** slot.
 
+### Fixed
+
+- **The drawer takes focus however it opens.** Opening it with your own button
+  (`aside-open`, e.g. with `hide-aside-toggle`) now moves keyboard focus into it,
+  like the built-in toggle, and closing hands focus back to whatever had it.
+
 ## [0.5.0] - 2026-10-08
 
 Long conversations, safer replies, and the fixes found by using the component
