@@ -50,6 +50,18 @@ const nextId = () =>
  *                          component does NOT mutate messages; the consumer owns
  *                          what edit means (truncate-after + resend, etc.).
  */
+/**
+ * Boolean attributes as the docs describe them: absent or `"false"` is off;
+ * present, `""` or `"true"` is on. Lit's stock converter treats ANY present
+ * attribute as true, so `show-timestamps="false"` — the natural way to write it
+ * in an Angular or Vue template — used to switch the feature ON. Reflection is
+ * unchanged: true writes a bare attribute, false removes it.
+ */
+const booleanAttribute = {
+  fromAttribute: (value: string | null): boolean => value !== null && value.trim().toLowerCase() !== 'false',
+  toAttribute: (value: boolean): string | null => (value ? '' : null),
+};
+
 @customElement('ai-chat')
 export class AiChat extends LitElement {
   static override styles = [chatStyles, hljsTheme];
@@ -103,7 +115,7 @@ export class AiChat extends LitElement {
    * Claude style). Set this to wrap them in a bubble like the user's messages.
    * Reflected so the CSS (`:host([assistant-bubble])`) can react. Default: false.
    */
-  @property({ type: Boolean, attribute: 'assistant-bubble', reflect: true })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'assistant-bubble', reflect: true })
   assistantBubble = false;
 
   /**
@@ -112,7 +124,7 @@ export class AiChat extends LitElement {
    * bar with your own markup — the slot wins whether or not this is set.
    * Reflected so CSS (`:host([show-header])`) can react. Default: false.
    */
-  @property({ type: Boolean, attribute: 'show-header', reflect: true })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-header', reflect: true })
   showHeader = false;
 
   /**
@@ -120,7 +132,7 @@ export class AiChat extends LitElement {
    * `show-header` is on, otherwise floating top-right). Calls `clear()`.
    * Default: false.
    */
-  @property({ type: Boolean, attribute: 'show-clear' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-clear' })
   showClear = false;
 
   /**
@@ -128,7 +140,7 @@ export class AiChat extends LitElement {
    * turn. Default: true — it's the expected behavior and costs nothing when
    * there are no errors.
    */
-  @property({ type: Boolean, attribute: 'show-retry' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-retry' })
   showRetry = true;
 
   /**
@@ -136,7 +148,7 @@ export class AiChat extends LitElement {
    * On by default. Set `show-copy="false"` to hide it; the row still renders
    * for any consumer actions slotted via `message-actions-start` / `-end`.
    */
-  @property({ type: Boolean, attribute: 'show-copy' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-copy' })
   showCopy = true;
 
   /**
@@ -146,7 +158,7 @@ export class AiChat extends LitElement {
    * (truncate-after + resend, edit-in-place, branch, ...). The component does not
    * mutate `.messages` itself. No-op on assistant messages.
    */
-  @property({ type: Boolean, attribute: 'show-edit' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-edit' })
   showEdit = false;
 
   /**
@@ -170,7 +182,7 @@ export class AiChat extends LitElement {
    * `stop()` (the Stop button, or Esc) always aborts, because that's the user
    * saying they don't want the reply at all.
    */
-  @property({ type: Boolean, attribute: 'abort-on-switch' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'abort-on-switch' })
   abortOnSwitch = false;
 
   /**
@@ -179,7 +191,7 @@ export class AiChat extends LitElement {
    * unaffected. Fill it via the `aside` slot; drive it with the `ai-chat:new-chat`
    * event and by swapping `.messages`. Reflected for CSS. Default: false.
    */
-  @property({ type: Boolean, attribute: 'show-aside', reflect: true })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-aside', reflect: true })
   showAside = false;
 
   /**
@@ -190,15 +202,15 @@ export class AiChat extends LitElement {
   asideSide: 'left' | 'right' = 'left';
 
   /** Show the sender name above each message bubble. Default: true. */
-  @property({ type: Boolean, attribute: 'show-names' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-names' })
   showNames = true;
 
   /** Show a timestamp (e.g. "3:45 PM") next to each message. Default: true. */
-  @property({ type: Boolean, attribute: 'show-timestamps' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-timestamps' })
   showTimestamps = true;
 
   /** Disable the whole input surface. */
-  @property({ type: Boolean })
+  @property({ type: Boolean, converter: booleanAttribute })
   disabled = false;
 
   /**
@@ -208,7 +220,7 @@ export class AiChat extends LitElement {
    * built-in adapters; other files still reach the consumer via `ai-chat:submit`.
    * Reflected so CSS (`:host([allow-attachments])`) can react. Default: false.
    */
-  @property({ type: Boolean, attribute: 'allow-attachments', reflect: true })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'allow-attachments', reflect: true })
   allowAttachments = false;
 
   /**
@@ -218,7 +230,7 @@ export class AiChat extends LitElement {
    * you're providing your own trigger via `composer-actions-start`. Only
    * meaningful with `allow-attachments`. Default: false.
    */
-  @property({ type: Boolean, attribute: 'hide-attach-button' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'hide-attach-button' })
   hideAttachButton = false;
 
   /**
@@ -249,7 +261,7 @@ export class AiChat extends LitElement {
    * its alt text. Turn on only when replies need pictures, and pair it with
    * `image-hosts`. Usage: `<ai-chat allow-images image-hosts="https://cdn.example.com/">`.
    */
-  @property({ type: Boolean, attribute: 'allow-images' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'allow-images' })
   allowImages = false;
 
   /**
@@ -273,7 +285,7 @@ export class AiChat extends LitElement {
    * component never fetches anything — you own the storage and the paging.
    * Usage: `<ai-chat has-earlier>`; clear it once the oldest message is shown.
    */
-  @property({ type: Boolean, attribute: 'has-earlier' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'has-earlier' })
   hasEarlier = false;
 
   /**

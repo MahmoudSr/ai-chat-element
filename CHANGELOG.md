@@ -37,6 +37,12 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Fixed
 
+- **`attr="false"` now turns a boolean attribute off, as the docs always said.**
+  Lit's stock converter treated any present attribute as true, so
+  `show-timestamps="false"` — the natural way to write it in an Angular or Vue
+  template — switched timestamps **on**. Applies to all 15 boolean attributes;
+  presence, `""` and `"true"` still mean on, and reflection is unchanged.
+
 - **Playground: sidebar clicks needed 3-4 presses while a reply streamed in the
   background.** The history list was rebuilt on every
   `ai-chat:background-message` token, which replaced the row under the cursor
