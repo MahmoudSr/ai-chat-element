@@ -308,6 +308,8 @@ export class AiChat extends LitElement {
   @state() private _dragging = false;
   /** Shown when the user has scrolled up away from the latest message. */
   @state() private _showJump = false;
+  /** The missing-transport warning has been printed for this element. */
+  private _warnedNoTransport = false;
   /** An `ai-chat:load-earlier` is out and its answer hasn't come back yet. */
   @state() private _loadingEarlier = false;
   /** The image attachment shown in the full-size preview overlay (null = none). */
@@ -683,9 +685,14 @@ export class AiChat extends LitElement {
     // caption is a real message). Only the empty-and-attachment-less case bails.
     if ((!text && atts.length === 0) || this._busy) return false;
     if (!this.transport) {
-      this._emitError(
-        'No transport configured. Set the `.transport` property.',
-      );
+      const message = 'No transport configured. Set the `.transport` property.';
+      // The error event alone was invisible: an app that doesn't listen saw a
+      // send button do nothing at all. Say it in the console once per element.
+      if (!this._warnedNoTransport) {
+        this._warnedNoTransport = true;
+        console.warn(`<ai-chat>: ${message} Nothing was sent. See the README's "Transports" section.`);
+      }
+      this._emitError(message);
       return false;
     }
 

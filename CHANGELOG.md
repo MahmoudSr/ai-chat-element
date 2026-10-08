@@ -37,6 +37,10 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Fixed
 
+- **Sending with no `.transport` now says so in the console.** It used to fire
+  only `ai-chat:error`, so an app that didn't listen saw the send button do
+  nothing at all. A `console.warn` explains it, once per element.
+
 - **`attr="false"` now turns a boolean attribute off, as the docs always said.**
   Lit's stock converter treated any present attribute as true, so
   `show-timestamps="false"` — the natural way to write it in an Angular or Vue
