@@ -66,6 +66,10 @@ export interface ChatLabels {
   previewImage: string;
   /** aria-label for the close button on the image preview overlay. */
   closePreview: string;
+  /** The control at the top of a conversation with older messages (`has-earlier`). */
+  loadEarlier: string;
+  /** The same control while older messages are on their way. */
+  loadingEarlier: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -96,4 +100,6 @@ export const DEFAULT_LABELS: ChatLabels = {
   cancelEdit: 'Cancel',
   previewImage: 'Preview {name}',
   closePreview: 'Close preview',
+  loadEarlier: 'Load earlier messages',
+  loadingEarlier: 'Loading earlier messages…',
 };

@@ -266,6 +266,24 @@ export class AiChat extends LitElement {
   })
   imageHosts: readonly string[] = [];
 
+  /**
+   * There are older messages than the ones in `.messages`. Shows a "Load
+   * earlier messages" control at the top of the list; asking for them fires
+   * `ai-chat:load-earlier`, and you answer with `prependMessages(older)`. The
+   * component never fetches anything — you own the storage and the paging.
+   * Usage: `<ai-chat has-earlier>`; clear it once the oldest message is shown.
+   */
+  @property({ type: Boolean, attribute: 'has-earlier' })
+  hasEarlier = false;
+
+  /**
+   * How older messages are asked for when `has-earlier` is set: `'scroll'`
+   * (default) loads as the reader nears the top, with the button as well for
+   * keyboard and screen-reader users; `'button'` loads only on a click.
+   */
+  @property({ type: String, attribute: 'load-earlier' })
+  loadEarlier: 'scroll' | 'button' = 'scroll';
+
   /** The conversation. Bindable and reflected back out via events. */
   @property({ attribute: false })
   messages: ChatMessage[] = [];
@@ -278,6 +296,8 @@ export class AiChat extends LitElement {
   @state() private _dragging = false;
   /** Shown when the user has scrolled up away from the latest message. */
   @state() private _showJump = false;
+  /** An `ai-chat:load-earlier` is out and its answer hasn't come back yet. */
+  @state() private _loadingEarlier = false;
   /** The image attachment shown in the full-size preview overlay (null = none). */
   @state() private _preview: Attachment | null = null;
   /** id of the user message currently being edited inline (null = none). */
@@ -403,6 +423,14 @@ export class AiChat extends LitElement {
 
   @query('.messages') private _scrollEl!: HTMLElement;
   @query('.scroll-sentinel') private _sentinel!: HTMLElement;
+  @query('.top-sentinel') private _topSentinel?: HTMLElement;
+  @query('.earlier__button') private _earlierButton?: HTMLButtonElement;
+  /** Watches the top of the list so older messages load as the reader nears it. */
+  private _topObserver?: IntersectionObserver;
+  private _observedTop?: Element;
+  /** The first message when older ones were asked for; a different one means the conversation changed. */
+  private _earlierAnchor?: ChatMessage;
+  private _prepending = false;
   @query('textarea') private _textarea!: HTMLTextAreaElement;
   @query('.composer__file') private _fileInput?: HTMLInputElement;
 
@@ -471,6 +499,42 @@ export class AiChat extends LitElement {
     };
     this.messages = [...this.messages, msg];
     return msg;
+  }
+
+  /**
+   * Add older messages ABOVE the conversation — your answer to
+   * `ai-chat:load-earlier`. What the reader is looking at stays exactly where
+   * it is on screen; the new messages appear above it. Call it with `[]` if
+   * nothing came back (or the load failed) so the control is usable again, and
+   * clear `has-earlier` once you've reached the first message.
+   */
+  async prependMessages(older: ChatMessage[]): Promise<void> {
+    const el = this._scrollEl;
+    // Distance from the bottom is what must not change: everything the reader
+    // sees sits below the inserted messages.
+    const fromBottom = el ? el.scrollHeight - el.scrollTop : 0;
+    const hadFocus = this.shadowRoot?.activeElement === this._earlierButton;
+    this._loadingEarlier = false;
+    this._earlierAnchor = undefined;
+    if (older.length > 0) {
+      this._prepending = true;
+      this.messages = [...older, ...this.messages];
+    }
+    await this.updateComplete;
+    this._prepending = false;
+    // Restore the distance from the bottom whatever the pin state says: a reader
+    // at the bottom stays at the bottom, and one reading back keeps their place.
+    // (The pin flag can lag a fast scroll by a frame, so it can't decide this.)
+    if (el && older.length > 0) {
+      el.scrollTop = el.scrollHeight - fromBottom;
+      // Our own scroll must not read as the user scrolling (see _onScroll).
+      this._lastScrollTop = el.scrollTop;
+      this._lastScrollHeight = el.scrollHeight;
+    }
+    // The button can go (no more history) while it holds focus; don't drop
+    // keyboard users onto <body>.
+    if (hadFocus && !this._earlierButton) this._focusComposer();
+    this._recheckTop();
   }
 
   /**
@@ -1106,13 +1170,62 @@ export class AiChat extends LitElement {
         { root: this._scrollEl, threshold: 0 },
       );
       if (this._sentinel) this._bottomObserver.observe(this._sentinel);
+      // Older messages start loading a little before the top comes into view,
+      // so a reader scrolling up rarely has to wait at the edge.
+      this._topObserver = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) this._autoLoadEarlier();
+        },
+        { root: this._scrollEl, rootMargin: '200px 0px 0px 0px', threshold: 0 },
+      );
     }
+  }
+
+  /** The top came into view: ask for older messages, if the reader is actually reading back. */
+  private _autoLoadEarlier(): void {
+    if (this.loadEarlier !== 'scroll') return;
+    const el = this._scrollEl;
+    // A long conversation opens pinned to the bottom with its top momentarily
+    // in view before the first scroll lands; that is not the reader going back.
+    // A short one that doesn't fill the view is: load until it does.
+    const overflows = el ? el.scrollHeight > el.clientHeight : false;
+    if (this._stickToBottom && overflows) return;
+    this._requestEarlier();
+  }
+
+  /** Fire `ai-chat:load-earlier` once; the next waits for `prependMessages()`. */
+  private _requestEarlier(): void {
+    if (!this.hasEarlier || this._loadingEarlier || this.messages.length === 0) return;
+    this._loadingEarlier = true;
+    this._earlierAnchor = this.messages[0];
+    this.dispatchEvent(
+      new CustomEvent('ai-chat:load-earlier', {
+        detail: { conversationId: this.conversationId ?? null, oldest: this.messages[0] },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /**
+   * Observe the top sentinel afresh: IntersectionObserver only reports CHANGES,
+   * so a sentinel still in view after a load (the history is still too short to
+   * fill the view) would otherwise never ask for the next page.
+   */
+  private _recheckTop(): void {
+    if (!this._topObserver) return;
+    if (this._observedTop) this._topObserver.unobserve(this._observedTop);
+    this._observedTop = this._topSentinel ?? undefined;
+    if (this._observedTop) this._topObserver.observe(this._observedTop);
   }
 
   override disconnectedCallback(): void {
     document.removeEventListener('keydown', this._onHostKeydown);
     this._bottomObserver?.disconnect();
     this._bottomObserver = undefined;
+    this._topObserver?.disconnect();
+    this._topObserver = undefined;
+    this._observedTop = undefined;
     // A background stream outlives the conversation it started in, but it must
     // not outlive the ELEMENT — nobody is listening for its events any more, so
     // letting it run would just burn tokens. Cancel every detached request.
@@ -1210,9 +1323,14 @@ export class AiChat extends LitElement {
     // from post-append geometry here, because appended content grows scrollHeight
     // before scrollTop catches up, which would read as "not at bottom" and stop
     // following mid-stream.
-    if (changed.has('messages') && this._stickToBottom) {
+    // Older messages added above never move the reader (prependMessages keeps
+    // their place itself).
+    if (changed.has('messages') && this._stickToBottom && !this._prepending) {
       this._scrollToBottom();
     }
+
+    // The top sentinel comes and goes with `has-earlier`; keep it observed.
+    if ((this._topSentinel ?? undefined) !== this._observedTop) this._recheckTop();
 
   }
 
@@ -1227,6 +1345,16 @@ export class AiChat extends LitElement {
    * the render, instead of scheduling a second one.
    */
   protected override willUpdate(changed: PropertyValues): void {
+    // A load that was out for a conversation no longer on screen will never be
+    // answered here; free the control for the one that is.
+    if (
+      this._loadingEarlier &&
+      !this._prepending &&
+      (changed.has('conversationId') || (changed.has('messages') && this.messages[0] !== this._earlierAnchor))
+    ) {
+      this._loadingEarlier = false;
+      this._earlierAnchor = undefined;
+    }
     if (this.abortOnSwitch) return;
     if (!changed.has('messages') && !changed.has('conversationId')) return;
 
@@ -1331,6 +1459,7 @@ export class AiChat extends LitElement {
             <div class="messages" part="messages"
                  @click=${this._onMessagesClick} @scroll=${this._onScroll}
                  role="log" aria-label=${this._labels.messagesRegion}>
+              ${hasMessages && this.hasEarlier ? this._renderEarlier() : nothing}
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
               <!-- Bottom sentinel watched by the IntersectionObserver to decide
                    whether we're pinned to the bottom (see firstUpdated). Only
@@ -1513,6 +1642,19 @@ export class AiChat extends LitElement {
         <slot name="user-avatar" @slotchange=${this._onSlotChange}></slot>
       </div>
     `;
+  }
+
+  /** The top of a conversation with older history: the trigger, and the sentinel that loads on scroll. */
+  private _renderEarlier() {
+    const loading = this._loadingEarlier;
+    return html`<div class="earlier" part="load-earlier-row">
+      <div class="top-sentinel" aria-hidden="true"></div>
+      <button class="earlier__button" part="load-earlier" type="button"
+              ?disabled=${loading} aria-busy=${loading ? 'true' : 'false'}
+              @click=${this._requestEarlier}>
+        ${loading ? this._labels.loadingEarlier : this._labels.loadEarlier}
+      </button>
+    </div>`;
   }
 
   private _renderMessages() {

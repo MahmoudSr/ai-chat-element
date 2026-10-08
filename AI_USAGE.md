@@ -134,7 +134,10 @@ paste/drag but hide the built-in button), `accept` (default `image/*`),
 `conversation-id` (your storage key for the conversation on screen; echoed back on
 `ai-chat:background-message`), `abort-on-switch` (cancel an in-flight reply on
 conversation switch/clear instead of finishing it in the background),
-`allow-images` (render images in replies — off by default because a model-written
+`has-earlier` (older messages exist: shows "Load earlier messages" at the top and
+fires `ai-chat:load-earlier`; clear it at the first message), `load-earlier`
+(`scroll` default — loads as the reader nears the top, button too — or `button`
+— only on click), `allow-images` (render images in replies — off by default because a model-written
 image URL can leak data; off, images show as alt text), `image-hosts`
 (space-separated URL prefixes images may load from with `allow-images`; only
 `https:`; array property `.imageHosts`).
@@ -148,10 +151,16 @@ transport), `retry()` →
 `ChatMessage` (appends WITHOUT sending — returns the created message; use to seed
 history), `stop()` → `void` (ALWAYS aborts the in-flight stream), `clear()` →
 `void` (empties conversation + draft; an in-flight reply keeps generating in the
-background unless `abort-on-switch` is set), `isGenerating(conversationId)` →
+background unless `abort-on-switch` is set), `prependMessages(older)` →
+`Promise<void>` (adds older messages ABOVE, keeping the reader's place — the
+answer to `ai-chat:load-earlier`; call with `[]` on failure/no results to
+re-enable the control), `isGenerating(conversationId)` →
 `boolean` (is a reply still streaming for that conversation?).
 
-**Events** (all bubble + composed; read `e.detail`): `ai-chat:submit`
+**Events** (all bubble + composed; read `e.detail`): `ai-chat:load-earlier`
+`{conversationId, oldest}` (reader wants older messages — fires once until
+`prependMessages()`; `oldest` is the paging cursor; dropped if the conversation
+on screen changes first), `ai-chat:submit`
 `{content, attachments}`, `ai-chat:message` `{message}` (fires only for a completed
 reply that HAS content — not for empty or failed turns, so persisting on it won't
 save blank messages; `message` carries `finishReason`/`usage` when reported),
@@ -277,7 +286,8 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   (`userName`, `assistantName`, `emptyHeading`, `emptyBody`, `copy`, `copied`,
   `typing`, `send`, `stop`, `jumpToLatest`, `inputLabel`, `messagesRegion`,
   `headerTitle`, `clearChat`, `retry`, `emptyResponse`, `copyMessage`, `edit`,
-  `saveEdit`, `cancelEdit`, `previewImage` (uses `{name}`), `closePreview`, `attach`,
+  `saveEdit`, `cancelEdit`, `previewImage` (uses `{name}`), `closePreview`,
+  `loadEarlier`, `loadingEarlier`, `attach`,
   `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
   three `attach*` messages use `{name}` as a filename placeholder).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
@@ -290,8 +300,8 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
   `composer-actions`, `composer-actions-start`, `composer-actions-end`,
   `attach-button`, `input`, `send-button`, `stop-button`, `jump-button`,
-  `retry-button`, `empty`, `empty-icon`, `empty-heading`, `empty-body`, `error`,
-  `empty-response`.
+  `retry-button`, `load-earlier`, `load-earlier-row`, `empty`, `empty-icon`,
+  `empty-heading`, `empty-body`, `error`, `empty-response`.
   (`header` = the built-in bar; `header-slot` = the wrapper that also holds your
   `header` slot content and keeps the bar's padding/divider when you fill it.
   Every message row exposes both `message` and a per-role part —

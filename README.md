@@ -341,6 +341,8 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `conversation-id`  | string                      | —       | Your key for the conversation on screen. Echoed back on `ai-chat:background-message` so you know which conversation a background reply belongs to. See [Background streaming](#background-streaming). |
 | `abort-on-switch`  | boolean                     | `false` | Cancel an in-flight reply when the conversation is switched or cleared, instead of letting it finish in the background. |
 | `allow-images`     | boolean                     | `false` | Render images inside replies. Off, an image shows as its alt text and nothing in a reply loads a URL. See [Images in replies](#images-in-replies). |
+| `has-earlier`      | boolean                     | `false` | There are older messages than `.messages` holds: shows "Load earlier messages" at the top and fires `ai-chat:load-earlier`. See [Long conversations](#long-conversations-load-earlier). |
+| `load-earlier`     | `scroll` \| `button`        | `scroll` | With `has-earlier`: `scroll` loads as the reader nears the top (the button is there too, for keyboard users); `button` loads only on a click. |
 | `image-hosts`      | string (space-separated)    | —       | With `allow-images`, the URL prefixes images may load from (e.g. `https://cdn.example.com/`). Only `https:` ever loads. Also settable as an array property `.imageHosts`. |
 
 To turn a boolean attribute off, set it to `"false"` (e.g. `show-timestamps="false"`).
@@ -363,6 +365,7 @@ Set via JS only (they hold objects/arrays):
 | `stop()`                  | `void`               | Aborts the in-flight stream, if any. Always cancels — unlike a conversation switch, this is the user saying they don't want the reply. |
 | `clear()`                 | `void`               | Empties the conversation and the composer draft. An in-flight reply keeps generating in the background (see [Background streaming](#background-streaming)) unless `abort-on-switch` is set. |
 | `openFilePicker()`        | `void`               | Opens the native file picker (for use with `hide-attach-button` + your own trigger). No-op unless `allow-attachments` is set. |
+| `prependMessages(older)`  | `Promise<void>`      | Adds older messages **above** the conversation — your answer to `ai-chat:load-earlier` — keeping what the reader sees in place. Call it with `[]` when nothing came back (or the load failed) to re-enable the control. |
 | `isGenerating(id)`        | `boolean`            | Whether the conversation with that `conversation-id` has a reply still generating in the background. Use it to mark a row in your history list. |
 
 **Events** (all `bubbles: true, composed: true`; read `e.detail`):
@@ -377,6 +380,7 @@ Set via JS only (they hold objects/arrays):
 | `ai-chat:attach-rejected` | `{ file: File, reason: 'type' \| 'size' \| 'too-many', message: string }` | Fires when a picked file is rejected by `accept` / `max-attachment-size` / `max-attachments`. |
 | `ai-chat:message-edit` | `{ index: number, message: ChatMessage, newContent: string }` | Fires when the user confirms an inline edit (`show-edit`, user messages only). **The component does not change `.messages`** — you decide what edit means. The usual ChatGPT behaviour is to truncate from `index` and resend `newContent`. |
 | `ai-chat:preview` | `{ attachment: Attachment }` | Fires when an image (staged in the composer or already sent) is clicked. **Cancelable** — `e.preventDefault()` suppresses the built-in overlay so you can open your own lightbox/gallery. |
+| `ai-chat:load-earlier` | `{ conversationId: string \| null, oldest: ChatMessage }` | The reader asked for older messages (`has-earlier`): scrolled near the top, or pressed the button. Fires once until you call `prependMessages()`. `oldest` is your paging cursor. |
 | `ai-chat:background-message` | `{ conversationId: string \| null, message: ChatMessage, done: boolean }` | A reply is still streaming for a conversation you've switched away from. Fires per token with `done: false`, then once with `done: true` when it settles (including on error — check `message.error`). `conversationId` is whatever `conversation-id` held when that turn was sent. See [Background streaming](#background-streaming). |
 
 `ai-chat:message` fires once per completed assistant turn — but **only when the
@@ -609,6 +613,50 @@ right, and `--ai-chat-aside-width` / `--ai-chat-aside-bg` to size and color it.
 
 ---
 
+## Long conversations (load earlier)
+
+For a long conversation, show only the newest messages and load older ones as
+the reader scrolls up — the way ChatGPT and Claude do. The component handles the
+scrolling and keeps the reader's place; **you** own the storage and the paging,
+so it works with any backend.
+
+```js
+const chat = document.querySelector('ai-chat');
+
+// Open a conversation with its newest page.
+const page = await api.messages(conversationId, { limit: 30 });
+chat.conversationId = conversationId;
+chat.messages = page.messages;
+chat.hasEarlier = page.hasMore;
+
+// The reader scrolled near the top (or pressed "Load earlier messages").
+chat.addEventListener('ai-chat:load-earlier', async (e) => {
+  try {
+    const older = await api.messages(e.detail.conversationId, {
+      before: e.detail.oldest.id, // your cursor
+      limit: 30,
+    });
+    await chat.prependMessages(older.messages);
+    chat.hasEarlier = older.hasMore;
+  } catch {
+    await chat.prependMessages([]); // re-enables the control so they can try again
+  }
+});
+```
+
+- **`has-earlier`** turns it on; clear it when you reach the first message.
+- **`load-earlier="button"`** loads only when the button is pressed. The default,
+  `scroll`, also loads as the reader nears the top — and keeps loading while the
+  history is too short to fill the view.
+- `ai-chat:load-earlier` fires **once** until you call `prependMessages()`, so a
+  fast scroll never sends duplicate requests. If the conversation on screen
+  changes (`conversation-id` or `.messages`) before you answer, the pending load
+  is dropped.
+- Message `id`s must be unique: the list is keyed by them, so existing messages
+  keep their DOM when older ones are added above.
+- Style it with `::part(load-earlier)` (the button) and `::part(load-earlier-row)`;
+  translate it with the `loadEarlier` / `loadingEarlier` labels.
+
 ## Background streaming
 
 Switching conversations while the AI is still answering does **not** cancel the
@@ -823,6 +871,9 @@ chat.labels = {
   // Image preview ({name} is replaced with the file name):
   previewImage: 'Ver {name}',
   closePreview: 'Cerrar vista previa',
+  // Top of a long conversation (has-earlier):
+  loadEarlier: 'Cargar mensajes anteriores',
+  loadingEarlier: 'Cargando mensajes anteriores…',
   // Attachment strings ({name} is replaced with the filename):
   attach: 'Adjuntar archivos',
   removeAttachment: 'Quitar adjunto',
@@ -1024,8 +1075,8 @@ For styling that a variable can't reach, target the shadow parts with
 `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
 `composer-actions`, `composer-actions-start`,
 `composer-actions-end`, `attach-button`, `input`, `send-button`, `stop-button`,
-`jump-button`, `retry-button`, `empty`, `empty-icon`, `empty-heading`,
-`empty-body`, `error`, `empty-response`.
+`jump-button`, `retry-button`, `load-earlier`, `load-earlier-row`, `empty`,
+`empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`.
 
 `message-actions` is the per-message actions row; `action-button` targets every
 button in it, with `copy-button` / `edit-button` for the built-ins specifically.

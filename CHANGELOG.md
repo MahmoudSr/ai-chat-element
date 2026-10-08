@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Long conversations: load earlier messages.** Show the newest page of a
+  conversation and load older ones as the reader scrolls up. Set
+  **`has-earlier`**; the component shows a "Load earlier messages" control at
+  the top and fires **`ai-chat:load-earlier`** `{ conversationId, oldest }` when
+  the reader nears the top or presses it; you answer with
+  **`prependMessages(older)`**, which adds them above while keeping exactly what
+  the reader was looking at in place. Fires once per load (no duplicate requests
+  on a fast scroll), keeps loading while a short history doesn't fill the view,
+  and drops a load that was out for a conversation no longer on screen.
+  **`load-earlier="button"`** loads only on a click. New parts `load-earlier` /
+  `load-earlier-row`, labels `loadEarlier` / `loadingEarlier`. The component
+  still never fetches — you own storage and paging.
+
 ### Security
 
 - **Replies can no longer load URLs by themselves (markdown image

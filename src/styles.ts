@@ -665,6 +665,30 @@ export const chatStyles = css`
     background: color-mix(in srgb, var(--ai-chat-accent) 8%, transparent);
   }
 
+  /* ---- Load earlier (has-earlier) ---- */
+  .earlier {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    padding: 4px 0 12px;
+  }
+  .top-sentinel { position: absolute; top: 0; left: 0; width: 1px; height: 1px; }
+  .earlier__button {
+    padding: 4px 12px;
+    border: var(--ai-chat-border-width) solid var(--ai-chat-border);
+    border-radius: var(--ai-chat-button-radius);
+    background: transparent;
+    color: var(--ai-chat-muted);
+    font: inherit; font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.1s ease, color 0.1s ease;
+  }
+  .earlier__button:hover:not(:disabled) {
+    border-color: var(--ai-chat-accent);
+    color: var(--ai-chat-fg);
+  }
+  .earlier__button:disabled { cursor: progress; opacity: 0.7; }
+
   /* ---- Typing indicator ---- */
   .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
   .typing i {
@@ -1078,6 +1102,7 @@ export const chatStyles = css`
   .clear-btn:focus-visible,
   .new-chat-btn:focus-visible,
   .retry-btn:focus-visible,
+  .earlier__button:focus-visible,
   .jump:focus-visible,
   .code-block__copy:focus-visible,
   .attachment-chip__remove:focus-visible,
