@@ -145,6 +145,33 @@ describe('load earlier messages', () => {
     await until(() => seen.length === 1);
   });
 
+  it('loads when a chat only just overflows and the reader scrolls to the top', async () => {
+    // Red-on-old: overflowing by less than the 200px look-ahead, the top was
+    // already "in view" while the chat opened pinned to the bottom — skipped then,
+    // and never reported again, so scrolling up to it never loaded anything.
+    const el = sized('has-earlier', 300);
+    el.messages = turns('new', 8);
+    await el.updateComplete;
+    await flushRaf();
+    const sc = scroller(el);
+    // Shrink the widget until the conversation overflows it by ~80px.
+    const tall = sc.scrollHeight - sc.clientHeight + 300 - 80;
+    el.style.height = `${tall}px`;
+    (el.parentElement as HTMLElement).style.height = `${tall}px`;
+    await flushRaf();
+    sc.scrollTop = sc.scrollHeight;
+    await flushRaf();
+    await tick(50);
+    expect(sc.scrollHeight - sc.clientHeight).toBeGreaterThan(20);
+    expect(sc.scrollHeight - sc.clientHeight).toBeLessThan(200);
+    const seen = listen(el);
+    expect(seen.length).toBe(0); // opening at the bottom is not reading back
+
+    sc.scrollTop = 0;
+    sc.dispatchEvent(new Event('scroll'));
+    await until(() => seen.length === 1);
+  });
+
   it('keeps loading while a short history still does not fill the view', async () => {
     // Tall enough that a few one-line messages leave room to spare.
     const el = sized('has-earlier', 1200);

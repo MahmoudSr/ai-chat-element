@@ -18,6 +18,10 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 - **The drawer takes focus however it opens.** Opening it with your own button
   (`aside-open`, e.g. with `hide-aside-toggle`) now moves keyboard focus into it,
   like the built-in toggle, and closing hands focus back to whatever had it.
+- **Scrolling to the top always loads earlier messages.** A conversation that
+  overflowed the view by less than the 200px look-ahead never asked for more
+  (`load-earlier="scroll"`): its top was already in range while the chat opened
+  at the bottom, so reaching it reported nothing new.
 
 ## [0.5.0] - 2026-10-08
 

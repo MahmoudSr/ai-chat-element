@@ -73,6 +73,9 @@ const booleanAttribute = {
   toAttribute: (value: boolean): string | null => (value ? '' : null),
 };
 
+/** Older messages start loading this far before the top comes into view. */
+const EARLIER_LOOKAHEAD_PX = 200;
+
 /** How long the copy button shows its tick after a copy. */
 const COPIED_TICK_MS = 1500;
 
@@ -1346,7 +1349,7 @@ export class AiChat extends LitElement {
         (entries) => {
           if (entries.some((e) => e.isIntersecting)) this._autoLoadEarlier();
         },
-        { root: this._scrollEl, rootMargin: '200px 0px 0px 0px', threshold: 0 },
+        { root: this._scrollEl, rootMargin: `${EARLIER_LOOKAHEAD_PX}px 0px 0px 0px`, threshold: 0 },
       );
     }
   }
@@ -1583,6 +1586,10 @@ export class AiChat extends LitElement {
     if (!grew && !atBottom && top < this._lastScrollTop - 1) {
       this._stickToBottom = false;
     }
+    // The top observer only reports CHANGES: on a chat that overflows by less
+    // than the look-ahead, the top is "in view" from the start (skipped then,
+    // while pinned) and never reported again. Judge by where the reader is.
+    if (!this._stickToBottom && top <= EARLIER_LOOKAHEAD_PX) this._autoLoadEarlier();
     this._lastScrollTop = top;
     this._lastScrollHeight = el.scrollHeight;
   }
