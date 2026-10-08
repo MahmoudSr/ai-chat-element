@@ -158,7 +158,10 @@ answer to `ai-chat:load-earlier`; call with `[]` on failure/no results to
 re-enable the control), `isGenerating(conversationId)` →
 `boolean` (is a reply still streaming for that conversation?).
 
-**Events** (all bubble + composed; read `e.detail`): `ai-chat:load-earlier`
+**Events** (all bubble + composed; read `e.detail`; each ALSO fires as
+`ai-chat-<name>` with a dash — same detail, cancelling either cancels both. In an
+Angular template bind the dash form, `(ai-chat-message)="…"`: Angular reads
+`(ai-chat:message)` as a global target and fails to compile): `ai-chat:load-earlier`
 `{conversationId, oldest}` (reader wants older messages — fires once until
 `prependMessages()`; `oldest` is the paging cursor; dropped if the conversation
 on screen changes first), `ai-chat:submit`

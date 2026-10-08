@@ -215,8 +215,9 @@ import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 @Component({
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA], // <- required so Angular allows <ai-chat>
-  // Custom events (colon names) bind fine in the template:
-  template: `<ai-chat #chat theme="light" (ai-chat:message)="onMessage($event)"></ai-chat>`,
+  // Bind the dash form of an event: Angular reads `(ai-chat:message)` as a
+  // global target (like `window:resize`) and refuses to compile it.
+  template: `<ai-chat #chat theme="light" (ai-chat-message)="onMessage($event)"></ai-chat>`,
 })
 export class ChatComponent implements AfterViewInit {
   @ViewChild('chat') chat!: ElementRef;
@@ -370,7 +371,10 @@ Set via JS only (they hold objects/arrays):
 | `prependMessages(older)`  | `Promise<void>`      | Adds older messages **above** the conversation — your answer to `ai-chat:load-earlier` — keeping what the reader sees in place. Call it with `[]` when nothing came back (or the load failed) to re-enable the control. |
 | `isGenerating(id)`        | `boolean`            | Whether the conversation with that `conversation-id` has a reply still generating in the background. Use it to mark a row in your history list. |
 
-**Events** (all `bubbles: true, composed: true`; read `e.detail`):
+**Events** (all `bubbles: true, composed: true`; read `e.detail`). Each also
+fires with a dash instead of the colon — `ai-chat-message`, `ai-chat-new-chat`,
+… — same detail; cancelling either cancels both. Use the dash form in
+framework templates (Angular can't bind a colon name).
 
 | Event             | `detail`                    | When / notes                                                        |
 | ----------------- | --------------------------- | ------------------------------------------------------------------- |

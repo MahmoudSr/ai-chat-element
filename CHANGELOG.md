@@ -8,6 +8,12 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Added
 
+- **Dash-named events for framework templates.** Every `ai-chat:*` event also
+  fires as `ai-chat-*` (`ai-chat-message`, `ai-chat-new-chat`, …) with the same
+  detail; cancelling either cancels both. The README's Angular example was
+  wrong: Angular reads `(ai-chat:message)` as a global target and fails to
+  compile — it now binds `(ai-chat-message)`.
+
 - **`assistant-avatar-src` / `user-avatar-src`** — set an avatar from an image
   URL, no slot needed. Slotted avatars are cloned into each message inside the
   shadow DOM, so a framework component styled by page CSS rendered blank there;

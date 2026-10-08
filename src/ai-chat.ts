@@ -516,6 +516,28 @@ export class AiChat extends LitElement {
     return { allowImages: this.allowImages, imageHosts: this.imageHosts };
   }
 
+  /**
+   * Every `ai-chat:*` event is also fired as `ai-chat-*` (dash instead of
+   * colon), same detail. Angular reads `(ai-chat:message)` as a global target
+   * like `window:resize` and refuses to compile it; `(ai-chat-message)` binds in
+   * any framework's template. Cancelling either name cancels both.
+   */
+  override dispatchEvent(event: Event): boolean {
+    const allowed = super.dispatchEvent(event);
+    if (!(event instanceof CustomEvent) || !event.type.startsWith('ai-chat:')) return allowed;
+    const alias = new CustomEvent(event.type.replace('ai-chat:', 'ai-chat-'), {
+      detail: event.detail,
+      bubbles: event.bubbles,
+      composed: event.composed,
+      cancelable: event.cancelable,
+    });
+    const aliasAllowed = super.dispatchEvent(alias);
+    // Callers read `event.defaultPrevented` after dispatch; a cancel on the
+    // alias must show there too.
+    if (!aliasAllowed && event.cancelable) event.preventDefault();
+    return allowed && aliasAllowed;
+  }
+
   /** Programmatically append a message without sending it. */
   addMessage(role: Role, content: string): ChatMessage {
     const msg: ChatMessage = {
