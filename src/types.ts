@@ -137,3 +137,18 @@ export interface ChatTransport {
     signal: AbortSignal,
   ): AsyncIterable<StreamChunk>;
 }
+
+/**
+ * A button your app adds to a message's actions row (next to Copy/Edit). Return
+ * them from `messageActions(message)`; pressing one fires `ai-chat:message-action`.
+ */
+export interface MessageAction {
+  /** Your id for it; comes back as `actionId` on the event. */
+  readonly id: string;
+  /** Accessible name and tooltip — and the visible text when there's no icon. */
+  readonly label: string;
+  /** Optional SVG markup for an icon button (sanitized; `currentColor` follows the theme). */
+  readonly icon?: string;
+  /** Shown but not pressable (e.g. while your own work for it is running). */
+  readonly disabled?: boolean;
+}

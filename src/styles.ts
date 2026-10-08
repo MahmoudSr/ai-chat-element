@@ -48,6 +48,20 @@ export const chatStyles = css`
     --ai-chat-composer-border-width: 0px;   /* top divider above the input; off by default */
     --ai-chat-code-border-width: var(--ai-chat-border-width);
     --ai-chat-table-border-width: var(--ai-chat-border-width);
+    /* Reply content (markdown). Every default derives from the palette above,
+       so dark mode follows on its own. Tables: a tinted header row, rules
+       between rows only, a rounded outer frame. */
+    --ai-chat-table-header-bg: color-mix(in srgb, var(--ai-chat-fg) 5%, transparent);
+    --ai-chat-table-header-fg: var(--ai-chat-muted);
+    --ai-chat-table-row-divider: var(--ai-chat-border);
+    --ai-chat-table-stripe-bg: transparent;
+    --ai-chat-table-cell-padding: 6px 12px;
+    --ai-chat-link-color: var(--ai-chat-accent);
+    --ai-chat-link-hover-color: color-mix(in srgb, var(--ai-chat-accent) 75%, var(--ai-chat-fg));
+    --ai-chat-strong-fg: inherit;
+    --ai-chat-heading-fg: inherit;
+    --ai-chat-marker-color: var(--ai-chat-muted);
+    --ai-chat-blockquote-border: var(--ai-chat-border);
 
     /* ---- Corner rounding ----
        ONE knob controls every rounded corner: --ai-chat-radius. Change it and
@@ -56,6 +70,7 @@ export const chatStyles = css`
        individually if you want (e.g. circular buttons via --ai-chat-button-radius:50%). */
     --ai-chat-radius: 8px;
     --ai-chat-radius-sm: var(--ai-chat-radius);
+    --ai-chat-table-radius: var(--ai-chat-radius-sm);
     --ai-chat-bubble-radius: var(--ai-chat-radius);
     --ai-chat-input-radius: var(--ai-chat-radius);
     --ai-chat-code-radius: var(--ai-chat-radius);
@@ -78,6 +93,9 @@ export const chatStyles = css`
 
     /* ---- Sizing knobs ---- */
     --ai-chat-avatar-size: 32px;
+    /* The avatar tile. Defaults to the assistant bubble; transparent suits a
+       picture with its own shape. */
+    --ai-chat-avatar-bg: var(--ai-chat-assistant-bg);
     /* Horizontal inset of the bubble's text. The bubble padding derives from it,
        and the name/time meta row aligns to it — so the label sits above the TEXT,
        not the bubble edge, and they stay in sync if you change it. Override
@@ -119,6 +137,9 @@ export const chatStyles = css`
     --ai-chat-jump-size: 36px;
     --ai-chat-jump-radius: 50%;
     --ai-chat-messages-padding: 20px 16px;
+    /* stable reserves the scrollbar's width so the centered column never shifts
+       when a scrollbar appears; auto gives the space back when nothing scrolls. */
+    --ai-chat-messages-scrollbar-gutter: stable;
     --ai-chat-composer-padding: 12px 16px 16px;
     --ai-chat-header-padding: 10px 16px;
     /* Divider under the built-in header; matches the border color by default. */
@@ -127,6 +148,11 @@ export const chatStyles = css`
     --ai-chat-aside-width: 260px;
     --ai-chat-aside-bg: transparent;
     --ai-chat-aside-padding: 12px;
+    /* auto: a short history list reserves no empty strip on its edge. */
+    --ai-chat-aside-scrollbar-gutter: auto;
+    /* The drawer on a narrow chat needs a solid surface over the chat. */
+    --ai-chat-aside-drawer-bg: var(--ai-chat-bg);
+    --ai-chat-aside-scrim: rgb(0 0 0 / 0.3);
     --ai-chat-show-avatars: grid;   /* set to 'none' to hide avatars */
 
     display: block;
@@ -157,6 +183,9 @@ export const chatStyles = css`
     --_dark-border: #262a35;
     --_dark-assistant-bg: #1b1e27;
     --_dark-assistant-fg: #e6e6e6;
+    /* The accent is tuned for a light page; on a dark one a link needs lifting
+       to stay readable (indigo on near-black is ~3:1). */
+    --_dark-link: color-mix(in srgb, var(--ai-chat-accent) 55%, #ffffff);
   }
   :host([theme='dark']) {
     --ai-chat-bg: var(--_dark-bg);
@@ -165,6 +194,7 @@ export const chatStyles = css`
     --ai-chat-border: var(--_dark-border);
     --ai-chat-assistant-bg: var(--_dark-assistant-bg);
     --ai-chat-assistant-fg: var(--_dark-assistant-fg);
+    --ai-chat-link-color: var(--_dark-link);
   }
   @media (prefers-color-scheme: dark) {
     :host(:not([theme='light']):not([theme='dark'])) {
@@ -174,6 +204,7 @@ export const chatStyles = css`
       --ai-chat-border: var(--_dark-border);
       --ai-chat-assistant-bg: var(--_dark-assistant-bg);
       --ai-chat-assistant-fg: var(--_dark-assistant-fg);
+      --ai-chat-link-color: var(--_dark-link);
     }
   }
 
@@ -217,7 +248,7 @@ export const chatStyles = css`
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    scrollbar-gutter: stable;
+    scrollbar-gutter: var(--ai-chat-aside-scrollbar-gutter);
     padding: var(--ai-chat-aside-padding);
     scrollbar-width: thin;
     scrollbar-color: var(--ai-chat-border) transparent;
@@ -252,11 +283,42 @@ export const chatStyles = css`
     border-right: none;
     border-left: var(--ai-chat-border-width) solid var(--ai-chat-border);
   }
-  /* On narrow widths the sidebar would crush the chat — hide it by default.
-     Consumers who want a drawer can override this breakpoint or roll their own. */
-  @media (max-width: 560px) {
-    .aside { display: none; }
+  /* ---- Sidebar as a drawer (chat narrower than aside-breakpoint) ----
+     The sidebar would crush a narrow chat, so it slides over it instead. */
+  .layout { position: relative; }
+  .layout--narrow .aside {
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    z-index: 5;
+    width: min(var(--ai-chat-aside-width), 85%);
+    background: var(--ai-chat-aside-drawer-bg);
+    box-shadow: 0 0 24px rgb(0 0 0 / 0.18);
+    transform: translateX(-100%);
+    visibility: hidden;
   }
+  .layout--animate .aside { transition: transform 0.2s ease, visibility 0s linear 0.2s; }
+  :host([aside-side='right']) .layout--narrow .aside {
+    left: auto; right: 0;
+    transform: translateX(100%);
+  }
+  .layout--narrow .aside.aside--open {
+    transform: none;
+    visibility: visible;
+  }
+  .layout--animate .aside.aside--open { transition: transform 0.2s ease; }
+  .aside:focus { outline: none; }
+  .aside-scrim {
+    position: absolute; inset: 0;
+    z-index: 4;
+    background: var(--ai-chat-aside-scrim);
+  }
+  .aside-toggle-float {
+    position: absolute;
+    top: 10px; left: 12px;
+    z-index: 3;
+  }
+  :host([aside-side='right']) .aside-toggle-float { left: auto; right: 12px; }
+  .aside-toggle-float .clear-btn { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); }
 
   /* ---- Header ----
      The header slot is always in the tree so consumers can override it. Its
@@ -274,7 +336,9 @@ export const chatStyles = css`
     padding: var(--ai-chat-header-padding);
     border-bottom: var(--ai-chat-header-border-width) solid var(--ai-chat-border);
   }
-  .header__title { font-weight: 600; font-size: 15px; }
+  /* The title takes the free space: it sits beside a leading drawer toggle, and
+     a trailing New-chat button stays at the far end. */
+  .header__title { flex: 1 1 auto; font-weight: 600; font-size: 15px; }
 
   /* When the consumer fills the header slot, their content replaces the
      built-in bar's CONTENT but should keep its frame: same padding, same
@@ -332,7 +396,7 @@ export const chatStyles = css`
     /* Reserve the scrollbar's space up front so the centered message column
        doesn't shift sideways when the scrollbar appears/disappears (Windows
        classic scrollbars take layout width). */
-    scrollbar-gutter: stable;
+    scrollbar-gutter: var(--ai-chat-messages-scrollbar-gutter);
     padding: var(--ai-chat-messages-padding);
     scrollbar-width: thin;          /* Firefox: slim scrollbar */
     scrollbar-color: var(--ai-chat-border) transparent;
@@ -424,7 +488,7 @@ export const chatStyles = css`
     place-items: center;
     overflow: hidden;
     border-radius: var(--ai-chat-avatar-radius);
-    background: var(--ai-chat-assistant-bg);
+    background: var(--ai-chat-avatar-bg);
     font-size: 16px;
     user-select: none;
   }
@@ -524,6 +588,9 @@ export const chatStyles = css`
   /* Reveal on any keyboard focus reaching the row, even without :focus-within
      support quirks, and honor reduced-motion by keeping the transition subtle. */
   @media (prefers-reduced-motion: reduce) {
+    .layout--animate .aside, .layout--animate .aside.aside--open { transition: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
     .message__actions { transition: none; }
   }
 
@@ -548,6 +615,10 @@ export const chatStyles = css`
   .message__action .icon { width: 15px; height: 15px; }
   /* Brief "copied" affirmation — the copy button flashes the accent color. */
   .message__action--done { color: var(--ai-chat-accent); }
+  /* An app action with no icon shows its label as text. */
+  .message__action--text { width: auto; padding: 0 8px; font: inherit; font-size: 12px; }
+  .message__action:disabled { opacity: 0.45; cursor: default; }
+  .message__action svg { width: 15px; height: 15px; }
   /* Consumer-slotted action content sits in the same pill treatment. */
   .message__action ::slotted(*) { display: inline-flex; }
 
@@ -665,6 +736,30 @@ export const chatStyles = css`
     background: color-mix(in srgb, var(--ai-chat-accent) 8%, transparent);
   }
 
+  /* ---- Load earlier (has-earlier) ---- */
+  .earlier {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    padding: 4px 0 12px;
+  }
+  .top-sentinel { position: absolute; top: 0; left: 0; width: 1px; height: 1px; }
+  .earlier__button {
+    padding: 4px 12px;
+    border: var(--ai-chat-border-width) solid var(--ai-chat-border);
+    border-radius: var(--ai-chat-button-radius);
+    background: transparent;
+    color: var(--ai-chat-muted);
+    font: inherit; font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.1s ease, color 0.1s ease;
+  }
+  .earlier__button:hover:not(:disabled) {
+    border-color: var(--ai-chat-accent);
+    color: var(--ai-chat-fg);
+  }
+  .earlier__button:disabled { cursor: progress; opacity: 0.7; }
+
   /* ---- Typing indicator ---- */
   .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
   .typing i {
@@ -689,8 +784,27 @@ export const chatStyles = css`
   .markdown > .markdown__part:first-child > :first-child { margin-top: 0; }
   .markdown > .markdown__part:last-child > :last-child { margin-bottom: 0; }
   .markdown p { margin: 0.5em 0; }
-  .markdown a { color: var(--ai-chat-accent); }
+  .markdown a { color: var(--ai-chat-link-color); text-underline-offset: 2px; }
+  .markdown a:hover { color: var(--ai-chat-link-hover-color); }
+  .markdown strong, .markdown b { color: var(--ai-chat-strong-fg); font-weight: 600; }
   .markdown ul, .markdown ol { padding-left: 1.4em; margin: 0.5em 0; }
+  .markdown li::marker { color: var(--ai-chat-marker-color); }
+  /* Headings sized for a chat reply, not a page: a step or two above body. */
+  .markdown h1, .markdown h2, .markdown h3, .markdown h4, .markdown h5, .markdown h6 {
+    margin: 0.9em 0 0.4em;
+    color: var(--ai-chat-heading-fg);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .markdown h1 { font-size: 1.25em; }
+  .markdown h2 { font-size: 1.15em; }
+  .markdown h3 { font-size: 1.05em; }
+  .markdown h4, .markdown h5, .markdown h6 { font-size: 1em; }
+  .markdown hr {
+    margin: 1em 0;
+    border: 0;
+    border-top: var(--ai-chat-table-border-width) solid var(--ai-chat-border);
+  }
   .markdown :not(pre) > code {
     font-family: var(--ai-chat-font-mono);
     font-size: 0.9em;
@@ -704,7 +818,12 @@ export const chatStyles = css`
      width:max-content lets it stay natural width and scroll, capped at 100% so a
      small table still fills nicely. */
   .markdown table {
-    border-collapse: collapse;
+    /* separate + 0 spacing, so the outer frame can be rounded. */
+    border-collapse: separate;
+    border-spacing: 0;
+    border: var(--ai-chat-table-border-width) solid var(--ai-chat-border);
+    border-radius: var(--ai-chat-table-radius);
+    font-variant-numeric: tabular-nums; /* money and counts line up */
     display: block;
     max-width: 100%;
     width: max-content;
@@ -714,13 +833,26 @@ export const chatStyles = css`
     scrollbar-color: var(--ai-chat-border) transparent;
   }
   .markdown th, .markdown td {
-    border: var(--ai-chat-table-border-width) solid var(--ai-chat-border);
-    padding: 6px 10px;
+    padding: var(--ai-chat-table-cell-padding);
     white-space: nowrap;
   }
+  /* Rules between rows only — no vertical lines. The first body row's rule
+     separates it from the header; a header-less table drops it (the frame is
+     already there). */
+  .markdown td { border-top: var(--ai-chat-table-border-width) solid var(--ai-chat-table-row-divider); }
+  .markdown table > tbody:first-child > tr:first-child > td { border-top: 0; }
+  .markdown th {
+    background: var(--ai-chat-table-header-bg);
+    color: var(--ai-chat-table-header-fg);
+    font-size: 0.9em;
+    font-weight: 600;
+  }
+  /* Start-aligned unless the markdown asked otherwise (|--:| sets align). */
+  .markdown th:not([align]), .markdown td:not([align]) { text-align: start; }
+  .markdown tbody tr:nth-child(even) > td { background: var(--ai-chat-table-stripe-bg); }
   .markdown blockquote {
     margin: 0.5em 0; padding-left: 12px;
-    border-left: 3px solid var(--ai-chat-border);
+    border-left: 3px solid var(--ai-chat-blockquote-border);
     color: var(--ai-chat-muted);
   }
 
@@ -1078,6 +1210,7 @@ export const chatStyles = css`
   .clear-btn:focus-visible,
   .new-chat-btn:focus-visible,
   .retry-btn:focus-visible,
+  .earlier__button:focus-visible,
   .jump:focus-visible,
   .code-block__copy:focus-visible,
   .attachment-chip__remove:focus-visible,

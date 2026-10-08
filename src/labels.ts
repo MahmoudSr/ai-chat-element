@@ -66,6 +66,14 @@ export interface ChatLabels {
   previewImage: string;
   /** aria-label for the close button on the image preview overlay. */
   closePreview: string;
+  /** The control at the top of a conversation with older messages (`has-earlier`). */
+  loadEarlier: string;
+  /** The same control while older messages are on their way. */
+  loadingEarlier: string;
+  /** The button that opens the history drawer on a narrow chat (`show-aside`). */
+  openAside: string;
+  /** The same button, and the backdrop, while the drawer is open. */
+  closeAside: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -96,4 +104,8 @@ export const DEFAULT_LABELS: ChatLabels = {
   cancelEdit: 'Cancel',
   previewImage: 'Preview {name}',
   closePreview: 'Close preview',
+  loadEarlier: 'Load earlier messages',
+  loadingEarlier: 'Loading earlier messages…',
+  openAside: 'Show conversations',
+  closeAside: 'Hide conversations',
 };

