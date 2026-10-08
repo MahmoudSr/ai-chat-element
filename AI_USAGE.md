@@ -346,7 +346,8 @@ sidebar's full-width New-chat button into a pill — set `--ai-chat-new-chat-rad
 
 Fonts/size: `--ai-chat-font`, `--ai-chat-font-mono`, `--ai-chat-font-size` (15px),
 `--ai-chat-line-height` (1.55), `--ai-chat-max-width` (760px), `--ai-chat-gap`
-(16px), `--ai-chat-avatar-size` (32px), `--ai-chat-button-size` (42px),
+(16px), `--ai-chat-avatar-size` (32px), `--ai-chat-avatar-bg` (= assistant-bg; the
+avatar tile), `--ai-chat-button-size` (42px),
 `--ai-chat-send-size` (34px), `--ai-chat-clear-size` (32px), `--ai-chat-jump-size`
 (36px), `--ai-chat-input-max-height` (200px),
 `--ai-chat-attachment-thumb-size` (32px),
@@ -357,10 +358,12 @@ Fonts/size: `--ai-chat-font`, `--ai-chat-font-mono`, `--ai-chat-font-size` (15px
 Padding: `--ai-chat-bubble-inset-x` (14px; horizontal text inset — the name/time
 label aligns to it, and `--ai-chat-bubble-padding` derives its horizontal value
 from it), `--ai-chat-bubble-padding`, `--ai-chat-input-padding`,
-`--ai-chat-messages-padding`, `--ai-chat-composer-padding`, `--ai-chat-header-padding`.
+`--ai-chat-messages-padding`, `--ai-chat-composer-padding`, `--ai-chat-header-padding`,
+`--ai-chat-messages-scrollbar-gutter` (stable; `auto` gives the strip back).
 
 Sidebar (with show-aside): `--ai-chat-aside-width` (260px), `--ai-chat-aside-bg`
-(transparent), `--ai-chat-aside-padding` (12px).
+(transparent), `--ai-chat-aside-padding` (12px), `--ai-chat-aside-scrollbar-gutter`
+(auto; `stable` reserves the strip).
 
 - **Icon slots:** `send-icon`, `stop-icon`, `jump-icon`, `clear-icon`,
   `retry-icon`, `copy-icon`, `edit-icon`, `error-icon`, `empty-icon`.

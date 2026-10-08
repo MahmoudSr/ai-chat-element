@@ -1026,6 +1026,7 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-max-width`        | `760px`           | Max width of messages + composer               |
 | `--ai-chat-gap`              | `16px`            | Vertical space between messages                |
 | `--ai-chat-avatar-size`      | `32px`            | Avatar width/height                            |
+| `--ai-chat-avatar-bg`        | `= assistant-bg`  | Avatar tile behind the picture (`transparent` for a shaped picture) |
 | `--ai-chat-button-size`      | `42px`            | Header/floating icon buttons                   |
 | `--ai-chat-send-size`        | `34px`            | Send/stop button inside the composer           |
 | `--ai-chat-clear-size`       | `32px`            | Compact New-chat icon button (header/floating) |
@@ -1050,6 +1051,7 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-bubble-padding`   | `6px = inset-x`  | Inside message bubbles (horizontal derives from `bubble-inset-x`) |
 | `--ai-chat-input-padding`    | `8px 14px 2px`   | Inside the textarea     |
 | `--ai-chat-messages-padding` | `20px 16px`      | Around the message list |
+| `--ai-chat-messages-scrollbar-gutter` | `stable` | Reserve the scrollbar's width in the message list (`auto` gives it back when nothing scrolls) |
 | `--ai-chat-composer-padding` | `12px 16px 16px` | Around the composer     |
 | `--ai-chat-header-padding`   | `10px 16px`      | Inside the header bar   |
 
@@ -1060,6 +1062,7 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-aside-width`   | `260px`       | Sidebar column width |
 | `--ai-chat-aside-bg`      | `transparent` | Sidebar background   |
 | `--ai-chat-aside-padding` | `12px`        | Inside the sidebar   |
+| `--ai-chat-aside-scrollbar-gutter` | `auto` | Reserve the scrollbar's width in the history list (`stable` keeps it) |
 
 ### All `::part()` hooks
 

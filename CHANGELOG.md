@@ -8,6 +8,15 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Added
 
+- **`--ai-chat-avatar-bg`** — the avatar tile on its own (it used to always
+  take the assistant bubble colour, so a transparent picture sat on a grey
+  square). Defaults to `--ai-chat-assistant-bg`, so nothing changes unless set.
+- **`--ai-chat-messages-scrollbar-gutter`** (default `stable`) and
+  **`--ai-chat-aside-scrollbar-gutter`** (default `auto`) — whether each
+  scroller reserves its scrollbar's width.
+  - **Behaviour change:** the history list no longer reserves an empty strip on
+    its edge when it doesn't scroll. Set it to `stable` for the old look.
+
 - **Long conversations: load earlier messages.** Show the newest page of a
   conversation and load older ones as the reader scrolls up. Set
   **`has-earlier`**; the component shows a "Load earlier messages" control at

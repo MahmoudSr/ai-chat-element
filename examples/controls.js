@@ -172,6 +172,7 @@ export const CONTROLS = [
   { g: 'Type & size', kind: 'var', key: '--ai-chat-line-height', type: 'range', def: 1.55, min: 1.1, max: 2.2, step: 0.05, label: 'line-height' },
   { g: 'Type & size', kind: 'var', key: '--ai-chat-max-width', type: 'range', def: 760, min: 320, max: 1200, fmt: px, label: 'max-width' },
   { g: 'Type & size', kind: 'var', key: '--ai-chat-gap', type: 'range', def: 16, min: 0, max: 44, fmt: px, label: 'gap' },
+  { g: 'Colors', kind: 'var', key: '--ai-chat-avatar-bg', type: 'color', def: '#f3f4f6', label: 'avatar-bg' },
   { g: 'Type & size', kind: 'var', key: '--ai-chat-avatar-size', type: 'range', def: 32, min: 18, max: 56, fmt: px, label: 'avatar-size' },
   { g: 'Type & size', kind: 'var', key: '--ai-chat-button-size', type: 'range', def: 42, min: 24, max: 60, fmt: px, label: 'button-size' },
   { g: 'Type & size', kind: 'var', key: '--ai-chat-send-size', type: 'range', def: 34, min: 20, max: 52, fmt: px, label: 'send-size' },
@@ -188,10 +189,12 @@ export const CONTROLS = [
   { g: 'Spacing', kind: 'var', key: '--ai-chat-bubble-padding', type: 'text', def: '4px 14px', label: 'bubble-padding' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-input-padding', type: 'text', def: '8px 14px 2px', label: 'input-padding' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-messages-padding', type: 'text', def: '20px 16px', label: 'messages-padding' },
+  { g: 'Spacing', kind: 'var', key: '--ai-chat-messages-scrollbar-gutter', type: 'text', def: 'stable', label: 'messages-scrollbar-gutter' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-composer-padding', type: 'text', def: '12px 16px 16px', label: 'composer-padding' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-header-padding', type: 'text', def: '10px 16px', label: 'header-padding' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-aside-width', type: 'range', def: 260, min: 150, max: 400, fmt: px, label: 'aside-width' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-aside-padding', type: 'text', def: '12px', label: 'aside-padding' },
+  { g: 'Spacing', kind: 'var', key: '--ai-chat-aside-scrollbar-gutter', type: 'text', def: 'auto', label: 'aside-scrollbar-gutter' },
 
   // ---------- Labels ----------
   { g: 'Labels (i18n)', kind: 'label', key: 'userName', type: 'text', def: 'You' },

@@ -78,6 +78,9 @@ export const chatStyles = css`
 
     /* ---- Sizing knobs ---- */
     --ai-chat-avatar-size: 32px;
+    /* The avatar tile. Defaults to the assistant bubble; transparent suits a
+       picture with its own shape. */
+    --ai-chat-avatar-bg: var(--ai-chat-assistant-bg);
     /* Horizontal inset of the bubble's text. The bubble padding derives from it,
        and the name/time meta row aligns to it — so the label sits above the TEXT,
        not the bubble edge, and they stay in sync if you change it. Override
@@ -119,6 +122,9 @@ export const chatStyles = css`
     --ai-chat-jump-size: 36px;
     --ai-chat-jump-radius: 50%;
     --ai-chat-messages-padding: 20px 16px;
+    /* stable reserves the scrollbar's width so the centered column never shifts
+       when a scrollbar appears; auto gives the space back when nothing scrolls. */
+    --ai-chat-messages-scrollbar-gutter: stable;
     --ai-chat-composer-padding: 12px 16px 16px;
     --ai-chat-header-padding: 10px 16px;
     /* Divider under the built-in header; matches the border color by default. */
@@ -127,6 +133,8 @@ export const chatStyles = css`
     --ai-chat-aside-width: 260px;
     --ai-chat-aside-bg: transparent;
     --ai-chat-aside-padding: 12px;
+    /* auto: a short history list reserves no empty strip on its edge. */
+    --ai-chat-aside-scrollbar-gutter: auto;
     --ai-chat-show-avatars: grid;   /* set to 'none' to hide avatars */
 
     display: block;
@@ -217,7 +225,7 @@ export const chatStyles = css`
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    scrollbar-gutter: stable;
+    scrollbar-gutter: var(--ai-chat-aside-scrollbar-gutter);
     padding: var(--ai-chat-aside-padding);
     scrollbar-width: thin;
     scrollbar-color: var(--ai-chat-border) transparent;
@@ -332,7 +340,7 @@ export const chatStyles = css`
     /* Reserve the scrollbar's space up front so the centered message column
        doesn't shift sideways when the scrollbar appears/disappears (Windows
        classic scrollbars take layout width). */
-    scrollbar-gutter: stable;
+    scrollbar-gutter: var(--ai-chat-messages-scrollbar-gutter);
     padding: var(--ai-chat-messages-padding);
     scrollbar-width: thin;          /* Firefox: slim scrollbar */
     scrollbar-color: var(--ai-chat-border) transparent;
@@ -424,7 +432,7 @@ export const chatStyles = css`
     place-items: center;
     overflow: hidden;
     border-radius: var(--ai-chat-avatar-radius);
-    background: var(--ai-chat-assistant-bg);
+    background: var(--ai-chat-avatar-bg);
     font-size: 16px;
     user-select: none;
   }
