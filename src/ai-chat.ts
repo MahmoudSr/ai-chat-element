@@ -73,6 +73,17 @@ const booleanAttribute = {
   toAttribute: (value: boolean): string | null => (value ? '' : null),
 };
 
+/** A file card links only to a URL that fetches a file — never script. */
+function safeFileHref(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const { protocol } = new URL(url, location.href);
+    return ['https:', 'http:', 'blob:', 'data:'].includes(protocol) ? url : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Older messages start loading this far before the top comes into view. */
 const EARLIER_LOOKAHEAD_PX = 200;
 
@@ -1992,6 +2003,12 @@ export class AiChat extends LitElement {
         </div>`
             : nothing
         }
+        ${
+          // A reply's files come after its text: the answer hands you the file.
+          isAssistant
+            ? this._renderFileCards(m, (m.attachments ?? []).filter((a) => a.kind !== 'image'))
+            : nothing
+        }
         ${this._renderMessageActions(m)}
         </div>
       </div>
@@ -2366,7 +2383,9 @@ export class AiChat extends LitElement {
   private _renderMessageAttachments(m: ChatMessage) {
     if (!m.attachments?.length) return nothing;
     const images = m.attachments.filter((a) => a.kind === 'image');
-    const files = m.attachments.filter((a) => a.kind !== 'image');
+    // A reply's files render below its text (see the message template).
+    const files = m.role === 'assistant' ? [] : m.attachments.filter((a) => a.kind !== 'image');
+    if (!images.length && !files.length) return nothing;
     // Grid sizing keys off the image count: 1 shows larger, 2+ tile into fixed
     // square cells so a wide screenshot can't stretch the bubble to full width.
     const gridClass =
@@ -2396,17 +2415,62 @@ export class AiChat extends LitElement {
               </div>`
             : nothing
         }
-        ${repeat(
-          files,
-          (a) => a.id,
-          (a) => html`<span class="message__attachment message__attachment--file"
-                       part="message-attachment" title=${a.name}>
-                       <span class="message__attachment-icon" aria-hidden="true">${fileIcon}</span>
-                       <span class="message__attachment-name">${a.name}</span>
-                     </span>`,
-        )}
+        ${this._renderFileCards(m, files)}
       </div>
     `;
+  }
+
+  /**
+   * File attachments as cards: icon, name, an optional detail line, a busy state.
+   * On a reply they sit BELOW the text (the answer hands you the file); on a
+   * sent message they stay above it, with its images.
+   */
+  private _renderFileCards(m: ChatMessage, files: readonly Attachment[]) {
+    if (!files.length) return nothing;
+    return html`<div class="file-cards">
+      ${repeat(files, (a) => a.id, (a) => this._renderFileCard(m, a))}
+    </div>`;
+  }
+
+  private _renderFileCard(m: ChatMessage, a: Attachment) {
+    const body = html`
+      <span class="file-card__icon" aria-hidden="true">${fileIcon}</span>
+      <span class="file-card__text">
+        <span class="file-card__name" part="file-card-name">${a.name}</span>
+        ${
+          a.busy
+            ? html`<span class="file-card__detail" part="file-card-detail">${this._labels.preparingFile}</span>`
+            : a.detail
+              ? html`<span class="file-card__detail" part="file-card-detail">${a.detail}</span>`
+              : nothing
+        }
+      </span>`;
+    const label = this._fill(this._labels.openFile, a.name);
+    const href = a.busy ? undefined : safeFileHref(a.url);
+    // A real link when there is a file to fetch; otherwise a button the app answers.
+    return href
+      ? html`<a class="message__attachment message__attachment--file file-card"
+               part="message-attachment file-card" href=${href} download=${a.name}
+               target="_blank" rel="noopener noreferrer" title=${a.name} aria-label=${label}
+               @click=${(e: Event) => this._onAttachmentClick(e, m, a)}>${body}</a>`
+      : html`<button type="button"
+               class="message__attachment message__attachment--file file-card"
+               part="message-attachment file-card" title=${a.name} aria-label=${label}
+               aria-busy=${a.busy ? 'true' : 'false'} ?disabled=${a.busy ?? false}
+               @click=${(e: Event) => this._onAttachmentClick(e, m, a)}>${body}</button>`;
+  }
+
+  /** `ai-chat:attachment-click` — cancel it to stop a link card from downloading. */
+  private _onAttachmentClick(e: Event, message: ChatMessage, attachment: Attachment): void {
+    const allowed = this.dispatchEvent(
+      new CustomEvent('ai-chat:attachment-click', {
+        detail: { message, attachment, index: this.messages.indexOf(message) },
+        bubbles: true,
+        composed: true,
+        cancelable: true,
+      }),
+    );
+    if (!allowed) e.preventDefault();
   }
 }
 

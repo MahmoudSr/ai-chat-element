@@ -167,7 +167,9 @@ re-enable the control), `isGenerating(conversationId)` →
 
 **Events** (all bubble + composed; read `e.detail`; `ai-chat:message-action`
 `{actionId, message, index}` fires when one of your `messageActions` buttons is
-pressed; `ai-chat:aside-toggle` `{open}` fires when the reader opens/closes the
+pressed; `ai-chat:attachment-click` `{attachment, message, index}` fires when a
+file card is pressed — cancelable, cancelling stops a link card's download;
+`ai-chat:aside-toggle` `{open}` fires when the reader opens/closes the
 sidebar drawer — toggle, backdrop, Esc, or a `conversation-id` change; each ALSO
 fires as
 `ai-chat-<name>` with a dash — same detail, cancelling either cancels both. In an
@@ -288,6 +290,12 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `composer-actions-start` (left) and `composer-actions-end` (right, before send)
   slots — no layout work needed. `--ai-chat-input-max-height` (default 200px) caps
   how tall it grows before scrolling.
+- **Files in a reply:** give an assistant message a `kind: 'file'` attachment
+  and it renders as a card BELOW the text (icon, `name`, optional `detail` line
+  like "CSV · 23 rows"). With an `https:`/`http:`/`blob:`/`data:` `url` it is a
+  download link; without one it is a button — make the file in
+  `ai-chat:attachment-click`, with `busy: true` on the attachment meanwhile (the
+  card reads `preparingFile` and is disabled). Never needs `allow-attachments`.
 - **Attachments:** off by default; `allow-attachments` adds a built-in attach
   button + drag-drop + paste (paste a screenshot straight in). Only IMAGES are
   auto-sent to the built-in OpenAI/Anthropic adapters (their chat APIs take images
@@ -306,6 +314,7 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `typing`, `send`, `stop`, `jumpToLatest`, `inputLabel`, `messagesRegion`,
   `headerTitle`, `clearChat`, `retry`, `emptyResponse`, `copyMessage`, `edit`,
   `saveEdit`, `cancelEdit`, `previewImage` (uses `{name}`), `closePreview`,
+  `openFile` (uses `{name}`), `preparingFile`,
   `loadEarlier`, `loadingEarlier`, `openAside`, `closeAside`, `attach`,
   `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
   three `attach*` messages use `{name}` as a filename placeholder).
@@ -313,6 +322,7 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `header`, `header-slot`, `header-title`, `clear-button`, `messages`, `message`,
   `message-user`, `message-assistant`, `message-system`, `bubble`, `avatar`,
   `meta`, `name`, `time`, `message-attachments`, `message-attachment`,
+  `file-card`, `file-card-name`, `file-card-detail`,
   `message-actions`, `action-button`, `copy-button`, `edit-button`,
   `message-edit`, `edit-input`, `edit-actions`, `edit-save-button`,
   `edit-cancel-button`, `preview`, `preview-image`, `preview-close`, `composer`,

@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **Files in a reply, as cards.** A `kind: 'file'` attachment on an assistant
+  message renders as a card BELOW the text — icon, name, and a new optional
+  **`detail`** line ("CSV · 23 rows") — the way ChatGPT and Claude hand you a
+  file. With a URL it is a download link; without one it is a button and the new
+  cancelable **`ai-chat:attachment-click`** `{ attachment, message, index }` is
+  where you make the file. **`busy: true`** shows the new `preparingFile` label
+  and disables it. New parts `file-card`, `file-card-name`, `file-card-detail`;
+  new label `openFile`. Files on a sent message are cards too, still above the
+  text. Only `https:`, `http:`, `blob:` and `data:` URLs become links.
+
 ### Changed
 
 - **Copying a message shows a tick.** The copy button swaps its icon for a tick
