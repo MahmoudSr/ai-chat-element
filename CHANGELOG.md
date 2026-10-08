@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-08
+
+Long conversations, safer replies, and the fixes found by using the component
+in a real admin dashboard (Angular). **Two behaviour changes** to check when
+upgrading: images in replies no longer render unless you add `allow-images`, and
+on a narrow chat the sidebar is now a drawer instead of disappearing.
+
 ### Added
 
 - **The sidebar on a narrow chat is a drawer.** Below **`aside-breakpoint`**
@@ -534,7 +541,8 @@ Initial public release.
 - Accessibility: ARIA live region, keyboard support, reduced-motion.
 - Licensed under MPL-2.0.
 
-[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.1.5...v0.2.0

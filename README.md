@@ -20,7 +20,7 @@ tweak it, and copy the generated code straight into your app.
 - ♿ **Accessible** — polite screen-reader announcement of each settled reply
   (no token-by-token spam), a keyboard focus ring, focus that never gets dropped,
   full keyboard support, and respects `prefers-reduced-motion`
-- 📦 **~91 KB gzipped**, zero peer dependencies
+- 📦 **~98 KB gzipped**, zero peer dependencies
 
 ---
 
@@ -100,8 +100,8 @@ server-backed pattern above. See [Transports](#transports).
 <script type="module">
   // Pin the version so a future release can't change your page unannounced.
   // Drop the @0.3.0 to always get the latest (fine for a quick try, not prod).
-  import 'https://esm.sh/ai-chat-element@0.3.0';
-  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.3.0';
+  import 'https://esm.sh/ai-chat-element@0.5.0';
+  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.5.0';
 
   const chat = document.querySelector('ai-chat');
   // Local, keyless example: talk to Ollama running on your machine.
