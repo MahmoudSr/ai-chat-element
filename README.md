@@ -100,8 +100,8 @@ server-backed pattern above. See [Transports](#transports).
 <script type="module">
   // Pin the version so a future release can't change your page unannounced.
   // Drop the @0.3.0 to always get the latest (fine for a quick try, not prod).
-  import 'https://esm.sh/ai-chat-element@0.5.0';
-  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.5.0';
+  import 'https://esm.sh/ai-chat-element@0.6.0';
+  import { openAIAdapter } from 'https://esm.sh/ai-chat-element@0.6.0';
 
   const chat = document.querySelector('ai-chat');
   // Local, keyless example: talk to Ollama running on your machine.
