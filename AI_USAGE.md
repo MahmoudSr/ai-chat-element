@@ -133,7 +133,11 @@ paste/drag but hide the built-in button), `accept` (default `image/*`),
 `max-attachments` (default 5), `max-attachment-size` (bytes, 0 = no cap),
 `conversation-id` (your storage key for the conversation on screen; echoed back on
 `ai-chat:background-message`), `abort-on-switch` (cancel an in-flight reply on
-conversation switch/clear instead of finishing it in the background).
+conversation switch/clear instead of finishing it in the background),
+`allow-images` (render images in replies — off by default because a model-written
+image URL can leak data; off, images show as alt text), `image-hosts`
+(space-separated URL prefixes images may load from with `allow-images`; only
+`https:`; array property `.imageHosts`).
 
 **Properties (JS only):** `.transport` (required), `.messages`, `.labels`.
 

