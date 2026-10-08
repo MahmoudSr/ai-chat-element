@@ -108,3 +108,12 @@ export const alertIcon = svg`
     <line x1="12" y1="9" x2="12" y2="13"></line>
     <line x1="12" y1="17" x2="12.01" y2="17"></line>
   </svg>`;
+
+/** Sidebar panel — opens the history drawer on a narrow chat. */
+export const asideIcon = svg`
+  <svg class="icon" viewBox=${base.viewBox} width="18" height="18"
+       fill=${base.fill} stroke=${base.stroke} stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+    <line x1="9" y1="4" x2="9" y2="20"></line>
+  </svg>`;

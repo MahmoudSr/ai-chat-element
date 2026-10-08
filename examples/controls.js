@@ -206,6 +206,8 @@ export const CONTROLS = [
   { g: 'Spacing', kind: 'var', key: '--ai-chat-header-padding', type: 'text', def: '10px 16px', label: 'header-padding' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-aside-width', type: 'range', def: 260, min: 150, max: 400, fmt: px, label: 'aside-width' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-aside-padding', type: 'text', def: '12px', label: 'aside-padding' },
+  { g: 'Colors', kind: 'var', key: '--ai-chat-aside-drawer-bg', type: 'color', def: '#ffffff', label: 'aside-drawer-bg' },
+  { g: 'Colors', kind: 'var', key: '--ai-chat-aside-scrim', type: 'text', def: 'rgb(0 0 0 / 0.3)', label: 'aside-scrim' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-aside-scrollbar-gutter', type: 'text', def: 'auto', label: 'aside-scrollbar-gutter' },
 
   // ---------- Labels ----------

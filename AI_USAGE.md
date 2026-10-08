@@ -128,7 +128,10 @@ The `done` chunk may carry `finishReason` (`FinishReason`) and `usage`
 `show-clear`, `show-retry` (default on), `show-copy` (default on — per-message
 copy button), `show-edit` (user messages only; fires `ai-chat:message-edit`),
 `show-aside`, `aside-side`
-(`left`|`right`), `system-prompt`, `disabled`, `allow-attachments`, `hide-attach-button` (keep
+(`left`|`right`), `aside-breakpoint` (px of the CHAT's width, default 560, `0`
+never: below it the sidebar is a drawer with a built-in toggle), `aside-open`
+(drawer open on a narrow chat; set it from your own button; reflected),
+`hide-aside-toggle` (keep the drawer, hide the built-in toggle), `system-prompt`, `disabled`, `allow-attachments`, `hide-attach-button` (keep
 paste/drag but hide the built-in button), `accept` (default `image/*`),
 `max-attachments` (default 5), `max-attachment-size` (bytes, 0 = no cap),
 `conversation-id` (your storage key for the conversation on screen; echoed back on
@@ -164,7 +167,9 @@ re-enable the control), `isGenerating(conversationId)` →
 
 **Events** (all bubble + composed; read `e.detail`; `ai-chat:message-action`
 `{actionId, message, index}` fires when one of your `messageActions` buttons is
-pressed; each ALSO fires as
+pressed; `ai-chat:aside-toggle` `{open}` fires when the reader opens/closes the
+sidebar drawer — toggle, backdrop, Esc, or a `conversation-id` change; each ALSO
+fires as
 `ai-chat-<name>` with a dash — same detail, cancelling either cancels both. In an
 Angular template bind the dash form, `(ai-chat-message)="…"`: Angular reads
 `(ai-chat:message)` as a global target and fails to compile): `ai-chat:load-earlier`
@@ -301,7 +306,7 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `typing`, `send`, `stop`, `jumpToLatest`, `inputLabel`, `messagesRegion`,
   `headerTitle`, `clearChat`, `retry`, `emptyResponse`, `copyMessage`, `edit`,
   `saveEdit`, `cancelEdit`, `previewImage` (uses `{name}`), `closePreview`,
-  `loadEarlier`, `loadingEarlier`, `attach`,
+  `loadEarlier`, `loadingEarlier`, `openAside`, `closeAside`, `attach`,
   `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
   three `attach*` messages use `{name}` as a filename placeholder).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
@@ -314,7 +319,7 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
   `composer-actions`, `composer-actions-start`, `composer-actions-end`,
   `attach-button`, `input`, `send-button`, `stop-button`, `jump-button`,
-  `retry-button`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`, `empty-icon`,
+  `retry-button`, `aside-toggle`, `aside-scrim`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`, `empty-icon`,
   `empty-heading`, `empty-body`, `error`, `empty-response`.
   (`header` = the built-in bar; `header-slot` = the wrapper that also holds your
   `header` slot content and keeps the bar's padding/divider when you fill it.
@@ -387,10 +392,12 @@ from it), `--ai-chat-bubble-padding`, `--ai-chat-input-padding`,
 
 Sidebar (with show-aside): `--ai-chat-aside-width` (260px), `--ai-chat-aside-bg`
 (transparent), `--ai-chat-aside-padding` (12px), `--ai-chat-aside-scrollbar-gutter`
-(auto; `stable` reserves the strip).
+(auto; `stable` reserves the strip), `--ai-chat-aside-drawer-bg` (= bg; the drawer
+on a narrow chat), `--ai-chat-aside-scrim` (rgb(0 0 0 / 0.3); behind the drawer).
 
 - **Icon slots:** `send-icon`, `stop-icon`, `jump-icon`, `clear-icon`,
-  `retry-icon`, `copy-icon`, `edit-icon`, `error-icon`, `empty-icon`.
+  `retry-icon`, `copy-icon`, `edit-icon`, `error-icon`, `empty-icon`,
+  `aside-toggle-icon`.
 - **Composer action slots:** `composer-actions-start`, `composer-actions-end`.
 
 ## React type shim (React < 19)

@@ -70,6 +70,10 @@ export interface ChatLabels {
   loadEarlier: string;
   /** The same control while older messages are on their way. */
   loadingEarlier: string;
+  /** The button that opens the history drawer on a narrow chat (`show-aside`). */
+  openAside: string;
+  /** The same button, and the backdrop, while the drawer is open. */
+  closeAside: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -102,4 +106,6 @@ export const DEFAULT_LABELS: ChatLabels = {
   closePreview: 'Close preview',
   loadEarlier: 'Load earlier messages',
   loadingEarlier: 'Loading earlier messages…',
+  openAside: 'Show conversations',
+  closeAside: 'Hide conversations',
 };

@@ -332,6 +332,9 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `show-edit`        | boolean                     | `false` | Show an Edit button on **user** messages; confirming fires `ai-chat:message-edit`. |
 | `show-aside`       | boolean                     | `false` | Show the sidebar column (fill the `aside` slot with your history list).           |
 | `aside-side`       | `left` \| `right`           | `left`  | Which side the sidebar sits on.                                                   |
+| `aside-breakpoint` | number (px)                 | `560`   | Below this width **of the chat itself**, the sidebar becomes a drawer opened by a toggle. `0` never collapses. See [On a narrow chat](#on-a-narrow-chat-the-sidebar-is-a-drawer). |
+| `aside-open`       | boolean                     | `false` | Whether the drawer is open (narrow chat only). Set it from your own button; reflected. |
+| `hide-aside-toggle`| boolean                     | `false` | Keep the drawer but hide the built-in toggle (bring your own trigger). |
 | `system-prompt`    | string                      | —       | Prepended to every request (not shown in UI).                                     |
 | `disabled`         | boolean                     | `false` | Disables the input.                                                               |
 | `allow-attachments`| boolean                     | `false` | Enable file/image attachments (attach button + drag-drop + paste). See [Attachments](#attachments). |
@@ -388,6 +391,7 @@ framework templates (Angular can't bind a colon name).
 | `ai-chat:attach-rejected` | `{ file: File, reason: 'type' \| 'size' \| 'too-many', message: string }` | Fires when a picked file is rejected by `accept` / `max-attachment-size` / `max-attachments`. |
 | `ai-chat:message-edit` | `{ index: number, message: ChatMessage, newContent: string }` | Fires when the user confirms an inline edit (`show-edit`, user messages only). **The component does not change `.messages`** — you decide what edit means. The usual ChatGPT behaviour is to truncate from `index` and resend `newContent`. |
 | `ai-chat:preview` | `{ attachment: Attachment }` | Fires when an image (staged in the composer or already sent) is clicked. **Cancelable** — `e.preventDefault()` suppresses the built-in overlay so you can open your own lightbox/gallery. |
+| `ai-chat:aside-toggle` | `{ open: boolean }` | The reader opened or closed the sidebar drawer (toggle, backdrop, Esc, or a conversation switch). |
 | `ai-chat:message-action` | `{ actionId: string, message: ChatMessage, index: number }` | One of your `messageActions` buttons was pressed. |
 | `ai-chat:load-earlier` | `{ conversationId: string \| null, oldest: ChatMessage }` | The reader asked for older messages (`has-earlier`): scrolled near the top, or pressed the button. Fires once until you call `prependMessages()`. `oldest` is your paging cursor. |
 | `ai-chat:background-message` | `{ conversationId: string \| null, message: ChatMessage, done: boolean }` | A reply is still streaming for a conversation you've switched away from. Fires per token with `done: false`, then once with `done: true` when it settles (including on error — check `message.error`). `conversationId` is whatever `conversation-id` held when that turn was sent. See [Background streaming](#background-streaming). |
@@ -475,7 +479,7 @@ For a picture, the simplest is a URL — no slot needed:
 > `--ai-chat-avatar-bg` (`transparent` for a shaped picture).
 
 Other slots: `send-icon`, `stop-icon`, `jump-icon`, `clear-icon`, `retry-icon`,
-`error-icon`, `empty-icon`, `empty` (replace the whole empty state), `header`
+`error-icon`, `empty-icon`, `aside-toggle-icon`, `empty` (replace the whole empty state), `header`
 (replace the whole top bar), `aside` (the history sidebar), and
 `composer-actions-start` / `composer-actions-end` (drop buttons into the input's
 action row — see below).
@@ -605,6 +609,7 @@ exactly what you need to build a ChatGPT-style history yourself:
   `detail.messages` is the outgoing conversation, so you can save it before the
   component clears itself. (Call `preventDefault()` to keep the messages.)
 - Switch conversations by setting **`chat.messages = savedConversation`**.
+- On a narrow chat the sidebar becomes a **drawer** — see below.
 
 That's the whole pattern — a minimal history in ~20 lines:
 
@@ -703,6 +708,27 @@ chat.addEventListener('ai-chat:load-earlier', async (e) => {
   keep their DOM when older ones are added above.
 - Style it with `::part(load-earlier)` (the button) and `::part(load-earlier-row)`;
   translate it with the `loadEarlier` / `loadingEarlier` labels.
+
+### On a narrow chat, the sidebar is a drawer
+
+Below `aside-breakpoint` (560px by default) **of the chat's own width** — so a
+phone, but also a narrow panel on a desktop — the sidebar would crush the
+conversation. It slides over it instead, opened by a built-in toggle in the
+header (or floating top-left without one). The backdrop, Esc, or switching
+conversation (`conversation-id` changing) closes it; keyboard focus moves into
+the drawer and back to the toggle.
+
+```html
+<ai-chat show-aside show-header aside-breakpoint="640"></ai-chat>
+```
+
+Drive it yourself with `aside-open` — e.g. from your own "Chats" button, with
+`hide-aside-toggle` to drop the built-in one — and listen to
+`ai-chat:aside-toggle` `{ open }` to follow it. Close it when the reader picks a
+conversation if you don't set `conversation-id`: `chat.asideOpen = false`.
+Style it with `--ai-chat-aside-drawer-bg`, `--ai-chat-aside-scrim`,
+`::part(aside-toggle)` and `::part(aside-scrim)`; swap the icon with the
+`aside-toggle-icon` slot; rename it with the `openAside` / `closeAside` labels.
 
 ## Background streaming
 
@@ -921,6 +947,9 @@ chat.labels = {
   // Top of a long conversation (has-earlier):
   loadEarlier: 'Cargar mensajes anteriores',
   loadingEarlier: 'Cargando mensajes anteriores…',
+  // The sidebar drawer on a narrow chat:
+  openAside: 'Mostrar conversaciones',
+  closeAside: 'Ocultar conversaciones',
   // Attachment strings ({name} is replaced with the filename):
   attach: 'Adjuntar archivos',
   removeAttachment: 'Quitar adjunto',
@@ -1129,6 +1158,8 @@ column alignment (`|--:|` right-aligns a number column).
 | `--ai-chat-aside-width`   | `260px`       | Sidebar column width |
 | `--ai-chat-aside-bg`      | `transparent` | Sidebar background   |
 | `--ai-chat-aside-padding` | `12px`        | Inside the sidebar   |
+| `--ai-chat-aside-drawer-bg` | `= bg`        | The drawer's surface on a narrow chat |
+| `--ai-chat-aside-scrim` | `rgb(0 0 0 / 0.3)` | Backdrop behind the open drawer |
 | `--ai-chat-aside-scrollbar-gutter` | `auto` | Reserve the scrollbar's width in the history list (`stable` keeps it) |
 
 ### All `::part()` hooks
@@ -1145,7 +1176,7 @@ For styling that a variable can't reach, target the shadow parts with
 `composer-box`, `composer-attachments`, `attachment-chip`, `attachment-remove`,
 `composer-actions`, `composer-actions-start`,
 `composer-actions-end`, `attach-button`, `input`, `send-button`, `stop-button`,
-`jump-button`, `retry-button`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`,
+`jump-button`, `retry-button`, `aside-toggle`, `aside-scrim`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`,
 `empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`.
 
 `message-actions` is the per-message actions row; `action-button` targets every
@@ -1177,6 +1208,7 @@ Put your own markup in any of these (`<x slot="name">`):
 | `assistant-avatar` / `user-avatar` | Avatar for each side (opt-in; column hides if empty)                  |
 | `header`                           | The entire top bar                                                    |
 | `aside`                            | Your conversation-history list (the sidebar body)                     |
+| `aside-toggle-icon`                | Icon of the drawer toggle on a narrow chat                            |
 | `empty`                            | The whole empty state                                                 |
 | `empty-icon`                       | The empty-state icon (defaults to a chat-bubble SVG; slot to replace) |
 | `composer-actions-start`           | Buttons at the left of the input's action row                         |

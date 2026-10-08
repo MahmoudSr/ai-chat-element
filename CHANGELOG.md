@@ -8,6 +8,20 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ### Added
 
+- **The sidebar on a narrow chat is a drawer.** Below **`aside-breakpoint`**
+  (560px by default) of the chat's OWN width — a phone, or a narrow panel on a
+  desktop — the sidebar slides over the conversation, opened by a built-in
+  toggle (in the header, or floating). Backdrop, Esc or a `conversation-id`
+  change closes it; focus moves in and back out; no slide on first render.
+  Drive it with **`aside-open`** (reflected) and **`hide-aside-toggle`**, follow
+  it with **`ai-chat:aside-toggle`** `{ open }`. New: `--ai-chat-aside-drawer-bg`,
+  `--ai-chat-aside-scrim`, parts `aside-toggle` / `aside-scrim`, slot
+  `aside-toggle-icon`, labels `openAside` / `closeAside`.
+  - **Behaviour change:** below 560px of SCREEN the sidebar used to vanish with
+    no way to reach it. `aside-breakpoint="0"` keeps it inline at every width.
+  - The header title now takes the free space, so it sits beside a leading
+    toggle; a trailing New-chat button still ends the row.
+
 - **Your own buttons in a message's actions row.** Set `messageActions` to a
   function `(message) => MessageAction[]` (`{ id, label, icon?, disabled? }`)
   and pressing one fires **`ai-chat:message-action`** `{ actionId, message,

@@ -150,6 +150,9 @@ export const chatStyles = css`
     --ai-chat-aside-padding: 12px;
     /* auto: a short history list reserves no empty strip on its edge. */
     --ai-chat-aside-scrollbar-gutter: auto;
+    /* The drawer on a narrow chat needs a solid surface over the chat. */
+    --ai-chat-aside-drawer-bg: var(--ai-chat-bg);
+    --ai-chat-aside-scrim: rgb(0 0 0 / 0.3);
     --ai-chat-show-avatars: grid;   /* set to 'none' to hide avatars */
 
     display: block;
@@ -280,11 +283,42 @@ export const chatStyles = css`
     border-right: none;
     border-left: var(--ai-chat-border-width) solid var(--ai-chat-border);
   }
-  /* On narrow widths the sidebar would crush the chat — hide it by default.
-     Consumers who want a drawer can override this breakpoint or roll their own. */
-  @media (max-width: 560px) {
-    .aside { display: none; }
+  /* ---- Sidebar as a drawer (chat narrower than aside-breakpoint) ----
+     The sidebar would crush a narrow chat, so it slides over it instead. */
+  .layout { position: relative; }
+  .layout--narrow .aside {
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    z-index: 5;
+    width: min(var(--ai-chat-aside-width), 85%);
+    background: var(--ai-chat-aside-drawer-bg);
+    box-shadow: 0 0 24px rgb(0 0 0 / 0.18);
+    transform: translateX(-100%);
+    visibility: hidden;
   }
+  .layout--animate .aside { transition: transform 0.2s ease, visibility 0s linear 0.2s; }
+  :host([aside-side='right']) .layout--narrow .aside {
+    left: auto; right: 0;
+    transform: translateX(100%);
+  }
+  .layout--narrow .aside.aside--open {
+    transform: none;
+    visibility: visible;
+  }
+  .layout--animate .aside.aside--open { transition: transform 0.2s ease; }
+  .aside:focus { outline: none; }
+  .aside-scrim {
+    position: absolute; inset: 0;
+    z-index: 4;
+    background: var(--ai-chat-aside-scrim);
+  }
+  .aside-toggle-float {
+    position: absolute;
+    top: 10px; left: 12px;
+    z-index: 3;
+  }
+  :host([aside-side='right']) .aside-toggle-float { left: auto; right: 12px; }
+  .aside-toggle-float .clear-btn { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12); }
 
   /* ---- Header ----
      The header slot is always in the tree so consumers can override it. Its
@@ -302,7 +336,9 @@ export const chatStyles = css`
     padding: var(--ai-chat-header-padding);
     border-bottom: var(--ai-chat-header-border-width) solid var(--ai-chat-border);
   }
-  .header__title { font-weight: 600; font-size: 15px; }
+  /* The title takes the free space: it sits beside a leading drawer toggle, and
+     a trailing New-chat button stays at the far end. */
+  .header__title { flex: 1 1 auto; font-weight: 600; font-size: 15px; }
 
   /* When the consumer fills the header slot, their content replaces the
      built-in bar's CONTENT but should keep its frame: same padding, same
@@ -551,6 +587,9 @@ export const chatStyles = css`
   .message__actions:focus-within { opacity: 1; }
   /* Reveal on any keyboard focus reaching the row, even without :focus-within
      support quirks, and honor reduced-motion by keeping the transition subtle. */
+  @media (prefers-reduced-motion: reduce) {
+    .layout--animate .aside, .layout--animate .aside.aside--open { transition: none; }
+  }
   @media (prefers-reduced-motion: reduce) {
     .message__actions { transition: none; }
   }

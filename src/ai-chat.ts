@@ -26,6 +26,7 @@ import {
   fileIcon,
   copyIcon,
   editIcon,
+  asideIcon,
 } from './icons.js';
 
 let idCounter = 0;
@@ -199,6 +200,27 @@ export class AiChat extends LitElement {
    * Which side the sidebar sits on. Left by default (ChatGPT/Claude style).
    * Reflected so the CSS can flip the layout order. Usage: `aside-side="right"`.
    */
+  /**
+   * Below this width (px) of the chat itself — not the screen — the sidebar
+   * becomes a drawer that slides over the chat, opened by a built-in toggle
+   * (or your own, via `aside-open`). Default 560. `0` never collapses.
+   */
+  @property({ type: Number, attribute: 'aside-breakpoint' })
+  asideBreakpoint = 560;
+
+  /**
+   * Whether the sidebar drawer is open on a narrow chat. Set it to open or
+   * close the drawer from your own button; the component changes it (and fires
+   * `ai-chat:aside-toggle`) when the reader uses the toggle, the backdrop, Esc,
+   * or switches conversation. No effect while the chat is wide.
+   */
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'aside-open', reflect: true })
+  asideOpen = false;
+
+  /** Keep the drawer behaviour but hide the built-in toggle (bring your own trigger). */
+  @property({ type: Boolean, converter: booleanAttribute, attribute: 'hide-aside-toggle' })
+  hideAsideToggle = false;
+
   @property({ type: String, attribute: 'aside-side', reflect: true })
   asideSide: 'left' | 'right' = 'left';
 
@@ -334,6 +356,11 @@ export class AiChat extends LitElement {
   @state() private _showJump = false;
   /** The missing-transport warning has been printed for this element. */
   private _warnedNoTransport = false;
+  /** The chat is narrower than `aside-breakpoint`: the sidebar is a drawer. */
+  @state() private _narrow = false;
+  /** Drawer mode has settled, so opening/closing may animate. Never true on the switch itself. */
+  @state() private _drawerAnimates = false;
+  private _layoutObserver?: ResizeObserver;
   /** An `ai-chat:load-earlier` is out and its answer hasn't come back yet. */
   @state() private _loadingEarlier = false;
   /** The image attachment shown in the full-size preview overlay (null = none). */
@@ -462,6 +489,9 @@ export class AiChat extends LitElement {
   @query('.messages') private _scrollEl!: HTMLElement;
   @query('.scroll-sentinel') private _sentinel!: HTMLElement;
   @query('.top-sentinel') private _topSentinel?: HTMLElement;
+  @query('.layout') private _layoutEl?: HTMLElement;
+  @query('.aside') private _asideEl?: HTMLElement;
+  @query('.aside-toggle') private _asideToggle?: HTMLButtonElement;
   @query('.earlier__button') private _earlierButton?: HTMLButtonElement;
   /** Watches the top of the list so older messages load as the reader nears it. */
   private _topObserver?: IntersectionObserver;
@@ -547,6 +577,36 @@ export class AiChat extends LitElement {
     // alias must show there too.
     if (!aliasAllowed && event.cancelable) event.preventDefault();
     return allowed && aliasAllowed;
+  }
+
+  private _measureNarrow(): void {
+    const width = this._layoutEl?.getBoundingClientRect().width ?? 0;
+    const narrow = this.showAside && this.asideBreakpoint > 0 && width > 0 && width < this.asideBreakpoint;
+    if (narrow !== this._narrow) {
+      this._narrow = narrow;
+      // Entering drawer mode must not animate the sidebar away (a phone would
+      // see it slide off on every load): enable motion one frame later.
+      this._drawerAnimates = false;
+      if (narrow) requestAnimationFrame(() => requestAnimationFrame(() => (this._drawerAnimates = this._narrow)));
+      // Widening shows the sidebar inline again; an open drawer state would be stale.
+      if (!narrow && this.asideOpen) this._setAsideOpen(false, false);
+    }
+  }
+
+  /** Open or close the drawer; `returnFocus` sends keyboard focus back to the toggle. */
+  private async _setAsideOpen(open: boolean, returnFocus: boolean): Promise<void> {
+    if (this.asideOpen === open) return;
+    this.asideOpen = open;
+    this.dispatchEvent(
+      new CustomEvent('ai-chat:aside-toggle', { detail: { open }, bubbles: true, composed: true }),
+    );
+    await this.updateComplete;
+    if (open) this._asideEl?.focus();
+    else if (returnFocus) this._asideToggle?.focus();
+  }
+
+  private _toggleAside(): void {
+    void this._setAsideOpen(!this.asideOpen, true);
   }
 
   /** Programmatically append a message without sending it. */
@@ -1219,6 +1279,12 @@ export class AiChat extends LitElement {
   }
 
   protected override firstUpdated(): void {
+    // The drawer follows the CHAT's width, not the screen's: a chat in a narrow
+    // panel on a wide screen needs it just as much as one on a phone.
+    if ('ResizeObserver' in window && this._layoutEl) {
+      this._layoutObserver = new ResizeObserver(() => this._measureNarrow());
+      this._layoutObserver.observe(this._layoutEl);
+    }
     // Watch a sentinel at the bottom of the scroller. When it's visible the user
     // is at (or effectively at) the bottom, so we keep following new content;
     // when it scrolls out of view (user scrolled up, or content grew past it) we
@@ -1290,6 +1356,8 @@ export class AiChat extends LitElement {
     this._bottomObserver = undefined;
     this._topObserver?.disconnect();
     this._topObserver = undefined;
+    this._layoutObserver?.disconnect();
+    this._layoutObserver = undefined;
     this._observedTop = undefined;
     // A background stream outlives the conversation it started in, but it must
     // not outlive the ELEMENT — nobody is listening for its events any more, so
@@ -1307,6 +1375,11 @@ export class AiChat extends LitElement {
     if (this._preview) {
       e.preventDefault();
       this._closePreview();
+      return;
+    }
+    if (this._narrow && this.asideOpen) {
+      e.preventDefault();
+      this._setAsideOpen(false, true);
       return;
     }
     if (this._busy) {
@@ -1410,6 +1483,11 @@ export class AiChat extends LitElement {
    * the render, instead of scheduling a second one.
    */
   protected override willUpdate(changed: PropertyValues): void {
+    // Picking a conversation in the drawer is the reader done with it.
+    if (changed.has('conversationId') && changed.get('conversationId') !== undefined && this._narrow && this.asideOpen) {
+      void this._setAsideOpen(false, false);
+    }
+    if (changed.has('asideBreakpoint') || changed.has('showAside')) queueMicrotask(() => this._measureNarrow());
     // A load that was out for a conversation no longer on screen will never be
     // answered here; free the control for the one that is.
     if (
@@ -1500,8 +1578,11 @@ export class AiChat extends LitElement {
     // unaffected. Structure mirrors ChatGPT/Claude: a fixed top holding the
     // full-width New-chat button, then the consumer's scrolling conversation
     // list in the `aside` slot (see the `new-chat` event + README history pattern).
+    const drawer = this.showAside && this._narrow;
     const aside = this.showAside
-      ? html`<aside class="aside" part="aside">
+      ? html`<aside class="aside ${drawer && this.asideOpen ? 'aside--open' : ''}" part="aside"
+                    id="ai-chat-aside" tabindex="-1"
+                    aria-hidden=${drawer && !this.asideOpen ? 'true' : 'false'}>
           ${
             this.showClear
               ? html`<div class="aside__top">${this._renderNewChatButton('block')}</div>`
@@ -1512,8 +1593,14 @@ export class AiChat extends LitElement {
       : nothing;
     return html`
       ${this._renderAvatarSources()}
-      <div class="layout" part="layout">
+      <div class="layout ${drawer ? 'layout--narrow' : ''} ${drawer && this._drawerAnimates ? 'layout--animate' : ''}" part="layout">
         ${aside}
+        ${
+          drawer && this.asideOpen
+            ? html`<div class="aside-scrim" part="aside-scrim" aria-hidden="true"
+                        @click=${() => this._setAsideOpen(false, true)}></div>`
+            : nothing
+        }
         <div class="root" part="root">
           ${this._renderHeader()}
           <div class="scroll-region">
@@ -1567,8 +1654,10 @@ export class AiChat extends LitElement {
   private _renderHeader() {
     // Button belongs in the header only when there's no sidebar to hold it.
     const clearInHeader = this.showClear && !this.showAside;
+    const toggle = this.showAside && this._narrow && !this.hideAsideToggle;
     const builtIn = this.showHeader
       ? html`<div class="header" part="header">
+          ${toggle ? this._renderAsideToggle() : nothing}
           <span class="header__title" part="header-title">${this._labels.headerTitle}</span>
           ${clearInHeader ? this._renderNewChatButton('icon') : nothing}
         </div>`
@@ -1583,7 +1672,22 @@ export class AiChat extends LitElement {
         clearInHeader && !this.showHeader
           ? html`<div class="clear-float">${this._renderNewChatButton('icon')}</div>`
           : nothing
+      }
+      ${
+        toggle && (!this.showHeader || slottedHeader)
+          ? html`<div class="aside-toggle-float">${this._renderAsideToggle()}</div>`
+          : nothing
       }`;
+  }
+
+  /** Opens/closes the history drawer on a narrow chat. */
+  private _renderAsideToggle() {
+    const label = this.asideOpen ? this._labels.closeAside : this._labels.openAside;
+    return html`<button class="aside-toggle clear-btn" part="aside-toggle" type="button"
+        aria-label=${label} title=${label} aria-expanded=${this.asideOpen ? 'true' : 'false'}
+        aria-controls="ai-chat-aside" @click=${this._toggleAside}>
+        <slot name="aside-toggle-icon">${asideIcon}</slot>
+      </button>`;
   }
 
   /**
