@@ -82,6 +82,11 @@ html {
   outline: 2px solid var(--vp-c-brand-2);
   outline-offset: 2px;
 }
+/* The search box already marks focus with its own border; a second ring
+   around the input inside it drew a double outline. */
+.VPLocalSearchBox .search-input:focus-visible {
+  outline: none;
+}
 
 /* The wordmark: the rivet is the mark and never moves. */
 .VPNavBarTitle .title {
