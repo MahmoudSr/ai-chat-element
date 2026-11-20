@@ -43,14 +43,17 @@ export default defineConfig({
   },
 
   markdown: {
-    theme: { light: 'github-light', dark: 'github-dark' },
+    // Code blocks are dark slabs in both modes (--vp-code-block-bg), so the
+    // syntax colours are dark-block colours in both modes too. A light theme
+    // here put dark text on the dark slab.
+    theme: { light: 'github-dark', dark: 'github-dark' },
   },
 
   themeConfig: {
     logo: { src: '/rivet.svg', alt: '' },
     siteTitle: 'ai-chat-element',
     nav: [
-      { text: 'Get started', link: '/guide/quick-start', activeMatch: '/guide/' },
+      { text: 'Get started', link: '/guide/', activeMatch: '/guide/' },
       { text: 'Playground', link: 'https://mahmoudsr.github.io/ai-chat-element/examples/playground.html' },
       { text: '0.7.0', link: 'https://github.com/MahmoudSr/ai-chat-element/blob/main/CHANGELOG.md' },
     ],
@@ -58,7 +61,22 @@ export default defineConfig({
       '/guide/': [
         {
           text: 'Get started',
-          items: [{ text: 'Quick start', link: '/guide/quick-start' }],
+          items: [
+            { text: 'Introduction', link: '/guide/' },
+            { text: 'Install', link: '/guide/install' },
+            { text: 'Quick start', link: '/guide/quick-start' },
+            { text: 'TypeScript', link: '/guide/typescript' },
+          ],
+        },
+        {
+          text: 'Frameworks',
+          items: [
+            { text: 'Plain HTML', link: '/guide/frameworks/html' },
+            { text: 'React and Next.js', link: '/guide/frameworks/react' },
+            { text: 'Vue', link: '/guide/frameworks/vue' },
+            { text: 'Angular', link: '/guide/frameworks/angular' },
+            { text: 'Svelte', link: '/guide/frameworks/svelte' },
+          ],
         },
       ],
     },

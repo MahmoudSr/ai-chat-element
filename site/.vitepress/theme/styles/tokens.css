@@ -51,6 +51,7 @@
   --vp-nav-height: 64px;
   --vp-code-font-size: 0.875em;
   --vp-code-block-bg: #16181d;
+  --vp-code-lang-color: #9aa1ad;
 }
 
 .dark {
@@ -120,4 +121,82 @@ html {
 /* Home is a single screen: nothing below the deck, no footer. */
 .fd-home .VPPage {
   padding: 0;
+}
+
+/* ---- Docs pages: the deck's language, applied quietly ---- */
+
+/* Each sidebar group is a strip with its own chip colour. The swatch sits
+   before the group title; the current page is marked by form (a filled
+   square notch), never by a second hue. */
+.VPSidebar .group {
+  --fd-group-chip: var(--fd-chip-start);
+}
+/* Groups in sidebar order: Get started, Frameworks (same section), Connect a
+   model, Features, Customize, Reference. */
+.VPSidebar .group:nth-of-type(3) { --fd-group-chip: var(--fd-chip-model); }
+.VPSidebar .group:nth-of-type(4) { --fd-group-chip: var(--fd-chip-features); }
+.VPSidebar .group:nth-of-type(5) { --fd-group-chip: var(--fd-chip-customize); }
+.VPSidebar .group:nth-of-type(6) { --fd-group-chip: var(--fd-chip-reference); }
+
+.VPSidebarItem.level-0 > .item > .text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 750;
+  font-stretch: 92%;
+  letter-spacing: 0.01em;
+}
+.VPSidebarItem.level-0 > .item > .text::before {
+  content: '';
+  flex: none;
+  width: 12px;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--fd-group-chip);
+}
+
+.VPSidebarItem.level-1.is-active > .item .text {
+  color: var(--fd-ink);
+  font-weight: 650;
+}
+.VPSidebarItem.level-1 > .item {
+  position: relative;
+}
+.VPSidebarItem.level-1.is-active > .item::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-radius: 1px;
+  background: var(--fd-group-chip);
+}
+
+/* Reading: headings in the world's grotesque, body at a calm measure. */
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3 {
+  font-stretch: 92%;
+  letter-spacing: -0.015em;
+}
+.vp-doc h1 {
+  font-weight: 850;
+  font-size: 40px;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+.vp-doc h2 {
+  font-weight: 750;
+  border-top: 0;
+  margin-top: 48px;
+}
+.vp-doc p,
+.vp-doc li {
+  max-width: 70ch;
+}
+.vp-doc :not(pre) > code {
+  font-size: 0.86em;
+  border-radius: 4px;
 }

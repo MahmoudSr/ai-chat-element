@@ -148,7 +148,7 @@ onMounted(async () => {
             <code>npm i ai-chat-element</code>
             <span class="fd-copy" aria-live="polite">{{ copied ? 'Copied' : 'Copy' }}</span>
           </button>
-          <a class="fd-go" :href="withBase('/guide/quick-start')">Get started</a>
+          <a class="fd-go" :href="withBase('/guide/')">Get started</a>
         </div>
         <p class="fd-codes">
           <span>{{ current.code }} {{ current.name }} · scripted demo</span>
