@@ -5,9 +5,10 @@ import { css } from 'lit';
  *
  * highlight.js ships themes as global stylesheets, but our markup lives inside
  * the component's shadow root where global CSS can't reach. We inline a compact
- * GitHub-style theme (dark by default, light via prefers-color-scheme) that
- * tracks the --ai-chat-code-* variables. Users can still override individual
- * token colors with the exposed custom properties if they want.
+ * GitHub-dark theme. Code blocks are dark in every theme (--ai-chat-code-bg
+ * defaults to a near-black), so the token colours are dark-block colours in
+ * every theme too. They used to switch to GitHub-light colours under a light
+ * OS, which put dark text on the dark block (about 1.3:1 for strings).
  */
 export const hljsTheme = css`
   .hljs { color: var(--ai-chat-code-fg); background: transparent; }
@@ -25,15 +26,4 @@ export const hljsTheme = css`
   .hljs-addition { color: #aff5b4; background: #033a16; }
   .hljs-emphasis { font-style: italic; }
   .hljs-strong { font-weight: bold; }
-
-  @media (prefers-color-scheme: light) {
-    .hljs-comment, .hljs-quote { color: #6e7781; }
-    .hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-type { color: #cf222e; }
-    .hljs-string, .hljs-meta .hljs-string, .hljs-regexp { color: #0a3069; }
-    .hljs-number, .hljs-symbol, .hljs-bullet { color: #0550ae; }
-    .hljs-title, .hljs-title.function_, .hljs-section { color: #8250df; }
-    .hljs-name, .hljs-selector-id, .hljs-selector-class, .hljs-tag { color: #116329; }
-    .hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable,
-    .hljs-built_in, .hljs-class .hljs-title { color: #953800; }
-  }
 `;

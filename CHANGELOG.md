@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **Code was hard to read when the OS was in light mode.** Code blocks are dark
+  in every theme, but the syntax colours switched to GitHub's light palette
+  under a light OS: dark-blue strings and dark-red keywords on a near-black
+  block (about 1.3:1). It also ignored `theme="dark"`. The colours now always
+  match the dark code block. Present since 0.1.0.
+
 ### Changed
 
 - **Less empty space under a finished reply.** The gap between messages
