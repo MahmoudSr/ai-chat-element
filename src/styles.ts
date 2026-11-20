@@ -743,8 +743,8 @@ export const chatStyles = css`
     border-radius: var(--ai-chat-radius-sm);
     cursor: pointer;
   }
-  .reasoning__trigger:hover:not(:disabled) { color: var(--ai-chat-fg); }
-  .reasoning__trigger:disabled { cursor: default; }
+  button.reasoning__trigger:hover { color: var(--ai-chat-fg); }
+  div.reasoning__trigger { cursor: default; }
   .reasoning__time { font-variant-numeric: tabular-nums; opacity: 0.75; }
   .reasoning__chevron { display: inline-flex; transition: transform 0.15s ease; }
   .reasoning__chevron .icon { width: 14px; height: 14px; }
@@ -807,8 +807,8 @@ export const chatStyles = css`
     cursor: pointer;
     border-radius: inherit;
   }
-  .tool__header:disabled { cursor: default; }
-  .tool__header:hover:not(:disabled) { background: color-mix(in srgb, var(--ai-chat-fg) 4%, transparent); }
+  div.tool__header { cursor: default; }
+  button.tool__header:hover { background: color-mix(in srgb, var(--ai-chat-fg) 4%, transparent); }
   .tool__status { display: inline-flex; flex: 0 0 auto; color: var(--ai-chat-muted); }
   .tool__status .icon { width: 16px; height: 16px; }
   .tool--running .tool__status,

@@ -729,15 +729,22 @@ export class AiChat extends LitElement {
     }
     return html`<div class="reasoning ${live ? 'reasoning--live' : ''} ${open ? 'reasoning--open' : ''}"
                      part="reasoning">
-      <button class="reasoning__trigger" part="reasoning-trigger" type="button"
-              aria-expanded=${hasText ? String(open) : nothing}
-              aria-controls=${hasText ? regionId : nothing}
-              ?disabled=${!hasText}
-              @click=${() => this._toggleStep(key, open)}>
-        <span class="reasoning__label">${label}</span>
-        ${elapsed ? html`<span class="reasoning__time">${elapsed}</span>` : nothing}
-        ${hasText ? html`<span class="reasoning__chevron" aria-hidden="true">${chevronDownIcon}</span>` : nothing}
-      </button>
+      ${
+        // Nothing to open (the provider hid the text): plain text, not a
+        // disabled button that screen readers announce as "unavailable".
+        hasText
+          ? html`<button class="reasoning__trigger" part="reasoning-trigger" type="button"
+                  aria-expanded=${String(open)} aria-controls=${regionId}
+                  @click=${() => this._toggleStep(key, open)}>
+              <span class="reasoning__label">${label}</span>
+              ${elapsed ? html`<span class="reasoning__time">${elapsed}</span>` : nothing}
+              <span class="reasoning__chevron" aria-hidden="true">${chevronDownIcon}</span>
+            </button>`
+          : html`<div class="reasoning__trigger" part="reasoning-trigger">
+              <span class="reasoning__label">${label}</span>
+              ${elapsed ? html`<span class="reasoning__time">${elapsed}</span>` : nothing}
+            </div>`
+      }
       ${
         hasText
           ? html`<div class="reasoning__content" part="reasoning-content" id=${regionId}
@@ -793,6 +800,11 @@ export class AiChat extends LitElement {
     if (tool.endedAt !== undefined) time = this._formatDuration(tool.endedAt - tool.startedAt);
     else if (live && Date.now() - tool.startedAt >= 1000) time = this._formatDuration(Date.now() - tool.startedAt);
 
+    const headInner = html`
+      <span class="tool__status" part="tool-status" aria-hidden="true">${icon}</span>
+      <span class="tool__name" part="tool-name">${tool.title || tool.name || tool.id}</span>
+      <span class="tool__state">${stateLabel}</span>
+      ${time ? html`<span class="tool__time">${time}</span>` : nothing}`;
     const classes = classMap({
       tool: true,
       [`tool--${unfinished ? 'incomplete' : tool.state}`]: true,
@@ -800,17 +812,17 @@ export class AiChat extends LitElement {
       'tool--open': open,
     });
     return html`<div class=${classes} part="tool" data-tool=${tool.name}>
-      <button class="tool__header" part="tool-header" type="button"
-              aria-expanded=${hasBody ? String(open) : nothing}
-              aria-controls=${hasBody ? bodyId : nothing}
-              ?disabled=${!hasBody}
-              @click=${() => this._toggleStep(key, open)}>
-        <span class="tool__status" part="tool-status" aria-hidden="true">${icon}</span>
-        <span class="tool__name" part="tool-name">${tool.title || tool.name || tool.id}</span>
-        <span class="tool__state">${stateLabel}</span>
-        ${time ? html`<span class="tool__time">${time}</span>` : nothing}
-        ${hasBody ? html`<span class="tool__chevron" aria-hidden="true">${chevronDownIcon}</span>` : nothing}
-      </button>
+      ${
+        // Nothing to open: plain text, not a disabled button.
+        hasBody
+          ? html`<button class="tool__header" part="tool-header" type="button"
+                  aria-expanded=${String(open)} aria-controls=${bodyId}
+                  @click=${() => this._toggleStep(key, open)}>
+              ${headInner}
+              <span class="tool__chevron" aria-hidden="true">${chevronDownIcon}</span>
+            </button>`
+          : html`<div class="tool__header" part="tool-header">${headInner}</div>`
+      }
       ${tool.error ? html`<div class="tool__error" part="tool-error">${tool.error}</div>` : nothing}
       ${
         hasBody
@@ -2127,15 +2139,17 @@ export class AiChat extends LitElement {
         <div class="root" part="root">
           ${this._renderHeader()}
           <div class="scroll-region">
-            <!-- role="log" gives the list structure/navigation, but NO aria-live:
-                 a polite live region re-announces on every mutation, so streaming
-                 deltas would spam a growing partial message token-by-token. The
-                 settled reply is announced once via the hidden region below. -->
+            <!-- role="log" gives the list structure/navigation, but it must NOT be
+                 live: a polite live region re-announces on every mutation, so
+                 streaming deltas would spam a growing partial message token by
+                 token. role="log" is IMPLICITLY polite, so aria-live="off" has to
+                 be said out loud (leaving it out kept the log live). The settled
+                 reply is announced once via the hidden region below. -->
             <div class="messages" part="messages"
                  @click=${this._onMessagesClick} @scroll=${this._onScroll}
                  @wheel=${this._onWheel} @touchstart=${this._onTouchStart}
                  @touchmove=${this._onTouchMove} @keydown=${this._onScrollKey}
-                 role="log" aria-label=${this._labels.messagesRegion}>
+                 role="log" aria-live="off" aria-label=${this._labels.messagesRegion}>
               ${hasMessages && this.hasEarlier ? this._renderEarlier() : nothing}
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
               <!-- Bottom sentinel watched by the IntersectionObserver to decide

@@ -113,7 +113,9 @@ describe('reasoning panel', () => {
     await el.updateComplete;
     const t = trigger(el)!;
     expect(t.textContent).toMatch(/Thought for \d+s/);
-    expect(t.disabled).toBe(true);
+    // Nothing to open: plain text, not a (disabled) button screen readers
+    // would announce as "unavailable".
+    expect(t.tagName).not.toBe('BUTTON');
     expect(t.hasAttribute('aria-expanded')).toBe(false);
     expect(content(el)).toBeNull();
   });

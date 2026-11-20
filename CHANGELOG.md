@@ -79,6 +79,12 @@ scroll fixes found by testing long replies in a real browser.
   message (older messages loaded above don't count as a switch).
 - **A long chat could ask for older messages just by opening** (with
   `has-earlier`), before the reader scrolled anywhere.
+- **Screen readers no longer hear every streamed token.** The message list is
+  `role="log"`, which is a polite live region *by default*; 0.1.5 meant to stop
+  the per-token announcements by leaving `aria-live` off it, which kept it
+  live. It now says `aria-live="off"` (Chrome's accessibility tree showed
+  `live="polite"` before, none after). The settled reply is still announced
+  once.
 - **`openAIAdapter` with `n > 1`** mixed other choices into the answer when a
   server sent each choice in its own chunk (it always read `choices[0]`). Only
   choice 0 is the answer now.

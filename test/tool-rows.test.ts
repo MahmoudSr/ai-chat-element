@@ -70,6 +70,17 @@ describe('tool-call rows', () => {
     expect(body(el)!.hidden, 'the error is visible while the row is still closed').toBe(true);
   });
 
+  it('a call with nothing to open is plain text, not a disabled button', async () => {
+    const el = mount();
+    el.messages = [{ id: 'm', role: 'assistant', content: 'x', createdAt: 0,
+      steps: [{ type: 'tool', id: 't', name: 'ping', state: 'error', error: 'timeout', at: 0, startedAt: 0, endedAt: 1 }] }];
+    await el.updateComplete;
+    const head = root(el).querySelector('.tool__header')!;
+    expect(head.tagName).not.toBe('BUTTON');
+    expect(head.hasAttribute('aria-expanded')).toBe(false);
+    expect(head.textContent).toContain('ping');
+  });
+
   it('a call cut off by Stop reads "Didn\'t finish" and stops spinning', async () => {
     const { el, c } = await start();
     c.push({ type: 'tool', id: 't1', name: 'long_job', state: 'running' });
