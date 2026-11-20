@@ -261,6 +261,7 @@ export const CONTROLS = [
   { g: 'Labels (i18n)', kind: 'label', key: 'toolSuccess', type: 'text', def: 'Done' },
   { g: 'Labels (i18n)', kind: 'label', key: 'toolError', type: 'text', def: 'Failed' },
   { g: 'Labels (i18n)', kind: 'label', key: 'toolIncomplete', type: 'text', def: "Didn't finish" },
+  { g: 'Labels (i18n)', kind: 'label', key: 'toolNotRun', type: 'text', def: 'Not run' },
   { g: 'Labels (i18n)', kind: 'label', key: 'toolInput', type: 'text', def: 'Input' },
   { g: 'Labels (i18n)', kind: 'label', key: 'toolOutput', type: 'text', def: 'Result' },
 

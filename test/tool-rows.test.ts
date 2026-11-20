@@ -84,6 +84,18 @@ describe('tool-call rows', () => {
     expect(last(el).steps![0]).toMatchObject({ state: 'running' }); // display-only; the data is untouched
   });
 
+  it('a call the model asked for but nothing ran reads "Not run", not "Didn\'t finish"', async () => {
+    // E.g. Anthropic's tool_use for your app: the model stops after asking.
+    const { el, c } = await start();
+    c.push({ type: 'tool', id: 't1', name: 'open_ticket', state: 'pending', args: { title: 'x' } });
+    c.finish({ finishReason: 'tool_calls' });
+    await until(() => !last(el).streaming);
+    await el.updateComplete;
+    expect(header(el)!.textContent).toContain('Not run');
+    expect(rows(el)[0].classList.contains('tool--incomplete')).toBe(true);
+    expect(rows(el)[0].classList.contains('tool--live')).toBe(false);
+  });
+
   it('arguments show live while they stream in, before they parse', async () => {
     const { el, c } = await start('tools="expanded"');
     c.push({ type: 'tool', id: 't1', name: 'search', state: 'pending', argsDelta: '{"query": "lit ' });

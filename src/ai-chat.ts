@@ -753,8 +753,9 @@ export class AiChat extends LitElement {
     const open = hasBody && (this._stepOpen.get(key) ?? (this.tools === 'expanded' || custom != null));
     const bodyId = `tool-${m.id}-${tool.id}`;
 
+    // Never started (the model asked and the reply ended) vs cut off mid-run.
     const stateLabel = unfinished
-      ? labels.toolIncomplete
+      ? tool.state === 'pending' ? labels.toolNotRun : labels.toolIncomplete
       : tool.state === 'pending'
         ? labels.toolPending
         : tool.state === 'running'
@@ -873,7 +874,7 @@ export class AiChat extends LitElement {
       .filter((s): s is ToolStep => s.type === 'tool')
       .map((t) => {
         const state = toolUnfinished(t, m)
-          ? l.toolIncomplete
+          ? t.state === 'pending' ? l.toolNotRun : l.toolIncomplete
           : t.state === 'success' ? l.toolSuccess : t.state === 'error' ? l.toolError : l.toolRunning;
         return `${t.title || t.name}: ${state}`;
       })

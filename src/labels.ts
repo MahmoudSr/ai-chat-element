@@ -92,8 +92,10 @@ export interface ChatLabels {
   toolSuccess: string;
   /** A tool call that failed. */
   toolError: string;
-  /** A tool call that stopped without an outcome (the reply was stopped or ended first). */
+  /** A tool call that was running when the reply ended or was stopped, with no outcome. */
   toolIncomplete: string;
+  /** A tool call the model asked for that never started (e.g. one your app is meant to run). */
+  toolNotRun: string;
   /** Heading over a tool call's arguments. */
   toolInput: string;
   /** Heading over a tool call's result. */
@@ -142,6 +144,7 @@ export const DEFAULT_LABELS: ChatLabels = {
   toolSuccess: 'Done',
   toolError: 'Failed',
   toolIncomplete: "Didn't finish",
+  toolNotRun: 'Not run',
   toolInput: 'Input',
   toolOutput: 'Result',
 };

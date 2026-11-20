@@ -992,6 +992,7 @@ chat.labels = {
   toolSuccess: 'Listo',
   toolError: 'Falló',
   toolIncomplete: 'No terminó',
+  toolNotRun: 'No ejecutada',
   toolInput: 'Entrada',
   toolOutput: 'Resultado',
   // Attachment strings ({name} is replaced with the filename):

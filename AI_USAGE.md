@@ -323,7 +323,7 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `openFile` (uses `{name}`), `preparingFile`,
   `loadEarlier`, `loadingEarlier`, `openAside`, `closeAside`, `thinking`,
   `thoughtFor` (uses `{duration}`, e.g. `12s`), `thoughtProcess`, `toolPending`,
-  `toolRunning`, `toolSuccess`, `toolError`, `toolIncomplete`, `toolInput`,
+  `toolRunning`, `toolSuccess`, `toolError`, `toolIncomplete`, `toolNotRun`, `toolInput`,
   `toolOutput`, `attach`,
   `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
   three `attach*` messages use `{name}` as a filename placeholder).
