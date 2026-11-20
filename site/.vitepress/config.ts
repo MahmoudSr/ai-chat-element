@@ -56,6 +56,15 @@ const docsSidebar = [
       { text: 'Keyboard and accessibility', link: '/features/accessibility' },
     ],
   },
+  {
+    text: 'Customize',
+    items: [
+      { text: 'Theming', link: '/customize/' },
+      { text: 'Styling parts', link: '/customize/parts' },
+      { text: 'Slots', link: '/customize/slots' },
+      { text: 'Labels and translation', link: '/customize/labels' },
+    ],
+  },
 ];
 
 export default defineConfig({
@@ -109,6 +118,7 @@ export default defineConfig({
       '/guide/': docsSidebar,
       '/models/': docsSidebar,
       '/features/': docsSidebar,
+      '/customize/': docsSidebar,
     },
     socialLinks: [{ icon: 'github', link: 'https://github.com/MahmoudSr/ai-chat-element' }],
     search: { provider: 'local' },

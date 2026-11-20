@@ -8,6 +8,8 @@ import openaiSource from '../src/adapters/openai.ts?raw';
 import anthropicSource from '../src/adapters/anthropic.ts?raw';
 import decks from '../site/.vitepress/theme/demo/decks.ts?raw';
 import scenarioSource from '../site/.vitepress/theme/demo/scenarios.ts?raw';
+import iconsSource from '../src/icons.ts?raw';
+import { slotDescriptions } from '../site/reference/descriptions.ts';
 
 /**
  * The docs site must only name things that exist in the code. Every page under
@@ -70,6 +72,8 @@ describe('the docs site only names real API', () => {
         if (name === 'element' || name.startsWith('element')) continue;
         const before = text.slice(Math.max(0, m.index! - 2), m.index);
         if (before.endsWith('--')) continue;
+        // ai-chat:not(...) and friends are CSS pseudo-classes, not events.
+        if (text[m.index! + m[0].length] === '(') continue;
         if (!fired.has(name)) bad.push(`${file}: ai-chat:${name}`);
       }
     }
@@ -106,6 +110,13 @@ describe('the docs site only names real API', () => {
       }
     }
     expect(bad).toEqual([]);
+  });
+
+  it('every slot has a description, and every description is a real slot', () => {
+    const real = new Set([...(chatSource + iconsSource).matchAll(/<slot name="([a-z-]+)"/g)].map((m) => m[1]));
+    const described = new Set(Object.keys(slotDescriptions));
+    expect([...real].filter((s) => !described.has(s)), 'slots without a description').toEqual([]);
+    expect([...described].filter((s) => !real.has(s)), 'descriptions for slots that do not exist').toEqual([]);
   });
 
   it('every adapter option it passes exists on that adapter', () => {

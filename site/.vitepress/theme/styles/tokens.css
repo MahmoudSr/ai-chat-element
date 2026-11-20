@@ -199,6 +199,8 @@ html {
 .vp-doc :not(pre) > code {
   font-size: 0.86em;
   border-radius: 4px;
+  /* An identifier never breaks in the middle (user- / avatar-src). */
+  white-space: nowrap;
 }
 
 /* Tables: the description column gets the room, and code never breaks in
@@ -265,4 +267,12 @@ html {
   .dh-dot {
     animation: none;
   }
+}
+
+/* A wrapped list of identifiers, like a strip of chips. */
+.vp-doc .fd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: none;
 }
