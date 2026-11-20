@@ -1,3 +1,7 @@
+---
+description: "Optional chat chrome: a header with a New chat button, Retry on failed replies, sender names, timestamps and avatars. All toggleable and renameable."
+---
+
 # Header, names and avatars
 
 The parts around the conversation: a header, the New chat button, Retry, sender

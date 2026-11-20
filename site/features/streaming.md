@@ -1,3 +1,7 @@
+---
+description: "Replies stream token by token and render as Markdown with tables, links and highlighted code. Stop with a button or Esc; scrolling never fights the reader."
+---
+
 # Streaming and Markdown
 
 Replies stream in token by token and render as Markdown while they arrive:

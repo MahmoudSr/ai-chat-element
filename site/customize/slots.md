@@ -1,3 +1,7 @@
+---
+description: "Put your own markup inside the chat with slots: avatars, a custom header, a history list, extra buttons next to Send, or replacement icons."
+---
+
 <script setup>
 import { data } from '../reference/api.data'
 import { slotDescriptions } from '../reference/descriptions'

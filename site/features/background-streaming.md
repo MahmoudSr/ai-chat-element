@@ -1,3 +1,7 @@
+---
+description: "Switching conversations doesn't cancel a reply that is still streaming. It keeps running, and switching back shows it live, like ChatGPT and Claude."
+---
+
 # Background streaming
 
 Switching conversations while a reply is still streaming **doesn't cancel it**,

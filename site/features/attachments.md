@@ -1,3 +1,7 @@
+---
+description: "Opt-in attachments: an attach button, drag and drop, or a pasted screenshot. Images are sent to OpenAI-compatible and Anthropic models automatically."
+---
+
 # Attachments
 
 Off by default. Add `allow-attachments` and the reader can attach files three

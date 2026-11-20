@@ -1,3 +1,7 @@
+---
+description: "Use ai-chat-element in Angular: add CUSTOM_ELEMENTS_SCHEMA, set the transport through ViewChild, and bind the dash form of events like (ai-chat-message)."
+---
+
 # Angular
 
 Add `CUSTOM_ELEMENTS_SCHEMA` to the component (or the `NgModule`) whose

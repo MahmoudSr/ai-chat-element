@@ -1,3 +1,7 @@
+---
+description: "Theme the chat with CSS variables: one line sets your brand accent, and every colour, size, corner and font can be changed from your own stylesheet."
+---
+
 <script setup>
 import { data } from '../reference/api.data'
 </script>

@@ -197,3 +197,25 @@ describe('the docs site only names real API', () => {
     expect(bad).toEqual([]);
   });
 });
+
+describe('the docs site is findable', () => {
+  /** The frontmatter description: what search results and link previews show. */
+  const descriptionOf = (src: string) => {
+    const fm = src.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+    const line = fm?.[1].match(/^description: (".*")$/m);
+    return line ? (JSON.parse(line[1]) as string) : undefined;
+  };
+
+  it('every page has its own description, sized for a search result', () => {
+    const bad: string[] = [];
+    const seen = new Map<string, string>();
+    for (const [file, src] of Object.entries(pages)) {
+      const d = descriptionOf(src);
+      if (!d) bad.push(`${file}: no description`);
+      else if (d.length < 70 || d.length > 160) bad.push(`${file}: ${d.length} chars`);
+      else if (seen.has(d)) bad.push(`${file}: same description as ${seen.get(d)}`);
+      else seen.set(d, file);
+    }
+    expect(bad).toEqual([]);
+  });
+});

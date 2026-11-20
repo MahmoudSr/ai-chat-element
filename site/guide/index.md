@@ -1,3 +1,7 @@
+---
+description: "ai-chat-element is a complete AI chat interface in one HTML tag: streaming replies, Markdown, highlighted code, attachments, reasoning and a history sidebar."
+---
+
 # Introduction
 
 `ai-chat-element` is a complete AI chat interface packaged as one standard HTML

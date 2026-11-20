@@ -1,3 +1,7 @@
+---
+description: "The production-safe setup: your server holds the API key and streams text back, and functionAdapter turns that stream into a transport for the chat."
+---
+
 # Your own backend
 
 The production-safe setup: **your server holds the API key**, calls the model,

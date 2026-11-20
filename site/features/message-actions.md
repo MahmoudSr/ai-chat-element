@@ -1,3 +1,7 @@
+---
+description: "Copy is built into every message, Edit is opt-in on your own messages, and messageActions adds your own buttons. Your app decides what an edit means."
+---
+
 # Message actions
 
 Hovering a message shows a row of actions under it. **Copy** is built in and on

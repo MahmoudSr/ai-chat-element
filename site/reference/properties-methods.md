@@ -1,3 +1,7 @@
+---
+description: "The ai-chat properties set from JavaScript, like transport, messages and labels, and its public methods with their types, generated from the source."
+---
+
 <script setup>
 import { data } from './api.data'
 import { propertyDescriptions as pd, methodDescriptions as md } from './descriptions'

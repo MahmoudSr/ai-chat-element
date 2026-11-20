@@ -1,3 +1,7 @@
+---
+description: "Keyboard and accessibility in ai-chat-element: Enter sends, Esc stops a reply, every control shows a focus ring, and each reply is announced once."
+---
+
 # Keyboard and accessibility
 
 ## Keyboard

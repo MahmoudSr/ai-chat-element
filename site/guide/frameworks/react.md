@@ -1,3 +1,7 @@
+---
+description: "Use the ai-chat Web Component in React and Next.js: set the transport in an effect, listen with addEventListener, and load it on the client only."
+---
+
 # React and Next.js
 
 Three things matter in React:

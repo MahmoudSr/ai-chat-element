@@ -1,3 +1,7 @@
+---
+description: "Every finished reply carries a normalized finish reason and token usage, reported the same way by both adapters, so one check works for any backend."
+---
+
 # Finish reason and usage
 
 When the provider reports them, each finished reply carries why it stopped and

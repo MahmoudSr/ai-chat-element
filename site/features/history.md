@@ -1,3 +1,7 @@
+---
+description: "Build a ChatGPT-style history sidebar: the chat shows one conversation and gives you a sidebar slot, a New chat event and swappable messages."
+---
+
 # History sidebar
 
 The component shows **one** conversation at a time, on purpose. Your app keeps

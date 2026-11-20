@@ -1,3 +1,7 @@
+---
+description: "Style the chat's inner elements with ::part() when no CSS variable reaches what you want to change. Every named part, listed with what it styles."
+---
+
 <script setup>
 import { data } from '../reference/api.data'
 </script>

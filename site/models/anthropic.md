@@ -1,3 +1,7 @@
+---
+description: "anthropicAdapter streams Claude replies through Anthropic's Messages API, with options for thinking and tools shown right in the chat."
+---
+
 # Anthropic
 
 `anthropicAdapter` talks to Claude through Anthropic's Messages API with

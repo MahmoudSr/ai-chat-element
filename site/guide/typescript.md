@@ -1,3 +1,7 @@
+---
+description: "ai-chat-element ships its TypeScript types. Import ChatMessage, ChatTransport, StreamChunk and the rest; the element is typed in HTMLElementTagNameMap."
+---
+
 # TypeScript
 
 The package ships its types. Import them next to the runtime exports:

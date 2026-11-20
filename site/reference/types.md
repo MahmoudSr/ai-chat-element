@@ -1,3 +1,7 @@
+---
+description: "The TypeScript types ai-chat-element exports, like ChatMessage, ChatTransport, StreamChunk and Attachment, shown straight from the source file."
+---
+
 # Types
 
 Everything below is imported straight from `src/types.ts`, so it is the

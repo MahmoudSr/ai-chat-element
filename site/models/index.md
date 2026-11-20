@@ -1,3 +1,7 @@
+---
+description: "Connect the chat to any AI model with a transport: built-in adapters for OpenAI-compatible servers and Anthropic, or functionAdapter for your own backend."
+---
+
 # Connect a model
 
 The element doesn't talk to any AI by itself. You give it a **transport**: an

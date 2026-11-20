@@ -1,3 +1,7 @@
+---
+description: "Use ai-chat-element in plain HTML with no build step and no framework: load a pinned version from a CDN, add the tag and set a transport."
+---
+
 # Plain HTML
 
 No build step and no framework: load the package from a CDN and use the tag.

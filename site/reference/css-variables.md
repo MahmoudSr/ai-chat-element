@@ -1,3 +1,7 @@
+---
+description: "A searchable list of every ai-chat CSS variable with its default value and what it controls, generated from the component stylesheet."
+---
+
 <script setup>
 import { computed, ref } from 'vue'
 import { data } from './api.data'

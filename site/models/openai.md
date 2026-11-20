@@ -1,3 +1,7 @@
+---
+description: "openAIAdapter streams from the OpenAI Chat Completions API and every server that speaks it: Ollama, LM Studio, OpenRouter, Groq, vLLM and Together."
+---
+
 # OpenAI-compatible servers
 
 `openAIAdapter` speaks the OpenAI Chat Completions API with streaming. Any

@@ -1,3 +1,7 @@
+---
+description: "Install ai-chat-element from npm, or load it from a CDN with no build step. One import registers the ai-chat custom element anywhere in your app."
+---
+
 # Install
 
 ## From npm

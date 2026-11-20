@@ -1,3 +1,7 @@
+---
+description: "Every ai-chat event: when it fires, whether it can be cancelled and what its detail holds. Each also fires in a dash form for framework templates."
+---
+
 <script setup>
 import { data } from './api.data'
 import { eventDescriptions as d } from './descriptions'

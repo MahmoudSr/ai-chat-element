@@ -1,3 +1,7 @@
+---
+description: "Load older messages as the reader scrolls up while keeping their place. The chat handles the scrolling; you own the storage and the paging."
+---
+
 # Long conversations
 
 For a long conversation, show only the newest messages and load older ones as

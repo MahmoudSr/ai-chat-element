@@ -1,3 +1,7 @@
+---
+description: "Show model reasoning as a collapsible \"Thought for 12s\" panel and each tool call as a row with its status, input and result, in the order they happened."
+---
+
 # Reasoning and tool calls
 
 Reasoning models think, and agents call tools. The chat shows both, in the

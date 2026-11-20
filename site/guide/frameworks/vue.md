@@ -1,3 +1,7 @@
+---
+description: "Use ai-chat-element in Vue: mark ai-chat as a custom element in the compiler options, set the transport through a template ref, bind dash-form events."
+---
+
 # Vue
 
 Tell the Vue compiler that `<ai-chat>` is a custom element, or it warns and

@@ -1,3 +1,7 @@
+---
+description: "Get a streaming AI chat on your page in two steps: import ai-chat-element, then set a transport that points at your own server or a model."
+---
+
 # Quick start
 
 Every use comes down to two steps:

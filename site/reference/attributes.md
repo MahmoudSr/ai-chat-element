@@ -1,3 +1,7 @@
+---
+description: "Every ai-chat attribute with its property name, default value and what it does, generated from the component source so it never drifts."
+---
+
 <script setup>
 import { data } from './api.data'
 import { attributeDescriptions as d } from './descriptions'

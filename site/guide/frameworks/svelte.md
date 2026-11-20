@@ -1,3 +1,7 @@
+---
+description: "Use ai-chat-element in Svelte and SvelteKit: bind the element and set its transport in onMount, importing the package there so it never runs on the server."
+---
+
 # Svelte
 
 Svelte renders custom elements as they are. Bind the element and set its

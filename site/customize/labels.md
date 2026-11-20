@@ -1,3 +1,7 @@
+---
+description: "Rename every word the chat shows and every name a screen reader hears with one labels object. It is also the whole translation API."
+---
+
 <script setup>
 import { data } from '../reference/api.data'
 </script>
