@@ -14,6 +14,7 @@ import { renderMarkdown, sanitizeIcon, StreamingMarkdown, type ImagePolicy } fro
 import { chatStyles } from './styles.js';
 import { hljsTheme } from './markdown/hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
+import { addReasoning, closeReasoning, settleSteps, upsertTool } from './steps.js';
 import {
   chevronDownIcon,
   sendIcon,
@@ -836,7 +837,7 @@ export class AiChat extends LitElement {
     this._abort = undefined;
     this._busy = false;
     this.messages = this.messages.map((m) =>
-      m.streaming ? { ...m, streaming: false } : m,
+      m.streaming ? { ...settleSteps(m, Date.now()), streaming: false } : m,
     );
     if (hadFocus) this._focusComposer();
   }
@@ -1002,10 +1003,21 @@ export class AiChat extends LitElement {
           detach();
         }
         if (chunk.type === 'delta') {
-          update((m) => ({ ...m, content: m.content + chunk.delta }));
+          update((m) => {
+            // Answer text resuming ends any reasoning in progress.
+            const c = closeReasoning(m, Date.now());
+            return { ...c, content: c.content + chunk.delta };
+          });
+          if (detached) emitBackground(false);
+        } else if (chunk.type === 'reasoning') {
+          update((m) => addReasoning(m, chunk, Date.now()));
+          if (detached) emitBackground(false);
+        } else if (chunk.type === 'tool') {
+          if (typeof chunk.id !== 'string' || !chunk.id) continue; // can't be matched later
+          update((m) => upsertTool(m, chunk, Date.now()));
           if (detached) emitBackground(false);
         } else if (chunk.type === 'error') {
-          update((m) => ({ ...m, streaming: false, error: chunk.error }));
+          update((m) => ({ ...settleSteps(m, Date.now()), streaming: false, error: chunk.error }));
           this._emitError(chunk.error);
           break;
         } else if (chunk.type === 'done') {
@@ -1030,7 +1042,7 @@ export class AiChat extends LitElement {
         // The stream may have been orphaned before it blew up; a background
         // failure still has to reach the consumer, so route it the same way.
         if (!detached && isOrphaned() && !this.abortOnSwitch) detach();
-        update((m) => ({ ...m, streaming: false, error: message }));
+        update((m) => ({ ...settleSteps(m, Date.now()), streaming: false, error: message }));
         if (!detached) this._emitError(message);
       }
     } finally {
@@ -1045,7 +1057,7 @@ export class AiChat extends LitElement {
         // so its incremental renderer would otherwise linger in the map.
         this._streamRenderers.delete(assistant.id);
         if (!signal.aborted) {
-          working = { ...working, streaming: false };
+          working = { ...settleSteps(working, Date.now()), streaming: false };
           // Land the finished reply in the view if the user is looking at this
           // conversation (they switched back mid-stream and watched it finish),
           // and release the composer, which we re-claimed on their return.
@@ -1071,7 +1083,7 @@ export class AiChat extends LitElement {
       // send/clear replaced our controller (e.g. New-chat mid-stream), leave the
       // shared _busy/_abort alone — they now belong to the newer stream.
       if (!detached && this._abort === controller) {
-        this._patch(assistant.id, (m) => ({ ...m, streaming: false }));
+        this._patch(assistant.id, (m) => ({ ...settleSteps(m, Date.now()), streaming: false }));
         this._busy = false;
         this._abort = undefined;
         const final = this.messages.find((m) => m.id === assistant.id);
@@ -1081,15 +1093,16 @@ export class AiChat extends LitElement {
         // non-content cases so it's translatable.
         if (final?.error) {
           this._announce(final.error);
-        } else if (final && !final.content) {
+        } else if (final && !final.content && !final.steps?.length) {
           this._announce(this._labels.emptyResponse);
         } else if (final) {
           this._announce(final.content);
         }
-        // Only announce a completed turn when it actually produced content.
+        // Only announce a completed turn when it actually produced something:
+        // text, or steps (a turn of tool calls with no prose is a real turn).
         // Skipping empties (and errors) keeps consumers who persist on
         // `ai-chat:message` from saving blank ghost turns to their history.
-        if (final && !final.error && final.content) {
+        if (final && !final.error && (final.content || final.steps?.length)) {
           this.dispatchEvent(
             new CustomEvent('ai-chat:message', {
               detail: { message: final },

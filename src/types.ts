@@ -104,7 +104,69 @@ export interface ChatMessage {
   finishReason?: FinishReason;
   /** Token counts for this turn, when the provider reports them. */
   usage?: TokenUsage;
+  /**
+   * What the assistant did on the way to its answer: reasoning ("thinking")
+   * and tool calls, in the order they happened. Optional and additive — a
+   * message without steps renders exactly as before, and `content` is always
+   * the full answer text on its own. Persist it with the message to show the
+   * steps again when the conversation is reopened.
+   */
+  steps?: MessageStep[];
 }
+
+/**
+ * The lifecycle of a tool call.
+ * - `pending`: the model asked for it (its arguments may still be streaming).
+ * - `running`: your backend is executing it.
+ * - `success` / `error`: it finished.
+ */
+export type ToolState = 'pending' | 'running' | 'success' | 'error';
+
+/** A stretch of the model's reasoning ("thinking") before or between answers. */
+export interface ReasoningStep {
+  type: 'reasoning';
+  /** Unique within its message. */
+  id: string;
+  /** The reasoning text so far (markdown). Empty when the provider hides it. */
+  text: string;
+  /** The provider sent this reasoning encrypted/redacted: there is no text to show. */
+  redacted?: boolean;
+  /** Length of `content` when this step began: where it sits within the answer. */
+  at: number;
+  /** Epoch ms the step began. */
+  startedAt: number;
+  /** Epoch ms it ended (the next text, tool or the end of the reply). */
+  endedAt?: number;
+}
+
+/** One tool invocation and, once it lands, its result. */
+export interface ToolStep {
+  type: 'tool';
+  /** Your id for the call (e.g. the provider's tool-call id). Chunks are matched on it. */
+  id: string;
+  /** The tool's name, e.g. `search`. */
+  name: string;
+  /** A friendlier label to show instead of `name`, e.g. `Searching the docs`. */
+  title?: string;
+  /** The parsed arguments. */
+  args?: unknown;
+  /** Raw argument text while it streams in (partial JSON), before `args` is known. */
+  argsText?: string;
+  /** The result. Objects render as JSON; strings as text (or JSON when they parse). */
+  output?: unknown;
+  /** Why it failed. */
+  error?: string;
+  state: ToolState;
+  /** Length of `content` when this step began: where it sits within the answer. */
+  at: number;
+  /** Epoch ms the call began. */
+  startedAt: number;
+  /** Epoch ms it reached `success` or `error`. */
+  endedAt?: number;
+}
+
+/** A step of an assistant turn. See {@link ChatMessage.steps}. */
+export type MessageStep = ReasoningStep | ToolStep;
 
 /**
  * A single chunk yielded by a transport while streaming a response.
@@ -113,9 +175,30 @@ export interface ChatMessage {
  * - `done`:  the stream has finished cleanly. May carry `finishReason` and
  *            `usage` metadata when the provider reports them.
  * - `error`: the stream failed; `error` holds a human-readable message.
+ * - `reasoning`: append to the model's reasoning ("thinking"). An empty `delta`
+ *                just marks that reasoning started (e.g. a provider that hides
+ *                its reasoning text still shows "Thinking…").
+ * - `tool`:      create or update the tool call with this `id`. Send it as often
+ *                as you like: when the call starts, as its arguments stream
+ *                (`argsDelta`), when it runs, and with its `output` or `error`.
+ *                Without an explicit `state`, an `error` means `error`, an
+ *                `output` means `success`, and a new call starts `running`.
  */
 export type StreamChunk =
   | { type: 'delta'; delta: string }
+  | { type: 'reasoning'; delta: string; redacted?: boolean }
+  | {
+      type: 'tool';
+      id: string;
+      name?: string;
+      title?: string;
+      args?: unknown;
+      /** A fragment of the raw argument text, appended to `argsText`. */
+      argsDelta?: string;
+      state?: ToolState;
+      output?: unknown;
+      error?: string;
+    }
   | {
       type: 'done';
       /** Normalized stop reason, when the provider reported one. */
