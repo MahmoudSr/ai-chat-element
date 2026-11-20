@@ -392,7 +392,7 @@ framework templates (Angular can't bind a colon name).
 | Event             | `detail`                    | When / notes                                                        |
 | ----------------- | --------------------------- | ------------------------------------------------------------------- |
 | `ai-chat:submit`  | `{ content: string, attachments: Attachment[] }` | Fires when the user sends, before the request goes out. `attachments` is `[]` unless files were attached. |
-| `ai-chat:message` | `{ message: ChatMessage }`  | Once per completed reply — **only when it has content** (empty/failed turns don't fire). The `message` carries `finishReason` / `usage` when reported. |
+| `ai-chat:message` | `{ message: ChatMessage }`  | Once per completed reply — **only when it has content or steps** (empty/failed turns don't fire). The `message` carries `finishReason` / `usage` when reported, and `steps` (reasoning, tool calls) when there were any. |
 | `ai-chat:error`   | `{ error: string }`         | Transport failure; `error` is a human-readable message.             |
 | `ai-chat:new-chat`| `{ messages: ChatMessage[] }` | Fires when the New-chat button is clicked, **before** clearing. **Cancelable** — call `e.preventDefault()` to keep the current conversation. `messages` is the conversation about to be cleared. |
 | `ai-chat:attach`  | `{ attachments: Attachment[] }` | Fires when files are picked/dropped/pasted, after they pass validation. **Cancelable** — `e.preventDefault()` removes them from the tray (you're handling them yourself). Mutate `attachment.url` here to swap in an uploaded URL before send. |
@@ -406,7 +406,8 @@ framework templates (Angular can't bind a colon name).
 | `ai-chat:background-message` | `{ conversationId: string \| null, message: ChatMessage, done: boolean }` | A reply is still streaming for a conversation you've switched away from. Fires per token with `done: false`, then once with `done: true` when it settles (including on error — check `message.error`). `conversationId` is whatever `conversation-id` held when that turn was sent. See [Background streaming](#background-streaming). |
 
 `ai-chat:message` fires once per completed assistant turn — but **only when the
-reply has content**. Empty responses and failed turns don't fire it, so if you
+reply has content** (or [steps](#reasoning--tool-calls): a turn of only tool
+calls counts). Empty responses and failed turns don't fire it, so if you
 persist on this event you won't save blank/ghost messages.
 
 ```js
@@ -447,6 +448,105 @@ yield { type: 'done', finishReason: 'stop', usage: { inputTokens: 12, outputToke
 
 The OpenAI adapter opts into usage reporting for you (it sends
 `stream_options: { include_usage: true }`); you don't pass anything.
+
+### Reasoning & tool calls
+
+Reasoning models and agents do more than write an answer: they think, and they
+call tools. The chat shows both, in the order they happened:
+
+- **Reasoning** — a one-line **"Thinking… 4s"** while the model thinks, then
+  **"Thought for 12s"**. Collapsed by default; the reader opens it to read the
+  reasoning in a quieter column.
+- **Tool calls** — one row per call: a status icon, the tool's name, its state
+  (*Preparing… / Running… / Done / Failed*) and how long it took. It opens to
+  the call's **Input** and **Result** as highlighted JSON with a copy button. A
+  failed call shows its error without being opened.
+
+```
+Thought for 3s ˅
+✓ get_weather   Done                            2s ˅
+It's 24°C and clear in Beirut. Let me check the forecast.
+✓ get_forecast  Done                            1s ˅
+The next three days cool off slightly.
+```
+
+**With the built-in adapters it's automatic.** Nothing to configure:
+
+- `anthropicAdapter` — thinking blocks (turn thinking on with `params`, e.g.
+  `params: { thinking: { type: 'enabled', budget_tokens: 2048 } }`), `tool_use`,
+  and Anthropic's server tools (web search, code execution) and MCP calls, which
+  arrive with their results.
+- `openAIAdapter` — `reasoning_content` / `reasoning` fields (DeepSeek, vLLM,
+  LM Studio, OpenRouter, Ollama), `tool_calls`, and a reply that starts with
+  `<think>…</think>` (models that think inline; `thinkTags: false` turns that off).
+
+The adapters only **show** tool calls. Running a tool for your app is your
+backend's job — and that's the usual setup: your server runs the agent loop and
+streams what happens.
+
+**From your own backend**, yield chunks instead of (or alongside) plain text:
+
+```js
+chat.transport = functionAdapter(async function* (messages, signal) {
+  yield { type: 'reasoning', delta: 'The user wants the weather. ' };
+  yield { type: 'tool', id: 'call_1', name: 'get_weather', args: { city: 'Beirut' } };
+  const weather = await getWeather('Beirut');          // your code
+  yield { type: 'tool', id: 'call_1', output: weather }; // same id: updates the row
+  yield `It's ${weather.tempC}°C in Beirut.`;           // plain strings are the answer
+});
+```
+
+| Chunk | What it does |
+| --- | --- |
+| `{ type: 'reasoning', delta, redacted? }` | Adds to the reasoning in progress. Answer text or a tool call since starts a new reasoning step. An empty `delta` just marks "thinking started" (e.g. when the provider hides the text). |
+| `{ type: 'tool', id, name?, title?, args?, argsDelta?, state?, output?, error? }` | Creates the call with this `id`, or updates it. Send it as often as you like: when it starts, as arguments stream (`argsDelta`), when it runs, and with its `output` or `error`. Without a `state`, an `error` means `error`, an `output` means `success`, and a new call starts `running`. `title` is a friendlier label shown instead of `name`. |
+
+Streaming from a server over plain HTTP? Send one JSON chunk per line and turn
+each line back into a chunk:
+
+```js
+chat.transport = functionAdapter(async function* (messages, signal) {
+  const res = await fetch('/api/agent', { method: 'POST', signal, body: JSON.stringify(messages) });
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += value;
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines) if (line.trim()) yield JSON.parse(line); // a StreamChunk, or a string
+  }
+});
+```
+
+**What you store.** The steps land on the message as `message.steps` (in order,
+each with `at` — where in the answer text it happened). `message.content` stays
+the whole answer text on its own, so copy, edit and retry work as before.
+Persist `steps` with the message and the conversation reopens with its reasoning
+and tool rows. A turn of only tool calls still fires `ai-chat:message`. What's
+sent back to the model is unchanged: the text, not the steps.
+
+**Showing it your way.**
+
+- `reasoning="collapsed|expanded|hidden"` and `tools="collapsed|expanded|hidden"`
+  — collapsed (default), open from the start, or not shown. The reader's own
+  open/close always wins.
+- `chat.renderTool` — draw a result yourself (a chart, a map, a card) instead of
+  the JSON. Return a DOM node, or `null` for the default. It's called once per
+  change of that call, not per token, so returning a fresh element is fine:
+
+  ```js
+  chat.renderTool = (tool) =>
+    tool.name === 'sales_by_month' && tool.state === 'success'
+      ? makeBarChart(tool.output) // any element, from any framework
+      : null;
+  ```
+
+- Theme it with the reasoning and tool variables (`--ai-chat-reasoning-color`,
+  `--ai-chat-tool-bg`, … — all listed under [All CSS variables](#all-css-variables)) and
+  the `reasoning*` / `tool*` parts; every string (*Thinking…*, *Thought for
+  {duration}*, *Running…*, *Not run*…) is a label.
 
 ---
 
@@ -1302,6 +1402,10 @@ import type {
   TokenUsage,
   Attachment,
   MessageAction,
+  MessageStep,
+  ReasoningStep,
+  ToolStep,
+  ToolState,
   ChatLabels,
 } from 'ai-chat-element';
 

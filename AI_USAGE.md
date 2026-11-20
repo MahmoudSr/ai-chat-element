@@ -22,7 +22,8 @@ plain HTML because it is a standard custom element. It ships its own styles
 - Main import: `import 'ai-chat-element'` (registers `<ai-chat>`)
 - Named exports: `openAIAdapter`, `anthropicAdapter`, `functionAdapter`, `AiChat`
 - Types: `ChatMessage`, `ChatTransport`, `StreamChunk`, `Role`, `FinishReason`,
-  `TokenUsage`, `Attachment`, `MessageAction`, `ChatLabels`, `OpenAIAdapterOptions`,
+  `TokenUsage`, `Attachment`, `MessageAction`, `MessageStep`, `ReasoningStep`,
+  `ToolStep`, `ToolState`, `ChatLabels`, `OpenAIAdapterOptions`,
   `AnthropicAdapterOptions`
 
 ## The two-step mental model (do NOT skip step 2)
@@ -124,9 +125,42 @@ chat.transport = functionAdapter(async function* (messages, signal) {
 A transport is any object with:
 `send(messages: ChatMessage[], signal: AbortSignal): AsyncIterable<StreamChunk>`
 where `StreamChunk` is
-`{type:'delta',delta} | {type:'done', finishReason?, usage?} | {type:'error',error}`.
+`{type:'delta',delta} | {type:'done', finishReason?, usage?} | {type:'error',error}
+| {type:'reasoning', delta, redacted?} | {type:'tool', id, name?, title?, args?,
+argsDelta?, state?, output?, error?}`.
 The `done` chunk may carry `finishReason` (`FinishReason`) and `usage`
 (`TokenUsage`) — both optional; see the events note below.
+
+### Reasoning & tool calls
+
+- The built-in adapters show the model's reasoning ("Thinking… / Thought for
+  12s", collapsed) and tool calls (one row each: status, name, state, time; opens
+  to input + result JSON) automatically. Nothing to configure.
+- From a custom backend, `functionAdapter` accepts `string | StreamChunk` yields:
+  strings are the answer; `{type:'reasoning', delta}` adds reasoning;
+  `{type:'tool', id, ...}` creates OR UPDATES the call with that `id` (send it
+  when it starts, with `argsDelta` fragments, and again with `output` or
+  `error`). Without `state`: `error` → `error`, `output` → `success`, a new
+  call → `running`. States: `pending | running | success | error`.
+- The component never RUNS tools. Your backend runs them and streams the chunks.
+- Steps land on `message.steps` (`MessageStep[]`: `ReasoningStep | ToolStep`, in
+  order, each with `at` = offset into `content` where it happened). `content`
+  stays the full answer text. Persist `steps` to show them again on reload. Not
+  sent back to the model.
+- `reasoning` / `tools` attributes: `collapsed` (default) | `expanded` | `hidden`.
+- `.renderTool = (tool, message) => Node | null` replaces a tool's result with
+  your own element (e.g. a chart); `null` = default JSON. Called once per change
+  of that call, not per token.
+
+```js
+chat.transport = functionAdapter(async function* (messages, signal) {
+  yield { type: 'reasoning', delta: 'Need the weather.' };
+  yield { type: 'tool', id: 't1', name: 'get_weather', args: { city: 'Beirut' } };
+  const w = await getWeather('Beirut');               // your code
+  yield { type: 'tool', id: 't1', output: w };        // same id: updates the row
+  yield `It's ${w.tempC}°C in Beirut.`;
+});
+```
 
 ## API surface
 
@@ -192,8 +226,9 @@ Angular template bind the dash form, `(ai-chat-message)="…"`: Angular reads
 `prependMessages()`; `oldest` is the paging cursor; dropped if the conversation
 on screen changes first), `ai-chat:submit`
 `{content, attachments}`, `ai-chat:message` `{message}` (fires only for a completed
-reply that HAS content — not for empty or failed turns, so persisting on it won't
-save blank messages; `message` carries `finishReason`/`usage` when reported),
+reply that HAS content or steps — not for empty or failed turns, so persisting on
+it won't save blank messages; `message` carries `finishReason`/`usage` when
+reported, and `steps` when there were any),
 `ai-chat:error` `{error}`, `ai-chat:new-chat` `{messages}` (cancelable — fired by
 the New-chat button before clearing; `preventDefault()` keeps the current
 conversation, and `messages` is what's about to be cleared), `ai-chat:attach`

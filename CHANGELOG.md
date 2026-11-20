@@ -6,6 +6,78 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+Reasoning and tool calls (issue #8), a dependency and security update, and four
+scroll fixes found by testing long replies in a real browser.
+
+### Added
+
+- **Reasoning ("thinking").** A one-line **"Thinking… 4s"** while the model
+  thinks, then **"Thought for 12s"** — collapsed by default; the reader opens it
+  to read the reasoning in a quieter, capped column. It sits where it happened
+  (reasoning mid-answer gets its own toggle between the paragraphs), the
+  reader's open/close survives streaming, and reasoning the provider hides still
+  shows its duration. New attribute **`reasoning="collapsed|expanded|hidden"`**,
+  vars `--ai-chat-reasoning-color/-font-size/-border-color/-max-height`, parts
+  `reasoning`, `reasoning-trigger`, `reasoning-content`, labels `thinking`,
+  `thoughtFor` (`{duration}`), `thoughtProcess`.
+- **Tool calls.** One row per call: status icon, name (or `title`), state
+  (*Preparing… / Running… / Done / Failed*), live duration. It opens to the
+  call's **Input** and **Result** as highlighted JSON with a copy button;
+  arguments show while they stream in; a failed call shows its error without
+  being opened; a call cut off mid-run reads *Didn't finish* and one that never
+  started *Not run* (never a spinner forever, even after a reload). New
+  attribute **`tools="collapsed|expanded|hidden"`**, property
+  **`renderTool(tool, message) => Node | null`** to draw a result yourself (a
+  chart, a map) — called once per change of that call, not per token. Vars
+  `--ai-chat-tool-bg/-border-color/-radius/-font-size/-running-color/-success-color/-error-color/-output-max-height`,
+  parts `tool`, `tool-header`, `tool-status`, `tool-name`, `tool-body`,
+  `tool-input`, `tool-output`, `tool-error`, labels `toolPending`,
+  `toolRunning`, `toolSuccess`, `toolError`, `toolIncomplete`, `toolNotRun`,
+  `toolInput`, `toolOutput`.
+- **`message.steps`** (`ReasoningStep | ToolStep`, in order, each with `at` —
+  where in the answer it happened). `content` stays the whole answer text, so
+  copy, edit, retry and what's sent to the model are unchanged. Persist `steps`
+  to show them again on reload. New exported types `MessageStep`,
+  `ReasoningStep`, `ToolStep`, `ToolState`.
+- **Two new stream chunks**: `{ type: 'reasoning', delta, redacted? }` and
+  `{ type: 'tool', id, … }` (create or update the call with that id; an
+  `output` implies success, an `error` failure). **`functionAdapter`** now
+  accepts `string | StreamChunk` yields, so a backend agent loop streams steps.
+- **The built-in adapters show steps on their own.** `anthropicAdapter`:
+  thinking (including redacted and omitted), `tool_use` with streamed input,
+  and server tools (web search, code execution) and MCP calls with their
+  results. `openAIAdapter`: `reasoning_content` / `reasoning`, `tool_calls`
+  fragments, and a reply that starts with `<think>…</think>` (new option
+  **`thinkTags`**, default `true`). Plain text streams are unchanged.
+
+### Changed
+
+- **`ai-chat:message` fires for a turn of only tool calls** (it used to need
+  text), and such a turn is announced to screen readers by what it did
+  ("deploy: Done, notify: Failed") instead of "No response."
+- **Dependencies updated; `npm audit` 11 → 0.** The bundled runtime libraries
+  are the latest (dompurify 3.4.18 — 0.6.0 shipped a version with a moderate
+  advisory; marked 18, lit 3.3.3, highlight.js 11.12). Built with Vite 8: the
+  adapters are one shared chunk instead of a copy in each entry, so 0.7.0 is
+  about 99.0 KB gzipped in total (0.6.0: 99.8 KB) with all of the above.
+
+### Fixed
+
+- **A scroll-up during a stream was undone.** Every token queues a scroll to
+  the bottom for the next frame; scrolling up between the two snapped you back
+  15ms later. The queued scroll now stands down for the reader (wheel, touch,
+  PageUp/↑/Home).
+- **Jump-to-latest could miss.** It aimed at where the bottom was when clicked;
+  a fast reply moved it, so it landed short and never followed again. It now
+  follows from the click.
+- **Switching chats while scrolled up opened the new one mid-history**, at the
+  old chat's scroll offset. A different conversation now opens at its latest
+  message (older messages loaded above don't count as a switch).
+- **A long chat could ask for older messages just by opening** (with
+  `has-earlier`), before the reader scrolled anywhere.
+- **Keyboard focus ring** on the new controls uses the component's own ring
+  (a test now sweeps every focusable control, so a new one can't miss it).
+
 ## [0.6.0] - 2026-10-08
 
 Files in a reply, a visible copy, and two fixes found in the admin dashboard.
