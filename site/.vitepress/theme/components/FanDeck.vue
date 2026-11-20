@@ -151,11 +151,10 @@ onMounted(async () => {
           <a class="fd-go" :href="withBase('/guide/quick-start')">Get started</a>
         </div>
         <p class="fd-codes">
-          <span>{{ current.code }} {{ current.name }}</span>
-          <span>--ai-chat-accent: {{ current.theme['--ai-chat-accent'] }}</span>
-          <span>Scripted demo</span>
+          <span>{{ current.code }} {{ current.name }} · scripted demo</span>
+          <span class="fd-rivet" aria-hidden="true"></span>
+          <span class="fd-accent">--ai-chat-accent: {{ current.theme['--ai-chat-accent'] }}</span>
         </p>
-        <span class="fd-rivet" aria-hidden="true"></span>
       </div>
     </div>
   </section>
@@ -269,7 +268,7 @@ onMounted(async () => {
   left: 50%;
   top: 18px;
   bottom: 10px;
-  width: min(480px, 38vw);
+  width: min(580px, 40vw);
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -298,16 +297,16 @@ onMounted(async () => {
 .fd-label {
   position: relative;
   flex: none;
-  padding: clamp(18px, 2.6svh, 26px) 28px 72px;
+  padding: clamp(16px, 2.2svh, 22px) 28px 12px;
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1.8svh, 16px);
+  gap: clamp(8px, 1.4svh, 12px);
 }
 .fd-label h1 {
   margin: 0;
   font-weight: 850;
   font-stretch: 88%;
-  font-size: clamp(32px, min(4.4vw, 6svh), 54px);
+  font-size: clamp(28px, min(3.3vw, 4.8svh), 46px);
   line-height: 0.98;
   letter-spacing: -0.025em;
   text-wrap: balance;
@@ -315,10 +314,10 @@ onMounted(async () => {
 }
 .fd-lede {
   margin: 0;
-  font-size: 16px;
-  line-height: 1.5;
+  font-size: 15px;
+  line-height: 1.45;
   color: var(--fd-ink-2);
-  max-width: 40ch;
+  max-width: 58ch;
 }
 .fd-install {
   display: flex;
@@ -327,7 +326,7 @@ onMounted(async () => {
 .fd-cmd {
   flex: 1;
   min-width: 0;
-  height: 48px;
+  height: 44px;
   padding: 0 8px 0 14px;
   display: flex;
   align-items: center;
@@ -359,7 +358,7 @@ onMounted(async () => {
 }
 .fd-go {
   flex: none;
-  height: 48px;
+  height: 44px;
   padding: 0 20px;
   display: inline-flex;
   align-items: center;
@@ -375,26 +374,22 @@ onMounted(async () => {
   transform: translateY(-1px);
 }
 .fd-codes {
-  position: absolute;
-  left: 28px;
-  right: 28px;
-  bottom: 40px;
-  margin: 0;
-  display: flex;
-  justify-content: space-between;
+  margin: 2px 0 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   gap: 12px;
   font: 600 10px var(--fd-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--fd-ink-3);
 }
+.fd-accent {
+  text-align: right;
+}
 .fd-rivet {
-  position: absolute;
-  left: 50%;
-  bottom: 8px;
-  width: 26px;
-  height: 26px;
-  margin-left: -13px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff 0 12%, #c9ccd3 35%, #6c727c 100%);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), inset 0 -1px 2px rgb(0 0 0 / 0.25);
@@ -469,13 +464,9 @@ onMounted(async () => {
     flex: none;
   }
   .fd-label {
-    padding: 22px 18px 50px;
+    padding: 22px 18px 14px;
   }
-  .fd-codes {
-    left: 18px;
-    right: 18px;
-  }
-  .fd-codes span:nth-child(2) {
+  .fd-accent {
     display: none;
   }
 }
