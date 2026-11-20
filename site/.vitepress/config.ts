@@ -117,6 +117,27 @@ export default defineConfig({
     // syntax colours are dark-block colours in both modes too. A light theme
     // here put dark text on the dark slab.
     theme: { light: 'github-dark', dark: 'github-dark' },
+    // Copy each column header onto its cells as data-label, so on a phone a
+    // table can stack into cards and still say what each value is.
+    config(md) {
+      md.core.ruler.push('table-cell-labels', (state) => {
+        let headers: string[] = [];
+        let col = 0;
+        const tokens = state.tokens;
+        for (let i = 0; i < tokens.length; i++) {
+          const t = tokens[i];
+          if (t.type === 'thead_open') headers = [];
+          else if (t.type === 'th_open') {
+            const inline = tokens[i + 1];
+            headers.push(inline?.type === 'inline' ? inline.content.replace(/`/g, '') : '');
+          } else if (t.type === 'tr_open') col = 0;
+          else if (t.type === 'td_open') {
+            if (headers[col]) t.attrSet('data-label', headers[col]);
+            col++;
+          }
+        }
+      });
+    },
   },
 
   themeConfig: {

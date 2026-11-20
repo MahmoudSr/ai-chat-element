@@ -55,8 +55,8 @@ reply made only of tool calls still fires `ai-chat:message`.
 | `reasoning` | `collapsed`, `expanded`, `hidden` | `collapsed` |
 | `tools` | `collapsed`, `expanded`, `hidden` | `collapsed` |
 
-The reader's own open or close always wins. Tool errors show even when `tools`
-is `hidden`.
+The reader's own open or close always wins, and a failed tool call shows
+even when `tools` is `hidden`.
 
 To draw a result yourself (a chart, a map, a card), set `renderTool`. Return an
 element, or `null` for the default JSON. It runs once per change of that call,

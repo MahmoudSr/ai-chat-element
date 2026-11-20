@@ -49,8 +49,7 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 
 ## Reasoning and tool calls
 
-Yield plain strings for the answer. Yield chunk objects for anything richer,
-and the reply shows it:
+Yield plain strings for the answer, and chunk objects for anything richer:
 
 ```js
 chat.transport = functionAdapter(async function* (messages, signal) {
@@ -66,8 +65,8 @@ chat.transport = functionAdapter(async function* (messages, signal) {
 | --- | --- |
 | a string | Appends answer text. |
 | `{ type: 'reasoning', delta }` | Appends to the reasoning panel. |
-| `{ type: 'tool', id, name?, title?, args?, argsDelta?, state?, output?, error? }` | Adds a tool row, or updates the one with the same `id`. |
-| `{ type: 'done', finishReason?, usage? }` | Ends the reply, with optional [finish reason and usage](./finish-and-usage). |
+| `{ type: 'tool', id, … }` | Adds a tool row, or updates the one with the same `id`. Fields: `name`, `title`, `args`, `argsDelta`, `state`, `output`, `error`, all optional. |
+| `{ type: 'done' }` | Ends the reply. Add `finishReason` and `usage` to report them; see [finish reason and usage](./finish-and-usage). |
 | `{ type: 'error', error }` | Ends the reply as failed, showing your message and Retry. |
 
 If your function just returns, the reply ends normally. If it throws, the

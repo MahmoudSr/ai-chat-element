@@ -24,7 +24,7 @@ component, where page CSS can't reach. Give avatars inline styles, or use the
 
 ## All {{ data.slots.length }} slots
 
-<table>
+<table class="fd-ref">
   <thead><tr><th>Slot</th><th>What goes there</th></tr></thead>
   <tbody>
     <tr v-for="s in [...data.slots].sort()" :key="s">

@@ -36,7 +36,7 @@ left. Set `dir="rtl"` on the element, or on any parent:
 
 ## All {{ data.labels.length }} labels
 
-<table>
+<table class="fd-ref">
   <thead><tr><th>Key</th><th>Default</th></tr></thead>
   <tbody>
     <tr v-for="l in data.labels" :key="l.key">

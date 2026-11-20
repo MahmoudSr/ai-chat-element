@@ -89,6 +89,7 @@ Shown automatically, with nothing to configure:
 
 ## Token usage
 
-The adapter asks for usage on every request (`stream_options: { include_usage: true }`),
-so finished replies carry token counts when the server reports them. See
+The adapter asks for usage on every request: it sends `stream_options` with
+`include_usage: true`. Finished replies carry token counts when the server
+reports them. See
 [Finish reason and usage](./finish-and-usage).

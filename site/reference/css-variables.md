@@ -26,7 +26,7 @@ follows `--ai-chat-accent`. See [Theming](/customize/) for how to use them.
   <output>{{ rows.length }} shown</output>
 </label>
 
-<table>
+<table class="fd-ref">
   <thead><tr><th>Variable</th><th>Default</th><th>What it controls</th></tr></thead>
   <tbody>
     <tr v-for="v in rows" :key="v.name" :id="v.name.slice(2)">

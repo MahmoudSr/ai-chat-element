@@ -278,7 +278,8 @@ html {
 }
 
 /* Long code in a table cell (a default value, an event's detail) may wrap. */
-.vp-doc td code.fd-wrap {
+.vp-doc td code.fd-wrap,
+.vp-doc td:first-child code.fd-wrap {
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -329,4 +330,68 @@ html {
   margin-top: 8px;
   white-space: normal;
   overflow-wrap: anywhere;
+}
+
+/* Line breaks: headings split into even lines, prose avoids a lonely last
+   word. */
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3 {
+  text-wrap: balance;
+}
+.vp-doc p,
+.vp-doc li,
+.vp-doc td {
+  text-wrap: pretty;
+}
+
+/* On a phone, a table never widens the page: ordinary tables scroll inside
+   their own box, and the reference tables stack each row into a card. */
+@media (max-width: 768px) {
+  .vp-doc table {
+    display: block;
+    overflow: visible;
+    border: 0;
+  }
+  .vp-doc table thead {
+    display: none;
+  }
+  .vp-doc table tbody,
+  .vp-doc table tr,
+  .vp-doc table td {
+    display: block;
+  }
+  .vp-doc table tr {
+    padding: 14px 0;
+    border-top: 1px solid var(--vp-c-divider);
+    background: transparent !important;
+  }
+  .vp-doc table td {
+    padding: 2px 0;
+    border: 0;
+    min-width: 0;
+  }
+  /* A Markdown table's cells carry their column name (data-label, added at
+     build time), so a stacked card still says what each value is. */
+  .vp-doc table td[data-label]:not(:first-child)::before {
+    content: attr(data-label) ': ';
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--fd-ink-3);
+  }
+  .vp-doc table td:first-child {
+    font-weight: 650;
+  }
+  /* The name and its property share a line. */
+  .vp-doc table.fd-ref td:first-child .fd-sub {
+    display: inline;
+    margin: 0 0 0 8px;
+  }
+  /* Only the long values wrap (types, defaults, payloads); a name like
+     conversation-id stays whole. */
+  .vp-doc table.fd-ref td code.fd-wrap,
+  .vp-doc table.fd-ref td code.fd-detail {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }

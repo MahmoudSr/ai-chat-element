@@ -47,8 +47,8 @@ chat.transport = functionAdapter(async function* (messages, signal) {
 
 ::: warning Never ship an API key in browser code
 Anything in the browser is visible to your users, so a key placed there can be
-copied and used at your expense. Keep the key on a server you control and have
-the browser talk to that server.
+copied and used at your expense. Keep the key on a server you control, and let
+the browser talk only to your server.
 :::
 
 The built-in `openAIAdapter` and `anthropicAdapter` take an `apiKey` directly.
