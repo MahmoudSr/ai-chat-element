@@ -401,3 +401,42 @@ html {
 .vp-doc .custom-block p {
   max-width: 58ch;
 }
+
+/* ---- State is form, never hue ----
+   The current page keeps ink text; the sidebar marks it with its group's
+   square notch, the nav with an ink underline. (VitePress paints both in the
+   brand colour through scoped selectors, hence the specificity here.) */
+.VPSidebar .VPSidebarItem.level-1.is-active > .item .link > .text,
+.VPSidebar .VPSidebarItem.level-1.is-active > .item > .text {
+  color: var(--fd-ink);
+  font-weight: 650;
+}
+.VPNavBar .VPNavBarMenuLink.active,
+.VPNavBar .VPNavBarMenuLink.active:hover {
+  color: var(--fd-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 8px;
+}
+
+/* Each section link in the nav carries its section's chip. */
+.VPNavBarMenu .VPNavBarMenuLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.VPNavBarMenu .list > li:nth-child(-n + 5) > .VPNavBarMenuLink::before {
+  content: '';
+  /* Exactly the capitals' height, sitting on the same line: measured, the
+     caps' middle is half a pixel above the line box's middle. */
+  width: 7px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--fd-nav-chip);
+  translate: 0 -0.5px;
+}
+.VPNavBarMenu .list > li:nth-child(1) { --fd-nav-chip: var(--fd-chip-start); }
+.VPNavBarMenu .list > li:nth-child(2) { --fd-nav-chip: var(--fd-chip-model); }
+.VPNavBarMenu .list > li:nth-child(3) { --fd-nav-chip: var(--fd-chip-features); }
+.VPNavBarMenu .list > li:nth-child(4) { --fd-nav-chip: var(--fd-chip-customize); }
+.VPNavBarMenu .list > li:nth-child(5) { --fd-nav-chip: var(--fd-chip-reference); }

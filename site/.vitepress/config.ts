@@ -145,6 +145,10 @@ export default defineConfig({
     siteTitle: 'ai-chat-element',
     nav: [
       { text: 'Get started', link: '/guide/', activeMatch: '/guide/' },
+      { text: 'Models', link: '/models/', activeMatch: '/models/' },
+      { text: 'Features', link: '/features/streaming', activeMatch: '/features/' },
+      { text: 'Customize', link: '/customize/', activeMatch: '/customize/' },
+      { text: 'Reference', link: '/reference/attributes', activeMatch: '/reference/' },
       { text: 'Playground', link: 'https://mahmoudsr.github.io/ai-chat-element/examples/playground.html' },
       { text: '0.7.0', link: 'https://github.com/MahmoudSr/ai-chat-element/blob/main/CHANGELOG.md' },
     ],

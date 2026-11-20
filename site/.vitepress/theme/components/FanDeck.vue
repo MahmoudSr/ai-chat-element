@@ -11,8 +11,12 @@ import { strips, DEFAULT_STRIP, type Strip } from '../demo/decks';
  */
 
 // Fixed slots like a real fan deck: a gap in the middle holds the pulled card.
-// The innermost slots must clear the card, or those strips hide behind it.
+// The innermost slots must clear the card, or those strips hide behind it; on
+// a narrower window the strips are shorter, so the fan opens a little wider.
 const SLOTS = [-72, -61.5, -51, -40.5, -30, 30, 40.5, 51, 61.5, 72];
+const SLOTS_NARROW = [-74, -64.5, -55, -45.5, -36, 36, 45.5, 55, 64.5, 74];
+const narrow = ref(false);
+const slots = computed(() => (narrow.value ? SLOTS_NARROW : SLOTS));
 
 const sel = ref(Math.max(0, strips.findIndex((s) => s.id === DEFAULT_STRIP)));
 const current = computed<Strip>(() => strips[sel.value]);
@@ -74,6 +78,22 @@ function applyStrip(strip: Strip) {
   if (!el) return;
   for (const [k, v] of Object.entries(strip.theme)) el.style.setProperty(k, v);
   el.messages = seed(strip);
+  // The demo opens on the question. When the whole exchange doesn't fit (a
+  // short window), start at the top instead of the bottom of the reply.
+  // On a phone the page scrolls anyway, so the chat grows to hold the whole
+  // exchange instead (no jump button over the reply).
+  const box = el.parentElement as HTMLElement;
+  box.style.height = '';
+  void (el as unknown as { updateComplete: Promise<unknown> }).updateComplete.then(() =>
+    requestAnimationFrame(() => {
+      const list = el.shadowRoot?.querySelector<HTMLElement>('.messages');
+      if (!list) return;
+      const extra = list.scrollHeight - list.clientHeight;
+      if (extra <= 0) return;
+      if (matchMedia('(max-width: 960px)').matches) box.style.height = `${box.offsetHeight + extra + 8}px`;
+      else list.scrollTop = 0;
+    }),
+  );
 }
 
 const sleep = (ms: number, signal: AbortSignal) =>
@@ -145,6 +165,12 @@ onMounted(async () => {
   el.transport = functionAdapter(demoStream);
   el.labels = { emptyHeading: 'Ask the demo something' };
   applyStrip(current.value);
+  const mq = matchMedia('(max-width: 1180px)');
+  narrow.value = mq.matches;
+  mq.addEventListener('change', (e) => {
+    narrow.value = e.matches;
+    setTimeout(hideCoveredCodes, 750);
+  });
   hideCoveredCodes();
   revealSelected(false);
   resizeObserver = new ResizeObserver(hideCoveredCodes);
@@ -165,7 +191,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         role="radio"
         class="fd-strip"
         :class="[`is-${strip.kind}`, { 'is-out': i === sel }]"
-        :style="{ '--a': `${SLOTS[i]}deg` }"
+        :style="{ '--a': `${slots[i]}deg` }"
         :aria-checked="i === sel"
         :aria-label="`${strip.name} (${strip.kind})`"
         :tabindex="i === sel ? 0 : -1"
@@ -191,6 +217,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           ref="chatEl"
           :theme="isDark ? 'dark' : 'light'"
           show-names="false"
+          show-timestamps="false"
           placeholder="Ask the demo something…"
         ></ai-chat>
       </div>
@@ -203,14 +230,22 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         <div class="fd-install">
           <button type="button" class="fd-cmd" @click="copyInstall">
             <code>npm i ai-chat-element</code>
-            <span class="fd-copy" aria-live="polite">{{ copied ? 'Copied' : 'Copy' }}</span>
+            <span class="fd-copy" :class="{ 'is-done': copied }">
+              <svg v-if="!copied" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>
+              <span class="fd-sr" aria-live="polite">{{ copied ? 'Copied' : 'Copy' }}</span>
+            </span>
           </button>
           <a class="fd-go" :href="withBase('/guide/')">Get started</a>
         </div>
         <p class="fd-codes">
-          <span>{{ current.code }} {{ current.name }} · scripted demo</span>
-          <span class="fd-rivet" aria-hidden="true"></span>
-          <span class="fd-accent">--ai-chat-accent: {{ current.theme['--ai-chat-accent'] }}</span>
+          <span>{{ current.code }} {{ current.name }}<span class="fd-wide"> · scripted demo</span></span>
+          <svg class="fd-rivet" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#b8bcc4"/><circle cx="16" cy="16" r="13" fill="none" stroke="#7d838d" stroke-width="2"/><circle cx="16" cy="16" r="7" fill="none" stroke="#9aa0a9" stroke-width="1"/><path d="M8.5 11.5a9 9 0 0 1 7.5-4.5" fill="none" stroke="#fff" stroke-width="1.25" stroke-linecap="round" opacity=".8"/></svg>
+          <span class="fd-accent"
+            ><span class="fd-wide"><span class="fd-var">--ai-chat-accent</span>: </span
+            ><span class="fd-var fd-wide">{{ current.theme['--ai-chat-accent'] }}</span
+            ><span class="fd-tight">Scripted demo</span></span
+          >
         </p>
       </div>
     </div>
@@ -293,7 +328,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
 }
 .fd-tab b {
   font-weight: 800;
-  font-stretch: 82%;
+  font-stretch: 76%;
   font-size: clamp(12px, 1.1vw, 16px);
   letter-spacing: 0.01em;
   text-transform: uppercase;
@@ -403,12 +438,29 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   text-overflow: ellipsis;
 }
 .fd-copy {
-  font: 600 11px var(--fd-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 6px 8px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
   border-radius: 6px;
   background: var(--fd-ground);
+}
+.fd-copy svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.fd-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 .fd-go {
   flex: none;
@@ -438,15 +490,36 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   text-transform: uppercase;
   color: var(--fd-ink-3);
 }
+.fd-codes > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .fd-accent {
   text-align: right;
 }
+/* A CSS variable is case-sensitive: print it exactly as written. */
+.fd-var {
+  text-transform: none;
+}
+.fd-tight {
+  display: none;
+}
+/* The one rivet: a flat drawn steel disc, the same drawing as the nav mark. */
 .fd-rivet {
+  display: block;
   width: 24px;
   height: 24px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff 0 12%, #c9ccd3 35%, #6c727c 100%);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4), inset 0 -1px 2px rgb(0 0 0 / 0.25);
+}
+/* Messages scroll under a soft edge instead of being cut by the card's top. */
+.fd-chat::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  inset: 0 0 auto 0;
+  height: 18px;
+  background: linear-gradient(var(--fd-card), transparent);
+  pointer-events: none;
 }
 
 /* ---- narrow: the deck lies flat as a row of strips above the card ---- */
@@ -506,24 +579,35 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   .fd-chip span {
     display: none;
   }
+  /* Tall enough for the whole scripted exchange, so it opens complete,
+     with no jump button over the reply. */
   .fd-chat {
-    height: 420px;
+    height: 560px;
     flex: none;
   }
   .fd-label {
     padding: 22px 18px 14px;
   }
-  .fd-accent {
-    display: none;
-  }
 }
 
-@media (min-width: 961px) and (max-width: 1180px) {
-  .fd-install {
-    flex-direction: column;
+@media (max-width: 1180px) {
+  /* Narrower strips: set the names tighter so OPENROUTER still fits. */
+  .fd-tab b {
+    font-stretch: 70%;
+    letter-spacing: 0;
+  }
+  .fd-cmd code {
+    font-size: 13px;
   }
   .fd-go {
-    justify-content: center;
+    padding: 0 16px;
+  }
+  /* Not enough room for the variable name and the demo note on one line. */
+  .fd-wide {
+    display: none;
+  }
+  .fd-tight {
+    display: inline;
   }
 }
 
