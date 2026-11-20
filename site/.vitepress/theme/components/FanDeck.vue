@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, shallowRef } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import { useData, withBase } from 'vitepress';
 import { strips, DEFAULT_STRIP, type Strip } from '../demo/decks';
 
@@ -19,7 +19,45 @@ const current = computed<Strip>(() => strips[sel.value]);
 const chatEl = shallowRef<HTMLElement & Record<string, unknown>>();
 const stripEls = ref<HTMLButtonElement[]>([]);
 const copied = ref(false);
+
+/* Solid white or solid ink on a chip, whichever reads better (WCAG). */
+function inkOn(hex: string): string {
+  const n = parseInt(hex.slice(1), 16);
+  const lin = (c: number) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return 1.05 / (L + 0.05) >= (L + 0.05) / 0.05 ? '#ffffff' : '#16181d';
+}
 const { isDark } = useData();
+const hero = ref<HTMLElement>();
+
+/* A code that the card or a neighbouring strip lies over can't be read, so
+   it isn't shown. What overlaps depends on the window size, so ask the
+   browser what's on top at each code's corners: on load, on resize, and
+   after a strip finishes sliding. */
+function hideCoveredCodes() {
+  const root = hero.value;
+  if (!root) return;
+  root.querySelectorAll<HTMLElement>('.fd-chip span, .fd-tab span').forEach((code) => {
+    code.style.visibility = '';
+    const owner = code.parentElement!;
+    // The strip is rotated, so the text runs along that angle: sample its
+    // middle and both ends on that line. (The upright bounding box's corners
+    // fall outside rotated text and would land on a neighbour.)
+    const strip = code.closest<HTMLElement>('.fd-strip')!;
+    const angle = (parseFloat(getComputedStyle(strip).getPropertyValue('--a')) || 0) * (Math.PI / 180);
+    const r = code.getBoundingClientRect();
+    const cx = (r.left + r.right) / 2;
+    const cy = (r.top + r.bottom) / 2;
+    const half = code.offsetWidth / 2 - 2;
+    const points = [0, -half, half].map((d) => [cx + d * Math.cos(angle), cy + d * Math.sin(angle)]);
+    const visible = points.every(([x, y]) => {
+      const top = document.elementFromPoint(x, y);
+      return !!top && (top === code || owner.contains(top));
+    });
+    if (!visible) code.style.visibility = 'hidden';
+  });
+}
+let resizeObserver: ResizeObserver | undefined;
 
 let functionAdapter: ((fn: (m: unknown[], s: AbortSignal) => AsyncIterable<string>) => unknown) | null = null;
 
@@ -58,10 +96,24 @@ async function* demoStream(_messages: unknown[], signal: AbortSignal) {
   }
 }
 
+/* On a phone the strips lie flat in a scrolling row; keep the selected one in
+   view (centred) rather than wherever the row happens to start. */
+function revealSelected(smooth: boolean) {
+  const row = hero.value?.querySelector<HTMLElement>('.fd-fan');
+  const strip = stripEls.value[sel.value];
+  if (!row || !strip || row.scrollWidth <= row.clientWidth) return;
+  const rr = row.getBoundingClientRect();
+  const sr = strip.getBoundingClientRect();
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  row.scrollBy({ left: sr.left - rr.left - (rr.width - sr.width) / 2, behavior: smooth && !reduce ? 'smooth' : 'auto' });
+}
+
 function select(i: number, focus = false) {
   sel.value = (i + strips.length) % strips.length;
   applyStrip(current.value);
-  if (focus) nextTick(() => stripEls.value[sel.value]?.focus());
+  if (focus) nextTick(() => stripEls.value[sel.value]?.focus({ preventScroll: true }));
+  nextTick(() => revealSelected(true));
+  setTimeout(hideCoveredCodes, 750);
 }
 
 function onKey(e: KeyboardEvent) {
@@ -93,11 +145,17 @@ onMounted(async () => {
   el.transport = functionAdapter(demoStream);
   el.labels = { emptyHeading: 'Ask the demo something' };
   applyStrip(current.value);
+  hideCoveredCodes();
+  revealSelected(false);
+  resizeObserver = new ResizeObserver(hideCoveredCodes);
+  if (hero.value) resizeObserver.observe(hero.value);
 });
+
+onBeforeUnmount(() => resizeObserver?.disconnect());
 </script>
 
 <template>
-  <section class="fd-hero" aria-labelledby="fd-title">
+  <section ref="hero" class="fd-hero" aria-labelledby="fd-title">
     <div class="fd-fan" role="radiogroup" aria-label="Show the chat in a framework or with a model">
       <button
         v-for="(strip, i) in strips"
@@ -116,15 +174,14 @@ onMounted(async () => {
       >
         <span class="fd-tab">
           <b>{{ strip.name }}</b>
-          <span :data-code="strip.code">{{ strip.code }} · {{ strip.kind }}</span>
+          <span>{{ strip.code }}</span>
         </span>
         <span
           v-for="(c, j) in strip.chips"
           :key="c"
           class="fd-chip"
-          :class="{ 'is-light': j >= 3 }"
-          :style="{ background: c }"
-        ><span>{{ c.slice(1) }}</span></span>
+          :style="{ background: c, color: inkOn(c) }"
+        ><span v-if="j < 2" aria-hidden="true">{{ c.slice(1) }}</span></span>
       </button>
     </div>
 
@@ -243,7 +300,7 @@ onMounted(async () => {
   line-height: 1.1;
 }
 .fd-tab span {
-  font: 500 10px/1.2 var(--fd-mono);
+  font: 500 11px/1.2 var(--fd-mono);
   color: var(--fd-ink-3);
 }
 .fd-chip {
@@ -254,11 +311,7 @@ onMounted(async () => {
   position: absolute;
   left: 9px;
   bottom: 6px;
-  font: 600 10px var(--fd-mono);
-  color: rgb(255 255 255 / 0.88);
-}
-.fd-chip.is-light span {
-  color: rgb(22 24 29 / 0.62);
+  font: 600 11px var(--fd-mono);
 }
 
 /* ---- the pulled card: the product ---- */
@@ -314,6 +367,7 @@ onMounted(async () => {
 }
 .fd-lede {
   margin: 0;
+  text-wrap: pretty;
   font-size: 15px;
   line-height: 1.45;
   color: var(--fd-ink-2);
@@ -448,13 +502,6 @@ onMounted(async () => {
   }
   .fd-tab {
     height: 48px;
-  }
-  .fd-tab span {
-    font-size: 0;
-  }
-  .fd-tab span::after {
-    content: attr(data-code);
-    font-size: 10px;
   }
   .fd-chip span {
     display: none;

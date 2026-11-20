@@ -192,9 +192,10 @@ html {
   border-top: 0;
   margin-top: 48px;
 }
+/* About 75 characters a line in Archivo. */
 .vp-doc p,
 .vp-doc li {
-  max-width: 70ch;
+  max-width: 64ch;
 }
 .vp-doc :not(pre) > code {
   font-size: 0.86em;
@@ -394,4 +395,9 @@ html {
     white-space: normal;
     overflow-wrap: anywhere;
   }
+}
+
+/* Tip and warning boxes set smaller text; keep their lines just as short. */
+.vp-doc .custom-block p {
+  max-width: 58ch;
 }

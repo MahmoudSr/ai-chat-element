@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
   padding: 8px 10px 8px 14px;
   border-top: 1px solid var(--fd-rule);
   background: var(--fd-ground);
-  font: 500 11px/1.4 var(--fd-mono);
+  font: 500 12px/1.4 var(--fd-mono);
   color: var(--fd-ink-3);
 }
 .ld-note {

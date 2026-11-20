@@ -32,7 +32,7 @@ export const strips: Strip[] = [
     name: 'Svelte',
     kind: 'framework',
     code: 'AC-05',
-    chips: ['#5A4300', '#A07A00', '#F2C230', '#F6D466', '#FAE6A3', '#FDF4D6'],
+    chips: ['#5A4300', '#8F6D00', '#F2C230', '#F6D466', '#FAE6A3', '#FDF4D6'],
     theme: { '--ai-chat-accent': '#F2C230', '--ai-chat-accent-fg': '#16181D', '--ai-chat-radius': '16px' },
     ask: 'And Svelte?',
     answer: `Svelte renders custom elements natively. Import once and bind the element:
