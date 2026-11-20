@@ -46,3 +46,6 @@ AGENTS.md
 # bugs the playground cannot. Not shipped; vendor/ is a copy of dist/.
 local-demo/vendor
 local-demo/*.log
+
+# Impeccable design-tool working files: third-party reference images
+.impeccable/reference/
