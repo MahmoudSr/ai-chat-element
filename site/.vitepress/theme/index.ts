@@ -2,11 +2,13 @@ import DefaultTheme from 'vitepress/theme';
 import type { Theme } from 'vitepress';
 import './styles/tokens.css';
 import FanDeck from './components/FanDeck.vue';
+import LiveDemo from './components/LiveDemo.vue';
 
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {
     app.component('FanDeck', FanDeck);
+    app.component('LiveDemo', LiveDemo);
     // Registering <ai-chat> calls customElements.define, which only exists in
     // the browser, so the component loads on the client only, never during
     // the static (SSR) build.

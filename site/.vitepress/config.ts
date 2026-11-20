@@ -42,6 +42,15 @@ const docsSidebar = [
       { text: 'Finish reason and usage', link: '/models/finish-and-usage' },
     ],
   },
+  {
+    text: 'Features',
+    items: [
+      { text: 'Streaming and Markdown', link: '/features/streaming' },
+      { text: 'Reasoning and tool calls', link: '/features/reasoning-tools' },
+      { text: 'Attachments', link: '/features/attachments' },
+      { text: 'Message actions', link: '/features/message-actions' },
+    ],
+  },
 ];
 
 export default defineConfig({
@@ -94,6 +103,7 @@ export default defineConfig({
     sidebar: {
       '/guide/': docsSidebar,
       '/models/': docsSidebar,
+      '/features/': docsSidebar,
     },
     socialLinks: [{ icon: 'github', link: 'https://github.com/MahmoudSr/ai-chat-element' }],
     search: { provider: 'local' },

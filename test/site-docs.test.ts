@@ -7,6 +7,7 @@ import indexSource from '../src/index.ts?raw';
 import openaiSource from '../src/adapters/openai.ts?raw';
 import anthropicSource from '../src/adapters/anthropic.ts?raw';
 import decks from '../site/.vitepress/theme/demo/decks.ts?raw';
+import scenarioSource from '../site/.vitepress/theme/demo/scenarios.ts?raw';
 
 /**
  * The docs site must only name things that exist in the code. Every page under
@@ -16,7 +17,11 @@ import decks from '../site/.vitepress/theme/demo/decks.ts?raw';
  * ship in the docs.
  */
 const pages = import.meta.glob('../site/**/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
-const sources: Record<string, string> = { ...pages, 'site/.vitepress/theme/demo/decks.ts': decks };
+const sources: Record<string, string> = {
+  ...pages,
+  'site/.vitepress/theme/demo/decks.ts': decks,
+  'site/.vitepress/theme/demo/scenarios.ts': scenarioSource,
+};
 const all = Object.entries(sources);
 
 /** Every fenced code block, plus inline code, across the site. */
@@ -79,8 +84,15 @@ describe('the docs site only names real API', () => {
       attrs.add(m[1].toLowerCase());
     }
     const bad: string[] = [];
-    for (const [file, text] of all) {
-      for (const tag of codeIn(text).matchAll(/<ai-chat\b([^>]*)>/g)) {
+    // The live demos build their <ai-chat> from each scenario's attrs string.
+    const demoTags = [...scenarioSource.matchAll(/attrs:\s*'([^']*)'/g)].map((m) => `<ai-chat ${m[1]}>`);
+    expect(demoTags.length).toBeGreaterThan(2);
+    const tagSources: Array<[string, string]> = [
+      ...all.map(([f, t]) => [f, codeIn(t)] as [string, string]),
+      ['scenarios.ts attrs', demoTags.join('\n')],
+    ];
+    for (const [file, text] of tagSources) {
+      for (const tag of text.matchAll(/<ai-chat\b([^>]*)>/g)) {
         // Drop attribute values first, or words inside them read as attributes.
         const names = tag[1].replace(/=\s*("[^"]*"|'[^']*'|\{[^}]*\})/g, ' ');
         for (const a of names.matchAll(/([:@#(\[]?[\w:-]+\)?\]?)(?=[\s=/>]|$)/g)) {
