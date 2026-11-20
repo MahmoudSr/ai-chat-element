@@ -10,13 +10,36 @@ import { strips, DEFAULT_STRIP, type Strip } from '../demo/decks';
  * conversation about that framework or model.
  */
 
-// Fixed slots like a real fan deck: a gap in the middle holds the pulled card.
-// The innermost slots must clear the card, or those strips hide behind it; on
-// a narrower window the strips are shorter, so the fan opens a little wider.
-const SLOTS = [-72, -61.5, -51, -40.5, -30, 30, 40.5, 51, 61.5, 72];
-const SLOTS_NARROW = [-75, -66, -57, -48, -39, 39, 48, 57, 66, 75];
-const narrow = ref(false);
-const slots = computed(() => (narrow.value ? SLOTS_NARROW : SLOTS));
+// Slots like a real fan deck: a gap in the middle holds the pulled card. The
+// innermost strips must clear the card, or their tabs hide behind it, and how
+// far they must turn depends on the card's width and the strips' length (a
+// short window means short strips). So the fan is fitted to the measured
+// geometry instead of fixed per breakpoint; these are the first-paint values.
+const slots = ref([-72, -61.5, -51, -40.5, -30, 30, 40.5, 51, 61.5, 72]);
+const PIVOT = 26; // px from a strip's bottom edge, as in the CSS
+const TAB = 66; // the tab's height at the strip's tip
+
+function fitSlots() {
+  const root = hero.value;
+  const card = root?.querySelector<HTMLElement>('.fd-card');
+  const strip = stripEls.value[0];
+  // On a phone the strips lie flat in a row: nothing to fit.
+  if (!root || !card || !strip || getComputedStyle(root.querySelector('.fd-fan')!).position === 'static') return;
+  const rad = (deg: number) => (deg * Math.PI) / 180;
+  const halfCard = card.offsetWidth / 2 + 12; // plus a little air
+  const halfStrip = strip.offsetWidth / 2;
+  const reach = strip.offsetHeight - PIVOT; // pivot to the strip's tip
+  const tabStart = reach - TAB; // pivot to the tab's lower edge
+  // Smallest angle where the tab's inner lower corner is clear of the card.
+  let inner = 26;
+  while (inner < 52 && tabStart * Math.sin(rad(inner)) - halfStrip * Math.cos(rad(inner)) < halfCard) inner += 0.5;
+  // Largest angle (up to 76) whose tip still lands inside the window.
+  let outer = 76;
+  while (outer > inner + 20 && reach * Math.sin(rad(outer)) + halfStrip * Math.cos(rad(outer)) > root.clientWidth / 2 - 8) outer -= 0.5;
+  const step = (outer - inner) / 4;
+  const right = [0, 1, 2, 3, 4].map((k) => +(inner + k * step).toFixed(2));
+  slots.value = [...right].reverse().map((x) => -x).concat(right);
+}
 
 const sel = ref(Math.max(0, strips.findIndex((s) => s.id === DEFAULT_STRIP)));
 const current = computed<Strip>(() => strips[sel.value]);
@@ -164,13 +187,9 @@ onMounted(async () => {
   el.transport = functionAdapter(demoStream);
   el.labels = { emptyHeading: 'Ask the demo something' };
   applyStrip(current.value);
-  const mq = matchMedia('(max-width: 1366px)');
-  narrow.value = mq.matches;
-  mq.addEventListener('change', (e) => {
-    narrow.value = e.matches;
-  });
+  fitSlots();
   hideCoveredCodes();
-  // Strips turn (to their narrow slots, or when one slides out); check again
+  // Strips turn (to fitted slots, or when one slides out); check again
   // when a turn actually ends rather than guessing how long it takes.
   let settle: ReturnType<typeof setTimeout> | undefined;
   hero.value?.addEventListener('transitionend', (e) => {
@@ -179,7 +198,10 @@ onMounted(async () => {
     settle = setTimeout(hideCoveredCodes, 30);
   });
   revealSelected(false);
-  resizeObserver = new ResizeObserver(hideCoveredCodes);
+  resizeObserver = new ResizeObserver(() => {
+    fitSlots();
+    hideCoveredCodes();
+  });
   if (hero.value) resizeObserver.observe(hero.value);
 });
 
