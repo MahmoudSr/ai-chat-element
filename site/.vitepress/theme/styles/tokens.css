@@ -13,9 +13,6 @@
   --fd-ink-3: #5d6270;
   --fd-rule: #e4e5e8;
   --fd-rule-strong: #cfd2d8;
-  --fd-steel-hi: #ffffff;
-  --fd-steel: #c9ccd3;
-  --fd-steel-lo: #6c727c;
 
   /* Section chips: each docs section owns one. */
   --fd-chip-start: #2f5bff;
@@ -442,3 +439,9 @@ html {
 .VPNavBarMenu .list > li:nth-child(3) { --fd-nav-chip: var(--fd-chip-features); }
 .VPNavBarMenu .list > li:nth-child(4) { --fd-nav-chip: var(--fd-chip-customize); }
 .VPNavBarMenu .list > li:nth-child(5) { --fd-nav-chip: var(--fd-chip-reference); }
+
+/* Hover is not a state change: nav links stay ink (VitePress turns them
+   brand blue on hover). */
+.VPNavBar .VPNavBarMenuLink:hover {
+  color: var(--fd-ink);
+}

@@ -305,7 +305,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   --lift: -8px;
   box-shadow: var(--fd-lift-high);
 }
-/* State by form: the turned strip slides out of the deck, and its tab is struck through with a notch. */
+/* State by form: the turned strip slides out of the deck, and its tab carries a dot. */
 .fd-strip.is-out {
   --lift: -12px;
   box-shadow: var(--fd-lift-high);

@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-21T00:00:00Z",
+  "title": "Design System: ai-chat-element docs",
+  "extensions": {
+    "colorMeta": {
+      "chip-start": { "role": "primary", "displayName": "Standard Blue", "canonical": "#2f5bff", "tonalRamp": ["#0b1a5c", "#132a8f", "#1f45e0", "#2f5bff", "#5c7fff", "#8fa8ff", "#c2d0ff", "#eaefff"] },
+      "chip-model": { "role": "secondary", "displayName": "Deep Teal", "canonical": "#00788f", "tonalRamp": ["#00252d", "#003f4b", "#005a6b", "#00788f", "#2f9bb0", "#6dbccb", "#addbe4", "#e3f3f6"] },
+      "chip-features": { "role": "secondary", "displayName": "Violet Ink", "canonical": "#5b3fe0", "tonalRamp": ["#1b1150", "#2c1d85", "#422cb8", "#5b3fe0", "#7f69ea", "#a597f1", "#ccc3f7", "#eeebfd"] },
+      "chip-customize": { "role": "secondary", "displayName": "Burnt Orange", "canonical": "#c2410c", "tonalRamp": ["#3d1503", "#6a2406", "#963209", "#c2410c", "#e0662f", "#ee966b", "#f7c6ab", "#fdeee6"] },
+      "chip-reference": { "role": "secondary", "displayName": "Graphite", "canonical": "#2c3039", "tonalRamp": ["#121418", "#1d2026", "#2c3039", "#454a55", "#6c727c", "#8b909c", "#c4c8cf", "#eceef2"] },
+      "link-blue": { "role": "primary", "displayName": "Link Blue", "canonical": "#1f45e0" },
+      "ground": { "role": "neutral", "displayName": "Cool Paper Ground", "canonical": "#f4f5f7", "tonalRamp": ["#0f1013", "#17191e", "#262931", "#353945", "#cfd2d8", "#e4e5e8", "#f4f5f7", "#ffffff"] },
+      "card": { "role": "neutral", "displayName": "Chip Card White", "canonical": "#ffffff" },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#16181d", "tonalRamp": ["#0c0d10", "#16181d", "#2c3039", "#3a3e48", "#5d6270", "#8b909c", "#b9bdc7", "#eceef2"] },
+      "code-slab": { "role": "neutral", "displayName": "Code Slab", "canonical": "#16181d" },
+      "rivet-steel": { "role": "neutral", "displayName": "Rivet Steel", "canonical": "#b8bcc4" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "The home headline on the pulled card only (Archivo 850, width 88%)." },
+      "headline": { "displayName": "Headline", "purpose": "Docs page h1 (Archivo 850, width 92%)." },
+      "title": { "displayName": "Title", "purpose": "Docs h2/h3, balance-wrapped, 48px above h2, no rule." },
+      "wordmark": { "displayName": "Wordmark", "purpose": "Nav title beside the rivet (Archivo 800, width 112%)." },
+      "strip-name": { "displayName": "Strip Name", "purpose": "Uppercase condensed framework/model names on fan strip tabs." },
+      "body": { "displayName": "Body", "purpose": "Lede and prose; docs text capped at 64ch." },
+      "label": { "displayName": "Label", "purpose": "Control labels, sidebar current item, filter label." },
+      "code": { "displayName": "Code", "purpose": "Code, install command, CSS variable names." },
+      "chip-code": { "displayName": "Chip Code", "purpose": "Paint codes on strip tabs and swatches; demo-frame status." }
+    },
+    "shadows": [
+      { "name": "lift", "value": "0 2px 3px rgb(22 24 29 / 0.12), 0 8px 24px rgb(22 24 29 / 0.1)", "purpose": "Resting strips, demo frames, mobile cards. Dark: 0 2px 3px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35)." },
+      { "name": "lift-high", "value": "0 4px 8px rgb(22 24 29 / 0.16), 0 30px 60px -10px rgb(22 24 29 / 0.28)", "purpose": "Pulled card, hovered and selected strips. Dark: 0 4px 8px rgb(0 0 0 / 0.45), 0 30px 60px -10px rgb(0 0 0 / 0.6)." },
+      { "name": "selected-ring", "value": "0 0 0 2px var(--fd-ground), 0 0 0 4px var(--fd-ink)", "purpose": "Selected accent swatch in ThemeLab: state by form." }
+    ],
+    "motion": [
+      { "name": "fd-ease", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Damped single-axis strip rotation and lift (0.7s), button rise (0.2s)." },
+      { "name": "strip-turn", "value": "transform 0.7s var(--fd-ease), box-shadow 0.3s ease", "purpose": "A strip turning or sliding out; instant under prefers-reduced-motion." },
+      { "name": "generating-pulse", "value": "opacity 1 -> 0.3 -> 1, 1.2s ease-in-out infinite", "purpose": "History-row dot for a conversation still generating; static under reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "phone-stack", "value": "420px" },
+      { "name": "themelab-stack", "value": "760px" },
+      { "name": "table-cards", "value": "768px" },
+      { "name": "deck-flat", "value": "960px" },
+      { "name": "strip-narrow-type", "value": "1180px" },
+      { "name": "fan-wide-slots", "value": "1366px" },
+      { "name": "short-window", "value": "max-height 800px (desktop): lede hidden" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Get Started Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one solid ink action on the home page.",
+      "html": "<a class=\"ds-go\" href=\"#\">Get started</a>",
+      "css": ".ds-go { display: inline-flex; align-items: center; height: 44px; padding: 0 20px; border-radius: 8px; background: var(--fd-ink, #16181d); color: var(--fd-card, #ffffff); font: 700 15px 'Archivo', ui-sans-serif, system-ui, sans-serif; text-decoration: none; transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); } .ds-go:hover { transform: translateY(-1px); } .ds-go:focus-visible { outline: 2px solid #2f5bff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Install Command",
+      "kind": "button",
+      "refersTo": "install-command",
+      "description": "Click-to-copy npm command, outlined in ink as the thing to copy.",
+      "html": "<button type=\"button\" class=\"ds-cmd\"><code>npm i ai-chat-element</code><span class=\"ds-copy\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><rect x=\"9\" y=\"9\" width=\"12\" height=\"12\" rx=\"2\"/><path d=\"M5 15V5a2 2 0 0 1 2-2h10\"/></svg></span></button>",
+      "css": ".ds-cmd { width: 300px; height: 44px; padding: 0 8px 0 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1.5px solid var(--fd-ink, #16181d); border-radius: 8px; background: var(--fd-card, #fff); color: var(--fd-ink, #16181d); cursor: copy; } .ds-cmd code { font: 500 14px 'JetBrains Mono', ui-monospace, monospace; } .ds-copy { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 6px; background: var(--fd-ground, #f4f5f7); } .ds-copy svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; } .ds-cmd:focus-visible { outline: 2px solid #2f5bff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Tool Button",
+      "kind": "button",
+      "refersTo": "button-tool",
+      "description": "Small secondary action in demo frames (Replay, Reset).",
+      "html": "<button type=\"button\" class=\"ds-tool\">Replay</button>",
+      "css": ".ds-tool { padding: 6px 10px; border: 1px solid var(--fd-rule-strong, #cfd2d8); border-radius: 6px; background: var(--fd-card, #fff); color: var(--fd-ink, #16181d); font: 600 12px 'Archivo', ui-sans-serif, sans-serif; cursor: pointer; } .ds-tool:hover { border-color: var(--fd-ink-3, #5d6270); } .ds-tool:focus-visible { outline: 2px solid #2f5bff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Filter Input",
+      "kind": "input",
+      "refersTo": "input-filter",
+      "description": "Filter above a long reference table, with a mono match count.",
+      "html": "<label class=\"ds-filter\">Filter <input type=\"search\" placeholder=\"accent\"><output>95 of 95</output></label>",
+      "css": ".ds-filter { display: flex; align-items: center; gap: 10px; font: 650 14px 'Archivo', ui-sans-serif, sans-serif; color: var(--fd-ink, #16181d); } .ds-filter input { flex: 1; max-width: 320px; height: 36px; padding: 0 12px; border: 1px solid var(--fd-rule-strong, #cfd2d8); border-radius: 8px; background: var(--fd-card, #fff); color: var(--fd-ink, #16181d); font: 500 14px 'Archivo', sans-serif; } .ds-filter input:focus-visible { outline: 2px solid #2f5bff; outline-offset: 2px; } .ds-filter output { font: 500 12px 'JetBrains Mono', monospace; color: var(--fd-ink-3, #5d6270); }"
+    },
+    {
+      "name": "Section Nav",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Top nav links, each with its section chip; current section is ink with a 2px ink underline.",
+      "html": "<nav class=\"ds-nav\"><a style=\"--c:#2f5bff\" class=\"is-active\">Get started</a><a style=\"--c:#00788f\">Models</a><a style=\"--c:#5b3fe0\">Features</a><a style=\"--c:#c2410c\">Customize</a><a style=\"--c:#2c3039\">Reference</a></nav>",
+      "css": ".ds-nav { display: flex; gap: 20px; font: 500 14px 'Archivo', ui-sans-serif, sans-serif; } .ds-nav a { display: inline-flex; align-items: center; gap: 7px; color: var(--fd-ink-2, #3a3e48); text-decoration: none; cursor: pointer; } .ds-nav a::before { content: ''; width: 7px; height: 10px; border-radius: 2px; background: var(--c); translate: 0 -0.5px; } .ds-nav a:hover { color: var(--fd-ink, #16181d); } .ds-nav a.is-active { color: var(--fd-ink, #16181d); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 8px; }"
+    },
+    {
+      "name": "Sidebar Group",
+      "kind": "nav",
+      "refersTo": "sidebar",
+      "description": "Group title with its chip swatch; the current page is ink with a square notch in the group colour.",
+      "html": "<div class=\"ds-side\" style=\"--c:#c2410c\"><p class=\"ds-side-title\">Customize</p><a>Theming</a><a class=\"is-active\">Styling parts</a><a>Slots</a></div>",
+      "css": ".ds-side { display: flex; flex-direction: column; gap: 6px; padding-left: 14px; font: 500 14px 'Archivo', sans-serif; } .ds-side-title { margin: 0 0 4px -14px; display: flex; align-items: center; gap: 10px; font-weight: 750; font-stretch: 92%; letter-spacing: 0.01em; color: var(--fd-ink, #16181d); } .ds-side-title::before { content: ''; width: 12px; height: 18px; border-radius: 3px; background: var(--c); } .ds-side a { position: relative; color: var(--fd-ink-2, #3a3e48); cursor: pointer; } .ds-side a:hover { color: var(--fd-ink, #16181d); } .ds-side a.is-active { color: var(--fd-ink, #16181d); font-weight: 650; } .ds-side a.is-active::before { content: ''; position: absolute; left: -14px; top: 50%; width: 6px; height: 6px; margin-top: -3px; border-radius: 1px; background: var(--c); }"
+    },
+    {
+      "name": "Fan Strip",
+      "kind": "custom",
+      "refersTo": "fan-strip",
+      "description": "Signature: a paint-deck strip with a named tab and full-strength swatches; selected slides out with an ink dot.",
+      "html": "<button type=\"button\" class=\"ds-strip is-out\"><span class=\"ds-tab\"><b>Angular</b><span>AC-04</span></span><span class=\"ds-chip\" style=\"background:#5C0B2E;color:#fff\"><i>5C0B2E</i></span><span class=\"ds-chip\" style=\"background:#C2185B;color:#fff\"><i>C2185B</i></span><span class=\"ds-chip\" style=\"background:#D81E6B\"></span><span class=\"ds-chip\" style=\"background:#EC5F98\"></span><span class=\"ds-chip\" style=\"background:#F5A3C4\"></span><span class=\"ds-chip\" style=\"background:#FCDDEA\"></span></button>",
+      "css": ".ds-strip { --lift: 0px; width: 104px; height: 300px; padding: 0; border: 0; display: flex; flex-direction: column; background: var(--fd-card, #fff); color: var(--fd-ink, #16181d); border-radius: 10px; overflow: hidden; text-align: left; cursor: pointer; box-shadow: 0 2px 3px rgb(22 24 29 / 0.12), 0 8px 24px rgb(22 24 29 / 0.1); transform: translateY(var(--lift)); transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease; } .ds-strip:hover { --lift: -8px; box-shadow: 0 4px 8px rgb(22 24 29 / 0.16), 0 30px 60px -10px rgb(22 24 29 / 0.28); } .ds-strip.is-out { --lift: -12px; box-shadow: 0 4px 8px rgb(22 24 29 / 0.16), 0 30px 60px -10px rgb(22 24 29 / 0.28); } .ds-strip:focus-visible { outline: 3px solid #16181d; outline-offset: 3px; } .ds-tab { position: relative; flex: none; height: 66px; padding: 12px 10px 0; display: flex; flex-direction: column; gap: 3px; } .ds-tab b { font: 800 14px/1.1 'Archivo', sans-serif; font-stretch: 76%; letter-spacing: 0.01em; text-transform: uppercase; } .ds-tab span { font: 500 11px/1.2 'JetBrains Mono', monospace; color: var(--fd-ink-3, #5d6270); } .ds-strip.is-out .ds-tab::after { content: ''; position: absolute; right: 10px; top: 12px; width: 12px; height: 12px; border-radius: 50%; background: #16181d; } .ds-chip { flex: 1; position: relative; } .ds-chip i { position: absolute; left: 9px; bottom: 6px; font: normal 600 11px 'JetBrains Mono', monospace; } @media (prefers-reduced-motion: reduce) { .ds-strip { transition: none; } }"
+    },
+    {
+      "name": "Demo Frame",
+      "kind": "card",
+      "refersTo": "demo-frame",
+      "description": "The frame around every live <ai-chat> on a docs page, with its ground toolbar.",
+      "html": "<div class=\"ds-frame\"><div class=\"ds-frame-body\">live &lt;ai-chat&gt;</div><div class=\"ds-frame-bar\"><span class=\"ds-note\">Scripted demo</span><span class=\"ds-event\">ai-chat:message</span><button type=\"button\" class=\"ds-play\">Replay</button></div></div>",
+      "css": ".ds-frame { width: 420px; border: 1px solid var(--fd-rule-strong, #cfd2d8); border-radius: 12px; overflow: hidden; background: var(--fd-card, #fff); box-shadow: 0 2px 3px rgb(22 24 29 / 0.12), 0 8px 24px rgb(22 24 29 / 0.1); } .ds-frame-body { height: 160px; display: grid; place-items: center; font: 500 14px 'Archivo', sans-serif; color: var(--fd-ink-3, #5d6270); } .ds-frame-bar { display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 14px; border-top: 1px solid var(--fd-rule, #e4e5e8); background: var(--fd-ground, #f4f5f7); font: 500 12px/1.4 'JetBrains Mono', monospace; color: var(--fd-ink-3, #5d6270); } .ds-note { text-transform: uppercase; letter-spacing: 0.05em; } .ds-event { flex: 1; color: var(--fd-ink-2, #3a3e48); } .ds-play { padding: 6px 10px; border: 1px solid var(--fd-rule-strong, #cfd2d8); border-radius: 6px; background: var(--fd-card, #fff); color: var(--fd-ink, #16181d); font: 600 12px 'Archivo', sans-serif; cursor: pointer; } .ds-play:hover { border-color: var(--fd-ink-3, #5d6270); } .ds-play:focus-visible { outline: 2px solid #2f5bff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Accent Swatch",
+      "kind": "chip",
+      "refersTo": "accent-swatch",
+      "description": "ThemeLab accent picker; selected by a ring, never by colour.",
+      "html": "<div class=\"ds-swatches\"><button class=\"ds-sw\" style=\"background:#F2C230\"></button><button class=\"ds-sw is-on\" style=\"background:#C2185B\"></button><button class=\"ds-sw\" style=\"background:#2f5bff\"></button></div>",
+      "css": ".ds-swatches { display: grid; grid-template-columns: repeat(3, 32px); gap: 6px; padding: 8px; background: var(--fd-ground, #f4f5f7); } .ds-sw { aspect-ratio: 1; border: 0; border-radius: 4px; cursor: pointer; transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1); } .ds-sw:hover { transform: translateY(-2px); } .ds-sw.is-on { box-shadow: 0 0 0 2px var(--fd-ground, #f4f5f7), 0 0 0 4px var(--fd-ink, #16181d); } .ds-sw:focus-visible { outline: 2px solid #2f5bff; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Colour Fan Deck",
+    "overview": "The site is a paint-store colour standard fanned open. One steel rivet (the one `<ai-chat>` tag) holds every strip: each strip is a framework or a model, and each carries a real, valid `<ai-chat>` theme. Turning the fan swings a strip to centre and re-themes the live chat through its actual CSS variables. Nothing on the home page is a picture of the product; the pulled card is the product.\n\nThe world is bright and dry: white chip card stock on a cool pale ground, flat full-strength swatches, ink type, one drawn steel disc. Colour is the content (it is what a fan deck is for), so the interface itself never spends hue on state. Selection, current page and hover are told by form: a strip slides out, a square notch sits beside the current link, a 2px ink underline marks the current section. The docs pages carry the same language quietly: each docs section owns one chip colour, shown as a swatch on its sidebar group and a cap-height chip on its nav link, and everything else is ink on white at a calm reading measure.\n\nDensity is low on the home page (exactly one screen on desktop, no footer) and editorial in the docs (64ch measure, generous heading space). Dark mode follows the visitor's system: page and live chat go dark, but the fan's strips keep light card stock, like a paint deck lying on a dark desk.",
+    "keyCharacteristics": [
+      "Cool pale ground (#f4f5f7), never cream; white cards; ink (#16181d) type.",
+      "Five section chips, flat and full strength, one per docs section.",
+      "State by form, never hue.",
+      "Archivo on its width axis for everything readable; JetBrains Mono only for code and chip codes.",
+      "One steel rivet as the mark, in the nav and at the fan's pivot; it never moves.",
+      "Code is always a dark slab, in both modes.",
+      "Live, mock-transport `<ai-chat>` instances wherever the product is shown."
+    ],
+    "rules": [
+      { "name": "The Hue Is Content Rule", "body": "Hue belongs to chips and themes. No selected, current, hover or active state is ever expressed by changing a colour; it is expressed by lift, notch, underline, ring or dot in ink.", "section": "colors" },
+      { "name": "The One Chip Per Section Rule", "body": "Each docs section owns exactly one chip colour, used only as that section's swatch (nav chip, sidebar group swatch, current-page notch). Never as text colour, background wash or button fill.", "section": "colors" },
+      { "name": "The Never Cream Rule", "body": "The ground is cool (#f4f5f7). Warm off-whites are outside this world.", "section": "colors" },
+      { "name": "The Mono Is Code Rule", "body": "JetBrains Mono appears only on code, CSS variable names, and paint/chip codes. Never for headings, buttons or prose.", "section": "typography" },
+      { "name": "The Whole Identifier Rule", "body": "Inline code and table identifiers never break mid-name (`white-space: nowrap`); only long values (types, defaults, payloads) may wrap.", "section": "typography" },
+      { "name": "The Lift Is State Rule", "body": "A strip rises 8px on hover and 12px when selected, gaining Lift High. Rising is how the deck says \"this one\", never a colour change.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** show state by form: lift (8px hover, 12px selected), a square notch, a 2px ink underline, a ring (`0 0 0 2px ground, 0 0 0 4px ink`) or a dot.",
+      "**Do** give each docs section one chip colour and use it only as that section's swatch.",
+      "**Do** put code on the dark slab (#16181d light, #0c0d10 dark) with github-dark colours in both modes.",
+      "**Do** show the product as a live `<ai-chat>` on a mock transport, framed in a 12px demo frame with Lift.",
+      "**Do** keep the home page one screen on desktop and stack label, strip row, chat on a phone.",
+      "**Do** keep prose at 64ch and stack tables into labelled cards at 768px and below.",
+      "**Do** honour `prefers-reduced-motion` on every transition and the pulsing dot."
+    ],
+    "donts": [
+      "**Don't** change a colour to mark selected, current, hover or active.",
+      "**Don't** use a warm or cream ground.",
+      "**Don't** set headings, buttons or prose in JetBrains Mono.",
+      "**Don't** add a second mark or move the rivet; it is the logo in the nav and the pivot of the fan.",
+      "**Don't** put a light-themed code block on the page; light syntax colours on the dark slab are unreadable.",
+      "**Don't** let a section chip become a text colour, a background wash or a button fill."
+    ]
+  }
+}
