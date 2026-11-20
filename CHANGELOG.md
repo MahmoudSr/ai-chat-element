@@ -79,6 +79,9 @@ scroll fixes found by testing long replies in a real browser.
   message (older messages loaded above don't count as a switch).
 - **A long chat could ask for older messages just by opening** (with
   `has-earlier`), before the reader scrolled anywhere.
+- **`openAIAdapter` with `n > 1`** mixed other choices into the answer when a
+  server sent each choice in its own chunk (it always read `choices[0]`). Only
+  choice 0 is the answer now.
 - **Saved steps are never trusted.** A conversation restored from an app's
   storage with broken steps (not a list, junk entries, garbage positions or
   times, unknown step types) renders what it can and skips the rest — before,

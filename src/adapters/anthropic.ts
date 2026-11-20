@@ -228,8 +228,9 @@ export function anthropicAdapter(
             }
             case 'content_block_stop': {
               const block = blocks.get(json.index);
-              if (block?.toolId) {
-                const args = parseArgs(block.json);
+              const args = block?.toolId ? parseArgs(block.json) : undefined;
+              // Nothing to say for a tool of YOUR app that took no input.
+              if (block?.toolId && (args !== undefined || block.server)) {
                 yield {
                   type: 'tool',
                   id: block.toolId,

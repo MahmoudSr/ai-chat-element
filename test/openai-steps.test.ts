@@ -116,6 +116,63 @@ describe('openAIAdapter: reasoning and tools', () => {
   });
 });
 
+describe('openAIAdapter: odd but real stream shapes', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const raw = (o: object) => `data: ${JSON.stringify(o)}\n\n`;
+
+  it('n > 1: only choice 0 makes the answer, even when other choices come in their own chunks', async () => {
+    const c = await run(
+      raw({ choices: [{ index: 0, delta: { content: 'First ' } }] }) +
+      raw({ choices: [{ index: 1, delta: { content: 'OTHER ' } }] }) +
+      raw({ choices: [{ index: 0, delta: { content: 'answer.' }, finish_reason: 'stop' }] }) +
+      raw({ choices: [{ index: 1, delta: { content: 'CHOICE' }, finish_reason: 'length' }] }) +
+      'data: [DONE]\n\n',
+    );
+    expect(merged(c)).toEqual([{ type: 'delta', text: 'First answer.' }]);
+    expect(c.at(-1)).toMatchObject({ finishReason: 'stop' });
+  });
+
+  it('usage-only chunks (empty choices), null content and reasoning after content', async () => {
+    const c = await run(
+      raw({ choices: [{ index: 0, delta: { content: null, reasoning_content: 'pre' } }] }) +
+      raw({ choices: [{ index: 0, delta: { content: 'A' } }] }) +
+      raw({ choices: [{ index: 0, delta: { reasoning_content: 'post' } }] }) +
+      raw({ choices: [], usage: { prompt_tokens: 1, completion_tokens: 2 } }) +
+      'data: [DONE]\n\n',
+    );
+    expect(noDone(c)).toEqual([
+      { type: 'reasoning', delta: 'pre' },
+      { type: 'delta', delta: 'A' },
+      { type: 'reasoning', delta: 'post' },
+    ]);
+    expect(c.at(-1)).toMatchObject({ usage: { inputTokens: 1, outputTokens: 2 } });
+  });
+
+  it('tool_calls fragments without an index continue the call they belong to', async () => {
+    const c = await run(
+      chunk({ tool_calls: [{ id: 'call_1', function: { name: 'search', arguments: '{"q":' } }] }) +
+      chunk({ tool_calls: [{ function: { arguments: '"lit"}' } }] }) +
+      chunk({ tool_calls: [{ id: 'call_2', function: { name: 'fetch', arguments: '{}' } }] }) +
+      chunk({}, 'tool_calls') + 'data: [DONE]\n\n',
+    );
+    const tools = c.filter((x) => x.type === 'tool');
+    expect(tools.filter((t) => 'name' in t).map((t) => (t as { id: string }).id)).toEqual(['call_1', 'call_2']);
+    expect(tools).toContainEqual({ type: 'tool', id: 'call_1', args: { q: 'lit' } });
+    expect(tools).toContainEqual({ type: 'tool', id: 'call_2', args: {} });
+  });
+
+  it('a stream that ends with no [DONE] still releases a held <think> and finishes', async () => {
+    const c = await run(chunk({ content: '<think>never closed' }));
+    expect(merged(c)).toEqual([{ type: 'reasoning', text: 'never closed' }]);
+    expect(c.at(-1)!.type).toBe('done');
+  });
+
+  it('<think> with an empty answer: reasoning only, no stray whitespace text', async () => {
+    const c = await run(chunk({ content: '<think>just thinking</think>\n\n' }) + 'data: [DONE]\n\n');
+    expect(merged(c)).toEqual([{ type: 'reasoning', text: 'just thinking' }]);
+  });
+});
+
 describe('ThinkTagSplitter', () => {
   const feed = (pieces: string[]) => {
     const s = new ThinkTagSplitter();

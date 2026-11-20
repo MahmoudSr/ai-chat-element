@@ -106,6 +106,21 @@ export function openAIAdapter(options: OpenAIAdapterOptions): ChatTransport {
       // Tool calls stream as fragments keyed by `index`: the first carries the
       // id and name, later ones pieces of the arguments' JSON.
       const calls = new Map<number, { id: string; args: string; closed: boolean }>();
+      let lastIndex = -1;
+      /**
+       * Which call a fragment belongs to. Normally its `index`. Some servers
+       * omit it: then a known `id` finds its call, a fragment with no id and no
+       * name continues the last call, and anything else starts a new one.
+       */
+      const callIndex = (tc: any): number => {
+        if (typeof tc?.index === 'number') return (lastIndex = tc.index);
+        if (typeof tc?.id === 'string' && tc.id) {
+          for (const [i, c] of calls) if (c.id === tc.id) return (lastIndex = i);
+        } else if (!tc?.function?.name && lastIndex >= 0) {
+          return lastIndex;
+        }
+        return (lastIndex = Math.max(-1, ...calls.keys()) + 1);
+      };
       /** Parse each call's arguments once it's complete. */
       function* closeCalls(): Generator<StreamChunk> {
         for (const call of calls.values()) {
@@ -134,7 +149,11 @@ export function openAIAdapter(options: OpenAIAdapterOptions): ChatTransport {
           } catch {
             continue; // ignore keep-alive / non-JSON lines
           }
-          const choice = json.choices?.[0];
+          // Only choice 0 is the answer. With `n > 1` in params, servers send each
+          // choice in its own chunk, so `choices[0]` is not always choice 0.
+          const choice = Array.isArray(json.choices)
+            ? json.choices.find((c: any) => (c?.index ?? 0) === 0)
+            : undefined;
           const d = choice?.delta ?? {};
           // Reasoning, by whichever name the server uses for it.
           const reasoning = typeof d.reasoning_content === 'string' ? d.reasoning_content : d.reasoning;
@@ -146,7 +165,7 @@ export function openAIAdapter(options: OpenAIAdapterOptions): ChatTransport {
           }
           if (Array.isArray(d.tool_calls)) {
             for (const tc of d.tool_calls) {
-              const index = typeof tc?.index === 'number' ? tc.index : calls.size;
+              const index = callIndex(tc);
               let call = calls.get(index);
               if (!call) {
                 call = { id: typeof tc.id === 'string' && tc.id ? tc.id : `call_${index}`, args: '', closed: false };

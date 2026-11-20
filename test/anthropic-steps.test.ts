@@ -148,6 +148,51 @@ describe('anthropicAdapter: thinking and tools', () => {
     expect(chunks.find((c) => c.type === 'tool' && 'error' in c)).toEqual({ type: 'tool', id: 'm1', error: 'Repository not found' });
   });
 
+  it('interleaved thinking between tool calls keeps its order; ping and unknown blocks are ignored', async () => {
+    const chunks = await run(sse(
+      start,
+      { type: 'ping' },
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'plan A' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 't1', name: 'a', input: {} } },
+      { type: 'content_block_stop', index: 1 },
+      { type: 'content_block_start', index: 2, content_block: { type: 'brand_new_block', data: 'x' } },
+      { type: 'content_block_delta', index: 2, delta: { type: 'brand_new_delta', stuff: 1 } },
+      { type: 'content_block_stop', index: 2 },
+      { type: 'ping' },
+      { type: 'content_block_start', index: 3, content_block: { type: 'thinking', thinking: '' } },
+      { type: 'content_block_delta', index: 3, delta: { type: 'thinking_delta', thinking: 'plan B' } },
+      { type: 'content_block_stop', index: 3 },
+      { type: 'content_block_start', index: 4, content_block: { type: 'tool_use', id: 't2', name: 'b', input: {} } },
+      { type: 'content_block_stop', index: 4 },
+      ...stop('tool_use'),
+    ));
+    expect(without(chunks, 'done').map((c) => (c.type === 'tool' ? `tool:${c.id}${'name' in c ? '+' : ''}` : `${c.type}:${'delta' in c ? c.delta : ''}`)))
+      .toEqual(['reasoning:', 'reasoning:plan A', 'tool:t1+', 'reasoning:', 'reasoning:plan B', 'tool:t2+']);
+  });
+
+  it('a stream error mid-tool ends with the error; invalid JSON input never becomes args', async () => {
+    const chunks = await run(sse(
+      start,
+      { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 't', name: 'x', input: {} } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{"broken": ' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } },
+    ));
+    expect(chunks.some((c) => c.type === 'tool' && 'args' in c)).toBe(false);
+    expect(chunks.at(-1)).toEqual({ type: 'error', error: 'Overloaded' });
+  });
+
+  it('a stream that ends without message_stop still finishes', async () => {
+    const chunks = await run(sse(
+      start,
+      { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'cut' } },
+    ));
+    expect(chunks.map((c) => c.type)).toEqual(['delta', 'done']);
+  });
+
   it('a plain text stream yields exactly what it did before', async () => {
     const chunks = await run(sse(
       start,
