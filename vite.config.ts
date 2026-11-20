@@ -9,8 +9,8 @@ export default defineConfig({
   build: {
     lib: {
       entry: {
-        'ai-chat-element': resolve(__dirname, 'src/index.ts'),
-        'adapters/index': resolve(__dirname, 'src/adapters/index.ts'),
+        'ai-chat-element': resolve(import.meta.dirname, 'src/index.ts'),
+        'adapters/index': resolve(import.meta.dirname, 'src/adapters/index.ts'),
       },
       formats: ['es'],
     },

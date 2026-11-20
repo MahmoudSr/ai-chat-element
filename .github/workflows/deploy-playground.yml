@@ -1,5 +1,9 @@
 name: Deploy playground
 
+# Every action is pinned to a full commit SHA (version in the comment). A tag
+# can be moved to point at different code; a SHA can't. Dependabot keeps the
+# pins current (.github/dependabot.yml).
+
 # Publishes the examples to GitHub Pages:
 # https://mahmoudsr.github.io/ai-chat-element/
 #
@@ -28,12 +32,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Must match the Node/npm that generated package-lock.json. On 20 (npm 10)
       # `npm ci` rejects a lockfile written by npm 11 — it reads the nested
       # vitest->vite 5 entries as missing top-level deps and refuses to install.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm
@@ -47,9 +53,9 @@ jobs:
 
       - run: npm run build:site
 
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: dist-site
 
@@ -61,4 +67,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

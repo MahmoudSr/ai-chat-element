@@ -1,0 +1,29 @@
+# Keeps dependencies and the SHA-pinned GitHub Actions current, so security
+# fixes don't sit unnoticed. Weekly and grouped: one PR per ecosystem per week
+# rather than one per package. Every PR still has to pass CI before merging.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      runtime:
+        dependency-type: production
+      tooling:
+        dependency-type: development
+    # A brand-new release is when a hijacked package does its damage; give the
+    # registry a few days to catch it before we pick it up.
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+    cooldown:
+      default-days: 7

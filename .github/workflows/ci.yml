@@ -4,12 +4,20 @@ name: CI
 # typecheck + tests (real Chromium) + library build. This is the check that
 # was previously only a side effect of the Pages deploy — now it runs on PRs
 # too, so nothing lands on main red.
+#
+# Every action is pinned to a full commit SHA (version in the comment). A tag
+# can be moved to point at different code; a SHA can't. Dependabot keeps the
+# pins current (.github/dependabot.yml).
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+# Read-only token: this job only checks code, it never writes to the repo.
+permissions:
+  contents: read
 
 # A newer push to the same branch/PR supersedes an in-flight run — no point
 # finishing CI for a commit that's already been replaced.
@@ -21,11 +29,13 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       # Node 24 to match the npm that wrote package-lock.json — npm ci on an
       # older npm rejects this lockfile (see deploy-playground.yml for the why).
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
           cache: npm

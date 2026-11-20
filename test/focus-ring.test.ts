@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { userEvent } from '@vitest/browser/context';
+import { userEvent } from 'vitest/browser';
 import { cleanupAll, mount, until } from './helpers.ts';
 import type { AiChat } from '../src/ai-chat.ts';
 
