@@ -11,7 +11,9 @@ import { strips } from '../demo/decks';
 const DEFAULTS = { accent: '#4f46e5', radius: 8, fontSize: 15, font: 'system', theme: 'auto', bubble: false };
 const FONTS: Record<string, { label: string; value: string }> = {
   system: { label: 'System (default)', value: '' },
-  archivo: { label: 'Archivo', value: "'Archivo', sans-serif" },
+  // Fontsource names it 'Archivo Variable' (this site self-hosts it that way),
+  // Google Fonts names it 'Archivo': the pasted code works with either.
+  archivo: { label: 'Archivo', value: "'Archivo Variable', 'Archivo', sans-serif" },
   serif: { label: 'Georgia', value: 'Georgia, serif' },
   mono: { label: 'Monospace', value: "ui-monospace, 'Cascadia Code', monospace" },
 };

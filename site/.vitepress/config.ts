@@ -213,22 +213,19 @@ export default defineConfig({
 
   sitemap: { hostname: SITE },
 
-  transformHead: ({ pageData, title, description }) =>
-    seoHead(pageData.relativePath, title, description, pageData.isNotFound),
+  transformHead: ({ pageData, title, description, assets }) => [
+    // The two fonts every page draws with, Latin subset: fetched alongside
+    // the CSS instead of after it, so text doesn't re-wrap when they land.
+    ...assets
+      .filter((a) => /(archivo-latin-wdth-normal|jetbrains-mono-latin-wght-normal)\.[\w-]+\.woff2$/.test(a))
+      .map((href): HeadConfig => ['link', { rel: 'preload', href, as: 'font', type: 'font/woff2', crossorigin: '' }]),
+    ...seoHead(pageData.relativePath, title, description, pageData.isNotFound),
+  ],
 
   buildEnd: (siteConfig) => writeLlmsTxt(siteConfig.srcDir, siteConfig.outDir),
 
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/ai-chat-element/rivet.svg' }],
-    ['link', { rel: 'preconnect', href: 'https://fonts.googleapis.com' }],
-    ['link', { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' }],
-    [
-      'link',
-      {
-        rel: 'stylesheet',
-        href: 'https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=JetBrains+Mono:wght@400;500;600&display=swap',
-      },
-    ],
     ['meta', { name: 'theme-color', content: '#F4F5F7' }],
   ],
 
