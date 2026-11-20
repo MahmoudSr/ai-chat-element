@@ -41,7 +41,10 @@
     "test": "vitest run --config vitest.config.ts",
     "test:watch": "vitest --config vitest.config.ts",
     "build:site": "vite build --config vite.config.site.ts",
-    "verify:bundling": "node scripts/verify-bundling.mjs"
+    "verify:bundling": "node scripts/verify-bundling.mjs",
+    "docs:dev": "vitepress dev site",
+    "docs:build": "vitepress build site",
+    "docs:preview": "vitepress preview site"
   },
   "keywords": [
     "ai",
@@ -71,6 +74,7 @@
     "playwright": "^1.65.1",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
+    "vitepress": "2.0.0-alpha.21",
     "vitest": "^5.1.1"
   }
 }

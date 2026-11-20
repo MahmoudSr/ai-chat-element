@@ -1,0 +1,105 @@
+/*
+ * Fan Deck: the site's visual world.
+ * Bright white chip cards on a cool pale ground (never cream), full-strength
+ * flat swatches, one steel rivet. Archivo carries display and UI; JetBrains
+ * Mono is only for code and chip codes. State is shown by form (a strip lifts,
+ * a notch cuts, a code is struck), never by hue, because hue is the content.
+ */
+:root {
+  --fd-ground: #f4f5f7;
+  --fd-card: #ffffff;
+  --fd-ink: #16181d;
+  --fd-ink-2: #3a3e48;
+  --fd-ink-3: #5d6270;
+  --fd-rule: #e4e5e8;
+  --fd-rule-strong: #cfd2d8;
+  --fd-steel-hi: #ffffff;
+  --fd-steel: #c9ccd3;
+  --fd-steel-lo: #6c727c;
+
+  /* Section chips: each docs section owns one. */
+  --fd-chip-start: #2f5bff;
+  --fd-chip-model: #00788f;
+  --fd-chip-features: #5b3fe0;
+  --fd-chip-customize: #c2410c;
+  --fd-chip-reference: #2c3039;
+
+  --fd-font: 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --fd-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  --fd-radius: 10px;
+  --fd-lift: 0 2px 3px rgb(22 24 29 / 0.12), 0 8px 24px rgb(22 24 29 / 0.1);
+  --fd-lift-high: 0 4px 8px rgb(22 24 29 / 0.16), 0 30px 60px -10px rgb(22 24 29 / 0.28);
+  --fd-ease: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* VitePress, re-skinned into the world. */
+  --vp-font-family-base: var(--fd-font);
+  --vp-font-family-mono: var(--fd-mono);
+  --vp-c-bg: var(--fd-card);
+  --vp-c-bg-alt: var(--fd-ground);
+  --vp-c-bg-soft: var(--fd-ground);
+  --vp-c-text-1: var(--fd-ink);
+  --vp-c-text-2: var(--fd-ink-2);
+  --vp-c-text-3: var(--fd-ink-3);
+  --vp-c-divider: var(--fd-rule);
+  --vp-c-border: var(--fd-rule-strong);
+  --vp-c-gutter: var(--fd-rule);
+  --vp-c-brand-1: #1f45e0;
+  --vp-c-brand-2: #2f5bff;
+  --vp-c-brand-3: #2f5bff;
+  --vp-c-brand-soft: rgb(47 91 255 / 0.1);
+  --vp-nav-height: 64px;
+  --vp-code-font-size: 0.875em;
+  --vp-code-block-bg: #16181d;
+}
+
+.dark {
+  --fd-ground: #0f1013;
+  --fd-card: #17191e;
+  --fd-ink: #eceef2;
+  --fd-ink-2: #b9bdc7;
+  --fd-ink-3: #8b909c;
+  --fd-rule: #262931;
+  --fd-rule-strong: #353945;
+  --fd-lift: 0 2px 3px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.35);
+  --fd-lift-high: 0 4px 8px rgb(0 0 0 / 0.45), 0 30px 60px -10px rgb(0 0 0 / 0.6);
+  --vp-c-brand-1: #8fa8ff;
+  --vp-c-brand-2: #6e8bff;
+  --vp-c-brand-3: #2f5bff;
+  --vp-c-brand-soft: rgb(110 139 255 / 0.16);
+  --vp-code-block-bg: #0c0d10;
+}
+
+::selection {
+  background: rgb(47 91 255 / 0.22);
+}
+
+html {
+  scrollbar-color: var(--fd-rule-strong) transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--vp-c-brand-2);
+  outline-offset: 2px;
+}
+
+/* The wordmark: the rivet is the mark and never moves. */
+.VPNavBarTitle .title {
+  font-weight: 800;
+  font-stretch: 112%;
+  letter-spacing: -0.01em;
+  font-size: 19px;
+  gap: 10px;
+}
+.VPNavBarTitle .logo {
+  height: 16px;
+  width: 16px;
+}
+.VPNavBar .content-body {
+  font-weight: 500;
+}
+
+/* Home is a single screen: nothing below the deck, no footer. */
+.fd-home .VPPage {
+  padding: 0;
+}

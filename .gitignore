@@ -49,3 +49,7 @@ local-demo/*.log
 
 # Impeccable design-tool working files: third-party reference images
 .impeccable/reference/
+
+# VitePress docs site build + cache
+site/.vitepress/dist
+site/.vitepress/cache
