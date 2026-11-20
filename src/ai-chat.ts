@@ -1550,6 +1550,14 @@ export class AiChat extends LitElement {
    * the render, instead of scheduling a second one.
    */
   protected override willUpdate(changed: PropertyValues): void {
+    // A different conversation opens at its latest message. The pin is about
+    // the conversation the reader was in: keeping it unpinned across a switch
+    // opened the new chat at the old chat's scroll offset, mid-history.
+    if (!this._prepending && this._isSwitch(changed)) {
+      this._stickToBottom = true;
+      this._readingBack = false;
+      this._showJump = false;
+    }
     // Picking a conversation in the drawer is the reader done with it.
     if (changed.has('conversationId') && changed.get('conversationId') !== undefined && this._narrow && this.asideOpen) {
       this._setAsideOpen(false, false);
@@ -1580,6 +1588,54 @@ export class AiChat extends LitElement {
     // ...and if the conversation we just switched TO has a reply still
     // generating, put it back on screen so it keeps streaming live.
     this._resumeDetachedForView();
+  }
+
+  /**
+   * The reader moving up, caught where it starts (wheel, finger, keys) rather
+   * than from the scroll it causes. Mid-stream the content grows every frame,
+   * and _onScroll can't tell a scroll that lands in the same frame as new
+   * content from a reflow, so a real scroll-up could go unseen and be undone.
+   */
+  private _readerScrollsUp(): void {
+    const el = this._scrollEl;
+    if (!el || el.scrollHeight <= el.clientHeight) return;
+    this._stickToBottom = false;
+    this._readingBack = true;
+  }
+
+  private _onWheel(e: WheelEvent): void {
+    if (e.deltaY < 0) this._readerScrollsUp();
+  }
+
+  private _touchY?: number;
+  private _onTouchStart(e: TouchEvent): void {
+    this._touchY = e.touches[0]?.clientY;
+  }
+  private _onTouchMove(e: TouchEvent): void {
+    const y = e.touches[0]?.clientY;
+    // A finger moving DOWN the screen scrolls the content up.
+    if (y !== undefined && this._touchY !== undefined && y > this._touchY + 2) this._readerScrollsUp();
+    this._touchY = y;
+  }
+
+  private _onScrollKey(e: KeyboardEvent): void {
+    if ((e.target as HTMLElement).closest?.('textarea, input, [contenteditable]')) return;
+    if (e.key === 'PageUp' || e.key === 'ArrowUp' || e.key === 'Home') this._readerScrollsUp();
+  }
+
+  /**
+   * Did this update swap in a different conversation? Yes when the
+   * `conversation-id` changed, or when the new messages share no message with
+   * the old ones. Streaming, edits, retries and older messages loaded above all
+   * keep messages in common, so they never count.
+   */
+  private _isSwitch(changed: PropertyValues): boolean {
+    if (changed.has('conversationId') && changed.get('conversationId') !== undefined) return true;
+    if (!changed.has('messages')) return false;
+    const before = changed.get('messages') as ChatMessage[] | undefined;
+    if (!before?.length || !this.messages.length) return false;
+    const ids = new Set(before.map((m) => m.id));
+    return !this.messages.some((m) => ids.has(m.id));
   }
 
   /**
@@ -1617,7 +1673,15 @@ export class AiChat extends LitElement {
     this._lastScrollHeight = el.scrollHeight;
   }
 
-  private _scrollToBottom(smooth = false): void {
+  /**
+   * Scroll to the bottom on the next frame. A follow-scroll (`force` off) is
+   * queued by every token, so it re-checks when it runs: a reader who scrolled
+   * up between the token and the frame must not be scrolled back down
+   * ("snap-back"). It checks the READER's intent, not the pin: the bottom
+   * observer also clears the pin whenever new content briefly pushes the
+   * sentinel out of view, and this very scroll is what repairs that.
+   */
+  private _scrollToBottom(smooth = false, force = false): void {
     const el = this._scrollEl;
     if (!el) return;
     // scrollTo({behavior:'smooth'}) ignores the CSS `scroll-behavior: auto`
@@ -1627,6 +1691,7 @@ export class AiChat extends LitElement {
       typeof matchMedia === 'function' &&
       matchMedia('(prefers-reduced-motion: reduce)').matches;
     requestAnimationFrame(() => {
+      if (!force && this._readingBack) return;
       el.scrollTo({
         top: el.scrollHeight,
         behavior: smooth && !reduce ? 'smooth' : 'auto',
@@ -1639,9 +1704,15 @@ export class AiChat extends LitElement {
   }
 
   private _jumpToBottom(): void {
-    // Scroll to the bottom; the IntersectionObserver will see the sentinel come
-    // back into view and re-pin _stickToBottom / hide the jump button.
-    this._scrollToBottom(true);
+    // The reader asked to follow: pin NOW rather than when the sentinel comes
+    // into view. The smooth scroll aims at where the bottom is at the click; a
+    // fast reply moves it during the animation, so waiting for the observer
+    // left the scroll short and following off. Pinned, each token re-aims at
+    // the real bottom. A scroll up during the animation still unpins (_onScroll).
+    this._stickToBottom = true;
+    this._readingBack = false;
+    this._showJump = false;
+    this._scrollToBottom(true, true);
   }
 
   override render() {
@@ -1683,6 +1754,8 @@ export class AiChat extends LitElement {
                  settled reply is announced once via the hidden region below. -->
             <div class="messages" part="messages"
                  @click=${this._onMessagesClick} @scroll=${this._onScroll}
+                 @wheel=${this._onWheel} @touchstart=${this._onTouchStart}
+                 @touchmove=${this._onTouchMove} @keydown=${this._onScrollKey}
                  role="log" aria-label=${this._labels.messagesRegion}>
               ${hasMessages && this.hasEarlier ? this._renderEarlier() : nothing}
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
