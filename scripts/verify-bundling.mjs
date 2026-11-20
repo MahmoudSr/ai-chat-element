@@ -21,6 +21,20 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
+
+// Each entry must be ONE self-contained file. A one-pass build with both
+// entries made Vite 8 move shared code into a hashed chunk both files import,
+// so a self-hosted copy of dist/ai-chat-element.js 404'd and died (see
+// vite.config.ts). A relative import in an entry means that came back.
+for (const entry of ['dist/ai-chat-element.js', 'dist/adapters/index.js']) {
+  const code = readFileSync(join(root, entry), 'utf8');
+  const relative = code.match(/(?:from|import)\s*["']\.{1,2}\/[^"']+["']/);
+  if (relative) {
+    console.error(`FAIL: ${entry} imports another file (${relative[0]}); it must be self-contained.`);
+    process.exit(1);
+  }
+}
+
 const dir = mkdtempSync(join(tmpdir(), 'ai-chat-bundle-'));
 
 try {

@@ -61,9 +61,10 @@ scroll fixes found by testing long replies in a real browser.
   ("deploy: Done, notify: Failed") instead of "No response."
 - **Dependencies updated; `npm audit` 11 → 0.** The bundled runtime libraries
   are the latest (dompurify 3.4.18 — 0.6.0 shipped a version with a moderate
-  advisory; marked 18, lit 3.3.3, highlight.js 11.12). Built with Vite 8: the
-  adapters are one shared chunk instead of a copy in each entry, so 0.7.0 is
-  about 99.0 KB gzipped in total (0.6.0: 99.8 KB) with all of the above.
+  advisory; marked 18, lit 3.3.3, highlight.js 11.12). Built with Vite 8, and
+  still one self-contained file per entry: `dist/ai-chat-element.js` is 99.7
+  KB gzipped with all of the above (0.6.0: 99.8 KB), `dist/adapters/index.js`
+  4.0 KB.
 
 ### Fixed
 

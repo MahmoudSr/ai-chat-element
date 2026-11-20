@@ -34,7 +34,7 @@
   "scripts": {
     "dev": "vite",
     "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true})\"",
-    "build": "npm run clean && tsc && vite build",
+    "build": "npm run clean && tsc && vite build && vite build --mode adapters",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run typecheck && npm test && npm run build && npm run verify:bundling",
