@@ -83,6 +83,9 @@ scroll fixes found by testing long replies in a real browser.
   some of these crashed the whole chat or dropped the answer text. Backends
   sending the wrong types (a number as reasoning, an Error object as a tool
   error) are handled the same way.
+- **Right-to-left.** The reasoning column and tool rows mirror in an RTL page
+  (the duration at the far end, the error under the name, the rule on the
+  right) — they used physical left/right CSS.
 - **Keyboard focus ring** on the new controls uses the component's own ring
   (a test now sweeps every focusable control, so a new one can't miss it).
 
