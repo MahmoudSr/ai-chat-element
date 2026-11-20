@@ -66,6 +66,8 @@ export function controllable() {
 
   return {
     transport,
+    /** Send any chunk (reasoning, tool, ...) mid-stream. */
+    push: (c: StreamChunk) => push(c),
     delta: (t: string) => push({ type: 'delta', delta: t }),
     close,
     /**

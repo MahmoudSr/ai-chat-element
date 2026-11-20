@@ -107,6 +107,74 @@ export const SCENARIOS = {
   },
 
   /** Sanitization check: none of this should execute or escape the bubble. */
+  /**
+   * A reasoning model: it thinks for a few seconds (streamed as reasoning
+   * chunks, with a little markdown), answers, thinks again mid-answer, then
+   * finishes. Open the "Thinking…" toggle while it runs.
+   */
+  async *reasoning(messages, signal) {
+    const think = async function* (text, delay = 45) {
+      for (const w of text.split(/(\s+)/)) {
+        await sleep(delay, signal);
+        yield { type: 'reasoning', delta: w };
+      }
+    };
+    yield* think('The user wants to know how this panel behaves. Let me plan:\n\n' +
+      '1. Show **"Thinking…"** with a live timer while I reason.\n' +
+      '2. Collapse to **"Thought for Ns"** once the answer starts.\n' +
+      '3. Keep the toggle where the reader left it, even while streaming.\n\n' +
+      'I should also mention the `reasoning` attribute.');
+    yield* stream('Here is how reasoning shows: the toggle above this text holds what I thought ' +
+      'before answering, collapsed by default so the answer stays front and center.\n\n', signal, 25);
+    yield* think('Now a second, shorter thought in the middle of the answer — it should get its own toggle, ' +
+      'placed right here between the two paragraphs.', 40);
+    yield* stream('Reasoning that happens mid-answer gets its own toggle, in place. Set `reasoning="expanded"` ' +
+      'to open them by default, or `reasoning="hidden"` to hide them.', signal, 25);
+  },
+
+  /**
+   * An agent on a server, streamed as steps: think, call a tool (its arguments
+   * stream in), answer a bit, call two more, answer. Exactly what a backend
+   * yields through functionAdapter.
+   */
+  async *agent(messages, signal) {
+    yield { type: 'reasoning', delta: 'I need the current weather and a forecast. Let me call the tools.' };
+    await sleep(700, signal);
+    yield { type: 'tool', id: 'call_1', name: 'get_weather', state: 'pending', argsDelta: '{"city": "Bei' };
+    await sleep(300, signal);
+    yield { type: 'tool', id: 'call_1', argsDelta: 'rut", "units": "C"}' };
+    yield { type: 'tool', id: 'call_1', args: { city: 'Beirut', units: 'C' }, state: 'running' };
+    await sleep(1400, signal);
+    yield { type: 'tool', id: 'call_1', output: { tempC: 24, sky: 'clear', humidity: 0.61 } };
+    yield* stream("It's **24°C and clear** in Beirut right now. Let me check the next few days. ", signal, 25);
+    yield { type: 'tool', id: 'call_2', name: 'get_forecast', title: 'Forecast, 3 days', args: { city: 'Beirut', days: 3 } };
+    yield { type: 'tool', id: 'call_3', name: 'get_air_quality', args: { city: 'Beirut' } };
+    await sleep(900, signal);
+    yield { type: 'tool', id: 'call_3', output: 'AQI 42 (good)' };
+    await sleep(900, signal);
+    yield { type: 'tool', id: 'call_2', output: [{ day: 'Tue', high: 25 }, { day: 'Wed', high: 23 }, { day: 'Thu', high: 22 }] };
+    yield* stream('\n\nThe next three days cool off slightly (25° → 22°), and the air quality is good.', signal, 25);
+  },
+
+  /** A tool that fails: the row shows the error without being opened. */
+  async *toolError(messages, signal) {
+    yield { type: 'tool', id: 'call_1', name: 'query_database', args: { sql: 'select * from orders where id = 42' } };
+    await sleep(1200, signal);
+    yield { type: 'tool', id: 'call_1', error: 'connection refused: db.internal:5432 (exit code 1)' };
+    yield* stream("I couldn't reach the orders database, so I can't look that order up right now. Want me to try again?", signal, 25);
+  },
+
+  /**
+   * A tool whose result the app renders itself. The playground sets
+   * chat.renderTool to draw a small SVG bar chart for "sales_by_month".
+   */
+  async *toolChart(messages, signal) {
+    yield { type: 'tool', id: 'call_1', name: 'sales_by_month', title: 'Sales by month', args: { year: 2026 } };
+    await sleep(1200, signal);
+    yield { type: 'tool', id: 'call_1', output: [12, 19, 15, 24, 31, 28] };
+    yield* stream('Sales peaked in **May** and held up in June. The chart above is drawn by the app through `renderTool` — the component only shows the JSON when no renderer claims it.', signal, 25);
+  },
+
   async *xss(messages, signal) {
     yield* stream(
       `Security check — all of the following must render as inert text, never execute:\n\n` +

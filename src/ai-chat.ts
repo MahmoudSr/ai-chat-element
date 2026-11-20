@@ -9,11 +9,15 @@ import type {
   Role,
   Attachment,
   MessageAction,
+  MessageStep,
+  ReasoningStep,
+  ToolStep,
 } from './types.js';
 import { renderMarkdown, sanitizeIcon, StreamingMarkdown, type ImagePolicy } from './markdown/markdown.js';
 import { chatStyles } from './styles.js';
 import { hljsTheme } from './markdown/hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
+import { addReasoning, closeReasoning, sanitizeSteps, settleSteps, toolUnfinished, upsertTool } from './steps.js';
 import {
   chevronDownIcon,
   sendIcon,
@@ -28,7 +32,12 @@ import {
   checkIcon,
   editIcon,
   asideIcon,
+  spinnerIcon,
+  stopIcon,
 } from './icons.js';
+
+/** A tool value longer than this (characters) shows its start; Copy has the rest. */
+const VALUE_SHOW_LIMIT = 20_000;
 
 let idCounter = 0;
 const nextId = () =>
@@ -368,6 +377,36 @@ export class AiChat extends LitElement {
   @property({ type: String, attribute: 'load-earlier' })
   loadEarlier: 'scroll' | 'button' = 'scroll';
 
+  /**
+   * How a reply's reasoning ("thinking") shows: `collapsed` (default) — a
+   * one-line "Thought for 12s" the reader can open; `expanded` — open from the
+   * start; `hidden` — not shown at all. The reader's own open/close wins.
+   */
+  @property({ type: String, attribute: 'reasoning' })
+  reasoning: 'collapsed' | 'expanded' | 'hidden' = 'collapsed';
+
+  /**
+   * How a reply's tool calls show: `collapsed` (default) — one row each,
+   * opened by the reader to see the input and result; `expanded` — open from
+   * the start; `hidden` — not shown at all. The reader's own open/close wins.
+   */
+  @property({ type: String, attribute: 'tools' })
+  tools: 'collapsed' | 'expanded' | 'hidden' = 'collapsed';
+
+  /**
+   * Render a tool call's result yourself — a chart, a map, a card — instead of
+   * the default JSON. Return a DOM node to use it, or null/undefined for the
+   * default. Called once per change of that call (not per token), so returning
+   * a fresh element is fine. Works the same from any framework.
+   *
+   * @example
+   * chat.renderTool = (tool) => tool.name === 'weather' && tool.state === 'success'
+   *   ? Object.assign(document.createElement('weather-card'), { data: tool.output })
+   *   : null;
+   */
+  @property({ attribute: false })
+  renderTool?: (tool: ToolStep, message: ChatMessage) => Node | null | undefined;
+
   /** The conversation. Bindable and reflected back out via events. */
   @property({ attribute: false })
   messages: ChatMessage[] = [];
@@ -513,6 +552,14 @@ export class AiChat extends LitElement {
    * user's scroll during streaming.
    */
   private _stickToBottom = true;
+  /**
+   * True once the READER has scrolled up, until they're back at the bottom.
+   * Auto-loading older messages keys off this, not `_stickToBottom`: the pin is
+   * also written by the observers, and while a long chat opens the bottom one can
+   * report "not in view" before the open-at-bottom scroll lands. Read as "the
+   * reader went back", that fetched history nobody scrolled to.
+   */
+  private _readingBack = false;
   private _bottomObserver?: IntersectionObserver;
 
   @query('.messages') private _scrollEl!: HTMLElement;
@@ -563,13 +610,22 @@ export class AiChat extends LitElement {
    * Settled messages take the plain single-render path, untouched.
    */
   private _renderMarkdown(m: ChatMessage) {
-    if (m.streaming) {
-      let r = this._streamRenderers.get(m.id);
+    return this._markdownBlock(m.id, m.content, !!m.streaming);
+  }
+
+  /**
+   * Markdown for one piece of text. While it streams, an incremental renderer
+   * (keyed by `key`) freezes completed blocks so per-token cost stays flat;
+   * once settled, it renders once and is cached until the text changes.
+   */
+  private _markdownBlock(key: string, source: string, streaming: boolean) {
+    if (streaming) {
+      let r = this._streamRenderers.get(key);
       if (!r) {
         r = new StreamingMarkdown(this._labels.copy, this._imagePolicy);
-        this._streamRenderers.set(m.id, r);
+        this._streamRenderers.set(key, r);
       }
-      const { blocks, tail } = r.renderParts(m.content);
+      const { blocks, tail } = r.renderParts(source);
       // Each frozen block is its own node. The blocks array is append-only and
       // Lit reconciles children by index, so on a typical token every existing
       // block's unsafeHTML sees an unchanged string and does nothing — only the
@@ -580,9 +636,324 @@ export class AiChat extends LitElement {
       </div>`;
     }
     // Settled: render fully once and let the incremental state go. The map
-    // stays tiny — it only ever holds messages that are streaming right now.
-    this._streamRenderers.delete(m.id);
-    return html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy, this._imagePolicy))}</div>`;
+    // stays tiny — it only ever holds text that is streaming right now.
+    this._streamRenderers.delete(key);
+    return html`<div class="markdown">${unsafeHTML(this._settledHtml(key, source))}</div>`;
+  }
+
+  /**
+   * Settled markdown, cached per key while its source is unchanged. Keys are
+   * pieces of replies WITH steps (text between steps, reasoning text); a reply
+   * without steps keeps its original single-parse path.
+   */
+  private _settledCache = new Map<string, { source: string; html: string }>();
+  private _settledHtml(key: string, source: string): string {
+    const hit = this._settledCache.get(key);
+    if (hit && hit.source === source) return hit.html;
+    const out = renderMarkdown(source, this._labels.copy, this._imagePolicy);
+    this._settledCache.set(key, { source, html: out });
+    return out;
+  }
+
+  /** The steps a message shows, given the `reasoning` setting. */
+  private _visibleSteps(m: ChatMessage): MessageStep[] {
+    const steps = this._cleanSteps(m.steps);
+    if (!steps.length) return steps;
+    return steps.filter((s) =>
+      s.type === 'reasoning' ? this.reasoning !== 'hidden' : this.tools !== 'hidden',
+    );
+  }
+
+  /**
+   * A message's steps, safe to render (see sanitizeSteps), cached per steps
+   * array. Steps are replaced, never mutated, so a new array means new steps.
+   */
+  private _cleanStepsCache = new WeakMap<object, MessageStep[]>();
+  private _cleanSteps(steps: unknown): MessageStep[] {
+    if (!Array.isArray(steps) || steps.length === 0) return [];
+    let clean = this._cleanStepsCache.get(steps);
+    if (!clean) {
+      clean = sanitizeSteps(steps);
+      this._cleanStepsCache.set(steps, clean);
+    }
+    return clean;
+  }
+
+  /**
+   * An assistant reply. Without steps this is just its markdown. With steps,
+   * the answer text is split where each step happened, so text, reasoning and
+   * tool calls read in the order they occurred. Text before the last step is
+   * finished and renders once; only the trailing text streams.
+   */
+  private _renderAssistantContent(m: ChatMessage) {
+    const steps = this._visibleSteps(m);
+    if (!steps.length) return this._renderMarkdown(m);
+    const parts: unknown[] = [];
+    let pos = 0;
+    for (const step of steps) {
+      const at = Math.min(Math.max(step.at, pos), m.content.length);
+      if (at > pos) parts.push(this._markdownBlock(`${m.id}@${pos}`, m.content.slice(pos, at), false));
+      parts.push(this._renderStep(m, step));
+      pos = at;
+    }
+    if (pos < m.content.length) {
+      parts.push(this._markdownBlock(`${m.id}@${pos}`, m.content.slice(pos), !!m.streaming));
+    }
+    return parts;
+  }
+
+  private _renderStep(m: ChatMessage, step: MessageStep) {
+    return step.type === 'reasoning' ? this._renderReasoning(m, step) : this._renderTool(m, step);
+  }
+
+  /** Open/closed per step (reasoning or tool call), as the reader left it. */
+  private _stepOpen = new Map<string, boolean>();
+
+  private _renderReasoning(m: ChatMessage, step: ReasoningStep) {
+    const key = `${m.id}/reasoning:${step.id}`;
+    const live = !!m.streaming && step.endedAt === undefined;
+    const hasText = step.text.length > 0;
+    const open = hasText && (this._stepOpen.get(key) ?? this.reasoning === 'expanded');
+    const regionId = `reasoning-${m.id}-${step.id}`;
+    const labels = this._labels;
+    let label: string;
+    let elapsed = '';
+    if (live) {
+      label = labels.thinking;
+      const ms = Date.now() - step.startedAt;
+      if (ms >= 1000) elapsed = this._formatDuration(ms);
+    } else if (step.endedAt !== undefined) {
+      label = labels.thoughtFor.replace('{duration}', this._formatDuration(step.endedAt - step.startedAt));
+    } else {
+      label = labels.thoughtProcess;
+    }
+    return html`<div class="reasoning ${live ? 'reasoning--live' : ''} ${open ? 'reasoning--open' : ''}"
+                     part="reasoning">
+      ${
+        // Nothing to open (the provider hid the text): plain text, not a
+        // disabled button that screen readers announce as "unavailable".
+        hasText
+          ? html`<button class="reasoning__trigger" part="reasoning-trigger" type="button"
+                  aria-expanded=${String(open)} aria-controls=${regionId}
+                  @click=${() => this._toggleStep(key, open)}>
+              <span class="reasoning__label">${label}</span>
+              ${elapsed ? html`<span class="reasoning__time">${elapsed}</span>` : nothing}
+              <span class="reasoning__chevron" aria-hidden="true">${chevronDownIcon}</span>
+            </button>`
+          : html`<div class="reasoning__trigger" part="reasoning-trigger">
+              <span class="reasoning__label">${label}</span>
+              ${elapsed ? html`<span class="reasoning__time">${elapsed}</span>` : nothing}
+            </div>`
+      }
+      ${
+        hasText
+          ? html`<div class="reasoning__content" part="reasoning-content" id=${regionId}
+                      role="region" aria-label=${labels.thoughtProcess} ?hidden=${!open}>
+              ${open ? this._markdownBlock(`${m.id}#${step.id}`, step.text, live) : nothing}
+            </div>`
+          : nothing
+      }
+    </div>`;
+  }
+
+  private _toggleStep(key: string, wasOpen: boolean): void {
+    this._stepOpen.set(key, !wasOpen);
+    this.requestUpdate();
+  }
+
+  /**
+   * One tool call: a header row (status, name, state, time) that opens to the
+   * call's input and result. Failures show their error without opening. A
+   * `renderTool` callback can replace the result with the app's own element.
+   */
+  private _renderTool(m: ChatMessage, tool: ToolStep) {
+    const key = `${m.id}/tool:${tool.id}`;
+    const labels = this._labels;
+    const unfinished = toolUnfinished(tool, m);
+    const live = !!m.streaming && (tool.state === 'pending' || tool.state === 'running');
+    const custom = this._customToolNode(tool, m);
+    const input = tool.args !== undefined ? tool.args : tool.argsText;
+    const hasInput = input !== undefined && input !== '';
+    const hasOutput = custom != null || tool.output !== undefined;
+    const hasBody = hasInput || hasOutput;
+    const open = hasBody && (this._stepOpen.get(key) ?? (this.tools === 'expanded' || custom != null));
+    const bodyId = `tool-${m.id}-${tool.id}`;
+
+    // Never started (the model asked and the reply ended) vs cut off mid-run.
+    const stateLabel = unfinished
+      ? tool.state === 'pending' ? labels.toolNotRun : labels.toolIncomplete
+      : tool.state === 'pending'
+        ? labels.toolPending
+        : tool.state === 'running'
+          ? labels.toolRunning
+          : tool.state === 'success'
+            ? labels.toolSuccess
+            : labels.toolError;
+    const icon = unfinished
+      ? stopIcon
+      : tool.state === 'success'
+        ? checkIcon
+        : tool.state === 'error'
+          ? alertIcon
+          : spinnerIcon;
+    let time = '';
+    if (tool.endedAt !== undefined) time = this._formatDuration(tool.endedAt - tool.startedAt);
+    else if (live && Date.now() - tool.startedAt >= 1000) time = this._formatDuration(Date.now() - tool.startedAt);
+
+    const headInner = html`
+      <span class="tool__status" part="tool-status" aria-hidden="true">${icon}</span>
+      <span class="tool__name" part="tool-name">${tool.title || tool.name || tool.id}</span>
+      <span class="tool__state">${stateLabel}</span>
+      ${time ? html`<span class="tool__time">${time}</span>` : nothing}`;
+    const classes = classMap({
+      tool: true,
+      [`tool--${unfinished ? 'incomplete' : tool.state}`]: true,
+      'tool--live': live,
+      'tool--open': open,
+    });
+    return html`<div class=${classes} part="tool" data-tool=${tool.name}>
+      ${
+        // Nothing to open: plain text, not a disabled button.
+        hasBody
+          ? html`<button class="tool__header" part="tool-header" type="button"
+                  aria-expanded=${String(open)} aria-controls=${bodyId}
+                  @click=${() => this._toggleStep(key, open)}>
+              ${headInner}
+              <span class="tool__chevron" aria-hidden="true">${chevronDownIcon}</span>
+            </button>`
+          : html`<div class="tool__header" part="tool-header">${headInner}</div>`
+      }
+      ${tool.error ? html`<div class="tool__error" part="tool-error">${tool.error}</div>` : nothing}
+      ${
+        hasBody
+          ? html`<div class="tool__body" part="tool-body" id=${bodyId} ?hidden=${!open}>
+              ${
+                open && hasInput
+                  ? html`<div class="tool__section" part="tool-input">
+                      <div class="tool__label">${labels.toolInput}</div>
+                      ${this._codeBlock(`${key}~in`, input)}
+                    </div>`
+                  : nothing
+              }
+              ${
+                open && hasOutput
+                  ? html`<div class="tool__section" part="tool-output">
+                      <div class="tool__label">${labels.toolOutput}</div>
+                      ${custom ?? this._codeBlock(`${key}~out`, tool.output)}
+                    </div>`
+                  : nothing
+              }
+            </div>`
+          : nothing
+      }
+    </div>`;
+  }
+
+  /** A value as a highlighted, copyable code block: JSON pretty-printed, other text as-is. */
+  private _codeBlock(key: string, value: unknown) {
+    let lang = 'json';
+    let text: string;
+    if (typeof value === 'string') {
+      text = value;
+      try {
+        const parsed: unknown = JSON.parse(value);
+        if (parsed !== null && typeof parsed === 'object') text = JSON.stringify(parsed, null, 2);
+        else lang = 'text';
+      } catch {
+        // Partial JSON while the arguments stream in still reads best as JSON.
+        lang = /^\s*[[{]/.test(value) ? 'json' : 'text';
+      }
+    } else {
+      try {
+        text = JSON.stringify(value, null, 2) ?? String(value);
+      } catch {
+        text = String(value);
+        lang = 'text';
+      }
+    }
+    // A huge value can't be shown whole: highlighting costs ~2ms per KB, and
+    // even plain, laying out a 1.4MB block froze Chrome for ~0.7s (a 0.9MB
+    // result used to freeze it for 3.8s). Show the start, say how much more
+    // there is, and let Copy take the full value.
+    let more = 0;
+    if (text.length > VALUE_SHOW_LIMIT) {
+      more = text.length - VALUE_SHOW_LIMIT;
+      this._fullValues.set(key, text);
+      text = text.slice(0, VALUE_SHOW_LIMIT);
+    } else {
+      this._fullValues.delete(key);
+    }
+    // A fence longer than any backtick run inside, so the value can't close it.
+    const longest = Math.max(2, ...[...text.matchAll(/`+/g)].map((r) => r[0].length));
+    const fence = '`'.repeat(longest + 1);
+    const block = this._markdownBlock(key, `${fence}${lang}\n${text}\n${fence}`, false);
+    if (!more) return block;
+    return html`<div class="tool__value" data-full-key=${key}>
+      ${block}
+      <div class="tool__more">${this._labels.moreCharacters.replace('{count}', more.toLocaleString())}</div>
+    </div>`;
+  }
+
+  /** Full text of values shown cut short, by block key, for the Copy button. */
+  private _fullValues = new Map<string, string>();
+
+  /**
+   * The app's own rendering of a tool's result, from `renderTool`. Cached per
+   * step OBJECT: a step is replaced whenever it changes, so the callback runs
+   * once per change of that call, not once per token of the reply around it.
+   */
+  private _customTools = new WeakMap<ToolStep, Node | null>();
+  private _customToolNode(tool: ToolStep, m: ChatMessage): Node | null {
+    if (!this.renderTool) return null;
+    if (this._customTools.has(tool)) return this._customTools.get(tool)!;
+    let node: Node | null = null;
+    try {
+      const out = this.renderTool(tool, m);
+      node = out instanceof Node ? out : null;
+    } catch (error) {
+      console.error('<ai-chat>: renderTool threw for a tool call; showing the default.', error);
+    }
+    this._customTools.set(tool, node);
+    return node;
+  }
+
+
+  /** "search: Done, deploy: Failed" — what a turn of only tool calls did, for the screen reader. */
+  private _toolSummary(m: ChatMessage): string {
+    const l = this._labels;
+    return this._cleanSteps(m.steps)
+      .filter((s): s is ToolStep => s.type === 'tool')
+      .map((t) => {
+        const state = toolUnfinished(t, m)
+          ? t.state === 'pending' ? l.toolNotRun : l.toolIncomplete
+          : t.state === 'success' ? l.toolSuccess : t.state === 'error' ? l.toolError : l.toolRunning;
+        return `${t.title || t.name || t.id}: ${state}`;
+      })
+      .join(', ');
+  }
+
+  /** 4s, 1m 5s. Never "0s": a step that ended still took a moment. */
+  private _formatDuration(ms: number): string {
+    const total = Math.max(1, Math.round(ms / 1000));
+    if (total < 60) return `${total}s`;
+    const min = Math.floor(total / 60);
+    const sec = total % 60;
+    return sec ? `${min}m ${sec}s` : `${min}m`;
+  }
+
+  /**
+   * A one-second tick while any reply on screen has a step still in progress,
+   * so "Thinking… 4s" counts up. Runs only then; stops when nothing is live.
+   */
+  private _liveTimer?: number;
+  private _syncLiveTimer(): void {
+    const live = this.messages.some((m) => m.streaming && this._cleanSteps(m.steps).some((s) => s.endedAt === undefined));
+    if (live && this._liveTimer === undefined) {
+      this._liveTimer = window.setInterval(() => this.requestUpdate(), 1000);
+    } else if (!live && this._liveTimer !== undefined) {
+      window.clearInterval(this._liveTimer);
+      this._liveTimer = undefined;
+    }
   }
 
   private get _imagePolicy(): ImagePolicy {
@@ -745,6 +1116,7 @@ export class AiChat extends LitElement {
     // nothing to scroll, so clicking it does nothing and the observer never
     // re-fires to hide it). Reset the scroll-follow state explicitly.
     this._stickToBottom = true;
+    this._readingBack = false;
     this._showJump = false;
     if (this._textarea) {
       this._textarea.style.height = 'auto';
@@ -827,7 +1199,7 @@ export class AiChat extends LitElement {
     this._abort = undefined;
     this._busy = false;
     this.messages = this.messages.map((m) =>
-      m.streaming ? { ...m, streaming: false } : m,
+      m.streaming ? { ...settleSteps(m, Date.now()), streaming: false } : m,
     );
     if (hadFocus) this._focusComposer();
   }
@@ -857,6 +1229,7 @@ export class AiChat extends LitElement {
 
     // Sending always snaps the user back to the latest turn.
     this._stickToBottom = true;
+    this._readingBack = false;
     this._showJump = false;
     const userMsg: ChatMessage = {
       id: nextId(),
@@ -992,10 +1365,22 @@ export class AiChat extends LitElement {
           detach();
         }
         if (chunk.type === 'delta') {
-          update((m) => ({ ...m, content: m.content + chunk.delta }));
+          if (typeof chunk.delta !== 'string') continue; // a backend can send anything
+          update((m) => {
+            // Answer text resuming ends any reasoning in progress.
+            const c = closeReasoning(m, Date.now());
+            return { ...c, content: c.content + chunk.delta };
+          });
+          if (detached) emitBackground(false);
+        } else if (chunk.type === 'reasoning') {
+          update((m) => addReasoning(m, chunk, Date.now()));
+          if (detached) emitBackground(false);
+        } else if (chunk.type === 'tool') {
+          if (typeof chunk.id !== 'string' || !chunk.id) continue; // can't be matched later
+          update((m) => upsertTool(m, chunk, Date.now()));
           if (detached) emitBackground(false);
         } else if (chunk.type === 'error') {
-          update((m) => ({ ...m, streaming: false, error: chunk.error }));
+          update((m) => ({ ...settleSteps(m, Date.now()), streaming: false, error: chunk.error }));
           this._emitError(chunk.error);
           break;
         } else if (chunk.type === 'done') {
@@ -1020,7 +1405,7 @@ export class AiChat extends LitElement {
         // The stream may have been orphaned before it blew up; a background
         // failure still has to reach the consumer, so route it the same way.
         if (!detached && isOrphaned() && !this.abortOnSwitch) detach();
-        update((m) => ({ ...m, streaming: false, error: message }));
+        update((m) => ({ ...settleSteps(m, Date.now()), streaming: false, error: message }));
         if (!detached) this._emitError(message);
       }
     } finally {
@@ -1035,7 +1420,7 @@ export class AiChat extends LitElement {
         // so its incremental renderer would otherwise linger in the map.
         this._streamRenderers.delete(assistant.id);
         if (!signal.aborted) {
-          working = { ...working, streaming: false };
+          working = { ...settleSteps(working, Date.now()), streaming: false };
           // Land the finished reply in the view if the user is looking at this
           // conversation (they switched back mid-stream and watched it finish),
           // and release the composer, which we re-claimed on their return.
@@ -1061,7 +1446,7 @@ export class AiChat extends LitElement {
       // send/clear replaced our controller (e.g. New-chat mid-stream), leave the
       // shared _busy/_abort alone — they now belong to the newer stream.
       if (!detached && this._abort === controller) {
-        this._patch(assistant.id, (m) => ({ ...m, streaming: false }));
+        this._patch(assistant.id, (m) => ({ ...settleSteps(m, Date.now()), streaming: false }));
         this._busy = false;
         this._abort = undefined;
         const final = this.messages.find((m) => m.id === assistant.id);
@@ -1071,15 +1456,18 @@ export class AiChat extends LitElement {
         // non-content cases so it's translatable.
         if (final?.error) {
           this._announce(final.error);
-        } else if (final && !final.content) {
+        } else if (final && !final.content && !final.steps?.length) {
           this._announce(this._labels.emptyResponse);
+        } else if (final && !final.content) {
+          this._announce(this._toolSummary(final));
         } else if (final) {
           this._announce(final.content);
         }
-        // Only announce a completed turn when it actually produced content.
+        // Only announce a completed turn when it actually produced something:
+        // text, or steps (a turn of tool calls with no prose is a real turn).
         // Skipping empties (and errors) keeps consumers who persist on
         // `ai-chat:message` from saving blank ghost turns to their history.
-        if (final && !final.error && final.content) {
+        if (final && !final.error && (final.content || final.steps?.length)) {
           this.dispatchEvent(
             new CustomEvent('ai-chat:message', {
               detail: { message: final },
@@ -1373,7 +1761,7 @@ export class AiChat extends LitElement {
     // in view before the first scroll lands; that is not the reader going back.
     // A short one that doesn't fill the view is: load until it does.
     const overflows = el ? el.scrollHeight > el.clientHeight : false;
-    if (this._stickToBottom && overflows) return;
+    if (overflows && !this._readingBack) return;
     this._requestEarlier();
   }
 
@@ -1405,6 +1793,8 @@ export class AiChat extends LitElement {
 
   override disconnectedCallback(): void {
     window.clearTimeout(this._copiedTimer);
+    window.clearInterval(this._liveTimer);
+    this._liveTimer = undefined;
     document.removeEventListener('keydown', this._onHostKeydown);
     this._bottomObserver?.disconnect();
     this._bottomObserver = undefined;
@@ -1486,8 +1876,12 @@ export class AiChat extends LitElement {
     const target = e.target as HTMLElement;
     const btn = target.closest('.code-block__copy') as HTMLButtonElement | null;
     if (!btn) return;
+    // A tool value shown cut short copies in full.
+    const fullKey = (btn.closest('[data-full-key]') as HTMLElement | null)?.dataset.fullKey;
     const code =
-      btn.closest('.code-block')?.querySelector('code')?.textContent ?? '';
+      (fullKey && this._fullValues.get(fullKey)) ??
+      btn.closest('.code-block')?.querySelector('code')?.textContent ??
+      '';
     const { copy, copied } = this._labels;
     void navigator.clipboard?.writeText(code).then(() => {
       btn.textContent = copied;
@@ -1527,6 +1921,13 @@ export class AiChat extends LitElement {
     // The top sentinel comes and goes with `has-earlier`; keep it observed.
     if ((this._topSentinel ?? undefined) !== this._observedTop) this._recheckTop();
 
+    if (changed.has('messages')) this._syncLiveTimer();
+    // An open reasoning box that is still being written follows its newest
+    // line, unless the reader scrolled up inside it.
+    for (const box of this.renderRoot.querySelectorAll<HTMLElement>('.reasoning--live .reasoning__content:not([hidden])')) {
+      if (box.scrollHeight - box.scrollTop - box.clientHeight < 48) box.scrollTop = box.scrollHeight;
+    }
+
   }
 
   /**
@@ -1540,6 +1941,14 @@ export class AiChat extends LitElement {
    * the render, instead of scheduling a second one.
    */
   protected override willUpdate(changed: PropertyValues): void {
+    // A different conversation opens at its latest message. The pin is about
+    // the conversation the reader was in: keeping it unpinned across a switch
+    // opened the new chat at the old chat's scroll offset, mid-history.
+    if (!this._prepending && this._isSwitch(changed)) {
+      this._stickToBottom = true;
+      this._readingBack = false;
+      this._showJump = false;
+    }
     // Picking a conversation in the drawer is the reader done with it.
     if (changed.has('conversationId') && changed.get('conversationId') !== undefined && this._narrow && this.asideOpen) {
       this._setAsideOpen(false, false);
@@ -1573,6 +1982,54 @@ export class AiChat extends LitElement {
   }
 
   /**
+   * The reader moving up, caught where it starts (wheel, finger, keys) rather
+   * than from the scroll it causes. Mid-stream the content grows every frame,
+   * and _onScroll can't tell a scroll that lands in the same frame as new
+   * content from a reflow, so a real scroll-up could go unseen and be undone.
+   */
+  private _readerScrollsUp(): void {
+    const el = this._scrollEl;
+    if (!el || el.scrollHeight <= el.clientHeight) return;
+    this._stickToBottom = false;
+    this._readingBack = true;
+  }
+
+  private _onWheel(e: WheelEvent): void {
+    if (e.deltaY < 0) this._readerScrollsUp();
+  }
+
+  private _touchY?: number;
+  private _onTouchStart(e: TouchEvent): void {
+    this._touchY = e.touches[0]?.clientY;
+  }
+  private _onTouchMove(e: TouchEvent): void {
+    const y = e.touches[0]?.clientY;
+    // A finger moving DOWN the screen scrolls the content up.
+    if (y !== undefined && this._touchY !== undefined && y > this._touchY + 2) this._readerScrollsUp();
+    this._touchY = y;
+  }
+
+  private _onScrollKey(e: KeyboardEvent): void {
+    if ((e.target as HTMLElement).closest?.('textarea, input, [contenteditable]')) return;
+    if (e.key === 'PageUp' || e.key === 'ArrowUp' || e.key === 'Home') this._readerScrollsUp();
+  }
+
+  /**
+   * Did this update swap in a different conversation? Yes when the
+   * `conversation-id` changed, or when the new messages share no message with
+   * the old ones. Streaming, edits, retries and older messages loaded above all
+   * keep messages in common, so they never count.
+   */
+  private _isSwitch(changed: PropertyValues): boolean {
+    if (changed.has('conversationId') && changed.get('conversationId') !== undefined) return true;
+    if (!changed.has('messages')) return false;
+    const before = changed.get('messages') as ChatMessage[] | undefined;
+    if (!before?.length || !this.messages.length) return false;
+    const ids = new Set(before.map((m) => m.id));
+    return !this.messages.some((m) => ids.has(m.id));
+  }
+
+  /**
    * A real scroll event. Detects an upward scroll and unpins immediately — this
    * beats the async IntersectionObserver to the punch, killing the slow-scroll
    * jitter without the post-append geometry problems of measuring in updated().
@@ -1596,16 +2053,26 @@ export class AiChat extends LitElement {
     const atBottom = el.scrollHeight - top - el.clientHeight <= 2;
     if (!grew && !atBottom && top < this._lastScrollTop - 1) {
       this._stickToBottom = false;
+      this._readingBack = true;
     }
+    if (atBottom) this._readingBack = false;
     // The top observer only reports CHANGES: on a chat that overflows by less
     // than the look-ahead, the top is "in view" from the start (skipped then,
     // while pinned) and never reported again. Judge by where the reader is.
-    if (!this._stickToBottom && top <= EARLIER_LOOKAHEAD_PX) this._autoLoadEarlier();
+    if (this._readingBack && top <= EARLIER_LOOKAHEAD_PX) this._autoLoadEarlier();
     this._lastScrollTop = top;
     this._lastScrollHeight = el.scrollHeight;
   }
 
-  private _scrollToBottom(smooth = false): void {
+  /**
+   * Scroll to the bottom on the next frame. A follow-scroll (`force` off) is
+   * queued by every token, so it re-checks when it runs: a reader who scrolled
+   * up between the token and the frame must not be scrolled back down
+   * ("snap-back"). It checks the READER's intent, not the pin: the bottom
+   * observer also clears the pin whenever new content briefly pushes the
+   * sentinel out of view, and this very scroll is what repairs that.
+   */
+  private _scrollToBottom(smooth = false, force = false): void {
     const el = this._scrollEl;
     if (!el) return;
     // scrollTo({behavior:'smooth'}) ignores the CSS `scroll-behavior: auto`
@@ -1615,6 +2082,7 @@ export class AiChat extends LitElement {
       typeof matchMedia === 'function' &&
       matchMedia('(prefers-reduced-motion: reduce)').matches;
     requestAnimationFrame(() => {
+      if (!force && this._readingBack) return;
       el.scrollTo({
         top: el.scrollHeight,
         behavior: smooth && !reduce ? 'smooth' : 'auto',
@@ -1627,9 +2095,15 @@ export class AiChat extends LitElement {
   }
 
   private _jumpToBottom(): void {
-    // Scroll to the bottom; the IntersectionObserver will see the sentinel come
-    // back into view and re-pin _stickToBottom / hide the jump button.
-    this._scrollToBottom(true);
+    // The reader asked to follow: pin NOW rather than when the sentinel comes
+    // into view. The smooth scroll aims at where the bottom is at the click; a
+    // fast reply moves it during the animation, so waiting for the observer
+    // left the scroll short and following off. Pinned, each token re-aims at
+    // the real bottom. A scroll up during the animation still unpins (_onScroll).
+    this._stickToBottom = true;
+    this._readingBack = false;
+    this._showJump = false;
+    this._scrollToBottom(true, true);
   }
 
   override render() {
@@ -1665,13 +2139,17 @@ export class AiChat extends LitElement {
         <div class="root" part="root">
           ${this._renderHeader()}
           <div class="scroll-region">
-            <!-- role="log" gives the list structure/navigation, but NO aria-live:
-                 a polite live region re-announces on every mutation, so streaming
-                 deltas would spam a growing partial message token-by-token. The
-                 settled reply is announced once via the hidden region below. -->
+            <!-- role="log" gives the list structure/navigation, but it must NOT be
+                 live: a polite live region re-announces on every mutation, so
+                 streaming deltas would spam a growing partial message token by
+                 token. role="log" is IMPLICITLY polite, so aria-live="off" has to
+                 be said out loud (leaving it out kept the log live). The settled
+                 reply is announced once via the hidden region below. -->
             <div class="messages" part="messages"
                  @click=${this._onMessagesClick} @scroll=${this._onScroll}
-                 role="log" aria-label=${this._labels.messagesRegion}>
+                 @wheel=${this._onWheel} @touchstart=${this._onTouchStart}
+                 @touchmove=${this._onTouchMove} @keydown=${this._onScrollKey}
+                 role="log" aria-live="off" aria-label=${this._labels.messagesRegion}>
               ${hasMessages && this.hasEarlier ? this._renderEarlier() : nothing}
               ${hasMessages ? this._renderMessages() : this._renderEmpty()}
               <!-- Bottom sentinel watched by the IntersectionObserver to decide
@@ -1903,6 +2381,8 @@ export class AiChat extends LitElement {
       // Lets the bubble stretch for a comfortable editing width (CSS scopes the
       // widening to this message only).
       'message--editing': this._editingId === m.id,
+      // Tool rows take the full width, so they don't grow with the text streaming around them.
+      'message--tools': this._visibleSteps(m).some((s) => s.type === 'tool'),
     });
     const isAssistant = m.role === 'assistant';
     // Avatars are opt-in: provide an `assistant-avatar` / `user-avatar` slot to
@@ -1964,20 +2444,20 @@ export class AiChat extends LitElement {
             this._editingId === m.id
               ? this._renderEditForm(m)
               : isAssistant
-                ? this._renderMarkdown(m)
+                ? this._renderAssistantContent(m)
                 : m.content
                   ? html`<div class="plain">${m.content}</div>`
                   : nothing
           }
           ${
-            m.streaming && !m.content
+            m.streaming && !m.content && !this._visibleSteps(m).length
               ? html`<span class="typing" aria-label=${this._labels.typing}><i></i><i></i><i></i></span>`
               : nothing
           }
           ${
             // Finished with no content and no error → show a placeholder instead
             // of a blank ghost bubble (e.g. an empty upstream response).
-            isAssistant && !m.streaming && !m.content && !m.error
+            isAssistant && !m.streaming && !m.content && !m.error && !this._visibleSteps(m).length
               ? html`<div class="empty-response" part="empty-response">${this._labels.emptyResponse}</div>`
               : nothing
           }

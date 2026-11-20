@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { playwright } from '@vitest/browser-playwright';
 
 /**
  * Tests run in a REAL browser (Playwright/Chromium), not happy-dom or jsdom.
@@ -18,8 +19,8 @@ export default defineConfig({
     include: ['test/**/*.test.ts'],
     browser: {
       enabled: true,
-      provider: 'playwright',
-      name: 'chromium',
+      provider: playwright(),
+      instances: [{ browser: 'chromium' }],
       headless: true,
       screenshotFailures: false,
     },

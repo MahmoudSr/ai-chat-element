@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { userEvent } from '@vitest/browser/context';
+import { userEvent } from 'vitest/browser';
 import { cleanupAll, mount, until } from './helpers.ts';
 import type { AiChat } from '../src/ai-chat.ts';
 
@@ -82,6 +82,46 @@ describe('keyboard focus ring', () => {
     el.style.setProperty('--ai-chat-focus-width', '5px');
     await keyboardFocus(el, btn);
     expect(parseFloat(getComputedStyle(btn).outlineWidth)).toBeCloseTo(5, 1);
+  });
+
+  it('EVERY focusable control gets our ring, not the browser default', async () => {
+    // The ring comes from a hand-kept selector list, so a new control silently
+    // fell back to the browser's ring (found on the reasoning toggle in Chrome).
+    // Sweep everything focusable in a chat that shows as many controls as
+    // possible, so the next new control is caught here too.
+    const el = mount('<ai-chat show-header show-clear show-edit has-earlier load-earlier="button"></ai-chat>');
+    el.style.setProperty('--ai-chat-focus-color', 'rgb(255, 0, 0)');
+    el.messages = [
+      { id: 'u', role: 'user', content: 'hi', createdAt: 1 },
+      {
+        id: 'a', role: 'assistant', content: 'Answer with code:\n\n```js\nx()\n```', createdAt: 2,
+        steps: [
+          { type: 'reasoning', id: 'reasoning-0', text: 'thoughts', at: 0, startedAt: 0, endedAt: 2000 },
+          { type: 'tool', id: 't1', name: 'search', state: 'success', args: { q: 'x' }, output: 'y', at: 0, startedAt: 0, endedAt: 1000 },
+        ],
+      },
+      { id: 'e', role: 'assistant', content: '', createdAt: 3, error: 'boom' },
+    ];
+    await el.updateComplete;
+    const focusable = [
+      ...el.shadowRoot!.querySelectorAll<HTMLElement>('button:not([disabled]), textarea, [tabindex="0"]'),
+    ].filter((n) => n.getClientRects().length > 0);
+    expect(focusable.length, 'the sweep found controls').toBeGreaterThan(5);
+    expect(focusable.some((n) => n.classList.contains('reasoning__trigger')), 'reasoning toggle included').toBe(true);
+    expect(focusable.some((n) => n.classList.contains('tool__header')), 'tool row included').toBe(true);
+
+    await userEvent.keyboard('{Tab}'); // keyboard modality
+    const missing: string[] = [];
+    for (const n of focusable) {
+      n.focus();
+      if (!n.matches(':focus-visible')) continue;
+      // The composer box draws the ring for its textarea (focus-within).
+      const ringed = n.tagName === 'TEXTAREA' ? n.closest('.composer__box') ?? n : n;
+      if (getComputedStyle(ringed as HTMLElement).outlineColor !== 'rgb(255, 0, 0)') {
+        missing.push(`${n.tagName.toLowerCase()}.${[...n.classList].join('.')}`);
+      }
+    }
+    expect(missing, 'controls without our focus ring').toEqual([]);
   });
 
   it('honors a customized --ai-chat-focus-color', async () => {

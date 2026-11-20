@@ -16,14 +16,15 @@ describe('screen-reader live region', () => {
   const live = (el: AiChat) =>
     el.shadowRoot!.querySelector('.sr-live') as HTMLElement;
 
-  it('the message log is role="log" WITHOUT aria-live (no per-token spam)', async () => {
+  it('the message log is role="log" but NOT live (no per-token spam)', async () => {
+    // role="log" is an IMPLICIT polite live region (ARIA spec). Leaving
+    // aria-live off the element — what this test used to assert — kept it live:
+    // Chrome's accessibility tree showed live="polite" on the log, so screen
+    // readers could announce every streamed token. It must say "off".
     const el = mount();
     await el.updateComplete;
     expect(log(el)).toBeTruthy();
-    expect(
-      log(el).hasAttribute('aria-live'),
-      'the log must not be a live region',
-    ).toBe(false);
+    expect(log(el).getAttribute('aria-live'), 'the log must not be a live region').toBe('off');
   });
 
   it('exposes a hidden polite live region', async () => {

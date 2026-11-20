@@ -22,7 +22,8 @@ plain HTML because it is a standard custom element. It ships its own styles
 - Main import: `import 'ai-chat-element'` (registers `<ai-chat>`)
 - Named exports: `openAIAdapter`, `anthropicAdapter`, `functionAdapter`, `AiChat`
 - Types: `ChatMessage`, `ChatTransport`, `StreamChunk`, `Role`, `FinishReason`,
-  `TokenUsage`, `Attachment`, `MessageAction`, `ChatLabels`, `OpenAIAdapterOptions`,
+  `TokenUsage`, `Attachment`, `MessageAction`, `MessageStep`, `ReasoningStep`,
+  `ToolStep`, `ToolState`, `ChatLabels`, `OpenAIAdapterOptions`,
   `AnthropicAdapterOptions`
 
 ## The two-step mental model (do NOT skip step 2)
@@ -80,9 +81,16 @@ chat.transport = functionAdapter(async function* (messages, signal) {
 | `anthropicAdapter` | Anthropic Messages API.                                        |
 | `functionAdapter`  | Any custom backend — wrap an async generator of text chunks.   |
 
-**Adapter options.** `openAIAdapter({ model, apiKey?, baseURL?, headers?, params? })`
+**Adapter options.** `openAIAdapter({ model, apiKey?, baseURL?, headers?, params?, thinkTags? })`
 and `anthropicAdapter({ model, apiKey?, baseURL?, headers?, maxTokens?, params?,
 browserAccess? })`. `model` is the only required one. Notes:
+
+- Both adapters show the model's reasoning and tool calls as steps on their own
+  (OpenAI-compatible: `reasoning_content` / `reasoning` fields and `tool_calls`;
+  Anthropic: thinking blocks, `tool_use`, and server tools like web search).
+- `thinkTags` (OpenAI-compatible only, default `true`) shows a reply that STARTS
+  with `<think>…</think>` as reasoning (models that emit thinking inline). A
+  `<think>` later in a reply stays text. Set `false` to keep it all as text.
 
 - `params` is merged into the request body — sampling options go here.
 - `headers` adds request headers, e.g. for a proxy that injects auth server-side.
@@ -117,9 +125,42 @@ chat.transport = functionAdapter(async function* (messages, signal) {
 A transport is any object with:
 `send(messages: ChatMessage[], signal: AbortSignal): AsyncIterable<StreamChunk>`
 where `StreamChunk` is
-`{type:'delta',delta} | {type:'done', finishReason?, usage?} | {type:'error',error}`.
+`{type:'delta',delta} | {type:'done', finishReason?, usage?} | {type:'error',error}
+| {type:'reasoning', delta, redacted?} | {type:'tool', id, name?, title?, args?,
+argsDelta?, state?, output?, error?}`.
 The `done` chunk may carry `finishReason` (`FinishReason`) and `usage`
 (`TokenUsage`) — both optional; see the events note below.
+
+### Reasoning & tool calls
+
+- The built-in adapters show the model's reasoning ("Thinking… / Thought for
+  12s", collapsed) and tool calls (one row each: status, name, state, time; opens
+  to input + result JSON) automatically. Nothing to configure.
+- From a custom backend, `functionAdapter` accepts `string | StreamChunk` yields:
+  strings are the answer; `{type:'reasoning', delta}` adds reasoning;
+  `{type:'tool', id, ...}` creates OR UPDATES the call with that `id` (send it
+  when it starts, with `argsDelta` fragments, and again with `output` or
+  `error`). Without `state`: `error` → `error`, `output` → `success`, a new
+  call → `running`. States: `pending | running | success | error`.
+- The component never RUNS tools. Your backend runs them and streams the chunks.
+- Steps land on `message.steps` (`MessageStep[]`: `ReasoningStep | ToolStep`, in
+  order, each with `at` = offset into `content` where it happened). `content`
+  stays the full answer text. Persist `steps` to show them again on reload. Not
+  sent back to the model.
+- `reasoning` / `tools` attributes: `collapsed` (default) | `expanded` | `hidden`.
+- `.renderTool = (tool, message) => Node | null` replaces a tool's result with
+  your own element (e.g. a chart); `null` = default JSON. Called once per change
+  of that call, not per token.
+
+```js
+chat.transport = functionAdapter(async function* (messages, signal) {
+  yield { type: 'reasoning', delta: 'Need the weather.' };
+  yield { type: 'tool', id: 't1', name: 'get_weather', args: { city: 'Beirut' } };
+  const w = await getWeather('Beirut');               // your code
+  yield { type: 'tool', id: 't1', output: w };        // same id: updates the row
+  yield `It's ${w.tempC}°C in Beirut.`;
+});
+```
 
 ## API surface
 
@@ -144,13 +185,19 @@ fires `ai-chat:load-earlier`; clear it at the first message), `load-earlier`
 — only on click), `allow-images` (render images in replies — off by default because a model-written
 image URL can leak data; off, images show as alt text), `image-hosts`
 (space-separated URL prefixes images may load from with `allow-images`; only
-`https:`; array property `.imageHosts`).
+`https:`; array property `.imageHosts`), `reasoning` (`collapsed` default — a
+one-line "Thought for 12s" the reader can open — `expanded`, or `hidden`; how a
+reply's reasoning steps show), `tools` (same three values for tool-call rows;
+a failed call's error shows either way).
 
 **Properties (JS only):** `.transport` (required), `.messages`, `.labels`,
 `.messageActions` (`(message) => MessageAction[]` — your own buttons in a
 message's actions row, `{ id, label, icon?, disabled? }`; `icon` is SVG markup,
 sanitized; pressing one fires `ai-chat:message-action`; assign a new function
-when its result depends on changed state), `.imageHosts`.
+when its result depends on changed state), `.renderTool` (`(tool: ToolStep,
+message) => Node | null` — your own element for a tool call's result, e.g. a
+chart, instead of the JSON; `null` = default; called once per change of that
+call, not per token; a call with one starts open), `.imageHosts`.
 
 **Methods:** `send(text, attachments?)` → `Promise<boolean>` (resolves after the
 stream settles; `false` = no-op, e.g. empty text AND no attachments, or no
@@ -179,8 +226,9 @@ Angular template bind the dash form, `(ai-chat-message)="…"`: Angular reads
 `prependMessages()`; `oldest` is the paging cursor; dropped if the conversation
 on screen changes first), `ai-chat:submit`
 `{content, attachments}`, `ai-chat:message` `{message}` (fires only for a completed
-reply that HAS content — not for empty or failed turns, so persisting on it won't
-save blank messages; `message` carries `finishReason`/`usage` when reported),
+reply that HAS content or steps — not for empty or failed turns, so persisting on
+it won't save blank messages; `message` carries `finishReason`/`usage` when
+reported, and `steps` when there were any),
 `ai-chat:error` `{error}`, `ai-chat:new-chat` `{messages}` (cancelable — fired by
 the New-chat button before clearing; `preventDefault()` keeps the current
 conversation, and `messages` is what's about to be cleared), `ai-chat:attach`
@@ -315,7 +363,11 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `headerTitle`, `clearChat`, `retry`, `emptyResponse`, `copyMessage`, `edit`,
   `saveEdit`, `cancelEdit`, `previewImage` (uses `{name}`), `closePreview`,
   `openFile` (uses `{name}`), `preparingFile`,
-  `loadEarlier`, `loadingEarlier`, `openAside`, `closeAside`, `attach`,
+  `loadEarlier`, `loadingEarlier`, `openAside`, `closeAside`, `thinking`,
+  `thoughtFor` (uses `{duration}`, e.g. `12s`), `thoughtProcess`, `toolPending`,
+  `toolRunning`, `toolSuccess`, `toolError`, `toolIncomplete`, `toolNotRun`, `toolInput`,
+  `toolOutput`, `moreCharacters` (uses `{count}`; under a tool value too long to
+  show whole — Copy still copies all of it), `attach`,
   `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
   three `attach*` messages use `{name}` as a filename placeholder).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
@@ -330,7 +382,9 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `composer-actions`, `composer-actions-start`, `composer-actions-end`,
   `attach-button`, `input`, `send-button`, `stop-button`, `jump-button`,
   `retry-button`, `aside-toggle`, `aside-scrim`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`, `empty-icon`,
-  `empty-heading`, `empty-body`, `error`, `empty-response`.
+  `empty-heading`, `empty-body`, `error`, `empty-response`, `reasoning`,
+  `reasoning-trigger`, `reasoning-content`, `tool`, `tool-header`, `tool-status`,
+  `tool-name`, `tool-body`, `tool-input`, `tool-output`, `tool-error`.
   (`header` = the built-in bar; `header-slot` = the wrapper that also holds your
   `header` slot content and keeps the bar's padding/divider when you fill it.
   Every message row exposes both `message` and a per-role part —
@@ -371,7 +425,15 @@ Reply content (markdown; defaults derive from the palette, dark mode follows):
 (= accent), `--ai-chat-link-hover-color`, `--ai-chat-strong-fg` (inherit),
 `--ai-chat-heading-fg` (inherit), `--ai-chat-marker-color` (= muted),
 `--ai-chat-blockquote-border` (= border). Tables use tabular numerals and honour
-markdown column alignment.
+markdown column alignment. Reasoning: `--ai-chat-reasoning-color` (= muted),
+`--ai-chat-reasoning-font-size` (0.92em), `--ai-chat-reasoning-border-color`
+(= border; rule beside opened reasoning), `--ai-chat-reasoning-max-height`
+(320px; opened reasoning scrolls past it). Tool calls: `--ai-chat-tool-bg`
+(fg 3%), `--ai-chat-tool-border-color` (= border), `--ai-chat-tool-radius`
+(= radius), `--ai-chat-tool-font-size` (0.9em), `--ai-chat-tool-running-color`
+(= accent), `--ai-chat-tool-success-color` (#16a34a),
+`--ai-chat-tool-error-color` (= error), `--ai-chat-tool-output-max-height`
+(320px).
 
 Radius (all = --ai-chat-radius): `--ai-chat-radius` (8px), `--ai-chat-outer-radius`
 (= radius; 0 for square), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,

@@ -128,14 +128,53 @@ describe('load earlier messages', () => {
     expect(el.messages.length).toBe(4);
   });
 
+  it('does not ask for older messages just because a long chat opened', async () => {
+    // Red-on-old (seen in real runs on Chromium 159): the open-at-bottom scroll
+    // waits a frame, and the observers can report first. The bottom one ("not in
+    // view yet") cleared the pin, then the top one read the open as the reader
+    // going back and fetched history nobody scrolled to. Which side wins is frame
+    // timing, so deliver the two reports in that order through stand-in observers;
+    // everything else is the real component.
+    const observers: Array<{ cb: IntersectionObserverCallback; margin: string; targets: Element[] }> = [];
+    const Real = window.IntersectionObserver;
+    (window as any).IntersectionObserver = class {
+      private o: (typeof observers)[number];
+      constructor(cb: IntersectionObserverCallback, opts?: IntersectionObserverInit) {
+        this.o = { cb, margin: opts?.rootMargin ?? '', targets: [] };
+        observers.push(this.o);
+      }
+      observe(t: Element) { this.o.targets.push(t); }
+      unobserve(t: Element) { this.o.targets = this.o.targets.filter((x) => x !== t); }
+      disconnect() { this.o.targets = []; }
+    };
+    try {
+      const el = sized('has-earlier');
+      const seen = listen(el);
+      el.messages = turns('new', 30);
+      await el.updateComplete;
+      const report = (o: (typeof observers)[number], isIntersecting: boolean) =>
+        o.cb(o.targets.map((target) => ({ target, isIntersecting }) as IntersectionObserverEntry), o as never);
+      const top = observers.find((o) => o.margin !== '')!;
+      const bottom = observers.find((o) => o.margin === '')!;
+      expect(top.targets.length && bottom.targets.length).toBeTruthy();
+      report(bottom, false); // the bottom isn't in view yet...
+      report(top, true); // ...while the top briefly is
+      await flushRaf();
+      await tick(50);
+      expect(seen.length).toBe(0);
+    } finally {
+      window.IntersectionObserver = Real;
+    }
+  });
+
   it('loads on its own when the reader scrolls back to the top', async () => {
     const el = sized('has-earlier');
+    const seen = listen(el); // from mount: opening at the bottom is not reading back
     el.messages = turns('new', 30);
     await el.updateComplete;
     await flushRaf();
     await tick(50);
-    const seen = listen(el);
-    expect(seen.length).toBe(0); // opening at the bottom is not reading back
+    expect(seen.length).toBe(0);
 
     const sc = scroller(el);
     sc.scrollTop = sc.scrollTop - 50; // a real upward scroll unpins...

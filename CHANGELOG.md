@@ -6,6 +6,101 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-20
+
+Reasoning and tool calls (issue #8), a dependency and security update, and four
+scroll fixes found by testing long replies in a real browser.
+
+### Added
+
+- **Reasoning ("thinking").** A one-line **"Thinking… 4s"** while the model
+  thinks, then **"Thought for 12s"** — collapsed by default; the reader opens it
+  to read the reasoning in a quieter, capped column. It sits where it happened
+  (reasoning mid-answer gets its own toggle between the paragraphs), the
+  reader's open/close survives streaming, and reasoning the provider hides still
+  shows its duration. New attribute **`reasoning="collapsed|expanded|hidden"`**,
+  vars `--ai-chat-reasoning-color/-font-size/-border-color/-max-height`, parts
+  `reasoning`, `reasoning-trigger`, `reasoning-content`, labels `thinking`,
+  `thoughtFor` (`{duration}`), `thoughtProcess`.
+- **Tool calls.** One row per call: status icon, name (or `title`), state
+  (*Preparing… / Running… / Done / Failed*), live duration. It opens to the
+  call's **Input** and **Result** as highlighted JSON with a copy button;
+  arguments show while they stream in; a value too long to show whole (over
+  20,000 characters) shows its start and Copy takes all of it (new label
+  `moreCharacters`); a failed call shows its error without
+  being opened; a call cut off mid-run reads *Didn't finish* and one that never
+  started *Not run* (never a spinner forever, even after a reload). New
+  attribute **`tools="collapsed|expanded|hidden"`**, property
+  **`renderTool(tool, message) => Node | null`** to draw a result yourself (a
+  chart, a map) — called once per change of that call, not per token. Vars
+  `--ai-chat-tool-bg/-border-color/-radius/-font-size/-running-color/-success-color/-error-color/-output-max-height`,
+  parts `tool`, `tool-header`, `tool-status`, `tool-name`, `tool-body`,
+  `tool-input`, `tool-output`, `tool-error`, labels `toolPending`,
+  `toolRunning`, `toolSuccess`, `toolError`, `toolIncomplete`, `toolNotRun`,
+  `toolInput`, `toolOutput`.
+- **`message.steps`** (`ReasoningStep | ToolStep`, in order, each with `at` —
+  where in the answer it happened). `content` stays the whole answer text, so
+  copy, edit, retry and what's sent to the model are unchanged. Persist `steps`
+  to show them again on reload. New exported types `MessageStep`,
+  `ReasoningStep`, `ToolStep`, `ToolState`.
+- **Two new stream chunks**: `{ type: 'reasoning', delta, redacted? }` and
+  `{ type: 'tool', id, … }` (create or update the call with that id; an
+  `output` implies success, an `error` failure). **`functionAdapter`** now
+  accepts `string | StreamChunk` yields, so a backend agent loop streams steps.
+- **The built-in adapters show steps on their own.** `anthropicAdapter`:
+  thinking (including redacted and omitted), `tool_use` with streamed input,
+  and server tools (web search, code execution) and MCP calls with their
+  results. `openAIAdapter`: `reasoning_content` / `reasoning`, `tool_calls`
+  fragments, and a reply that starts with `<think>…</think>` (new option
+  **`thinkTags`**, default `true`). Plain text streams are unchanged.
+
+### Changed
+
+- **`ai-chat:message` fires for a turn of only tool calls** (it used to need
+  text), and such a turn is announced to screen readers by what it did
+  ("deploy: Done, notify: Failed") instead of "No response."
+- **Dependencies updated; `npm audit` 11 → 0.** The bundled runtime libraries
+  are the latest (dompurify 3.4.18 — 0.6.0 shipped a version with a moderate
+  advisory; marked 18, lit 3.3.3, highlight.js 11.12). Built with Vite 8, and
+  still one self-contained file per entry: `dist/ai-chat-element.js` is 99.7
+  KB gzipped with all of the above (0.6.0: 99.8 KB), `dist/adapters/index.js`
+  4.0 KB.
+
+### Fixed
+
+- **A scroll-up during a stream was undone.** Every token queues a scroll to
+  the bottom for the next frame; scrolling up between the two snapped you back
+  15ms later. The queued scroll now stands down for the reader (wheel, touch,
+  PageUp/↑/Home).
+- **Jump-to-latest could miss.** It aimed at where the bottom was when clicked;
+  a fast reply moved it, so it landed short and never followed again. It now
+  follows from the click.
+- **Switching chats while scrolled up opened the new one mid-history**, at the
+  old chat's scroll offset. A different conversation now opens at its latest
+  message (older messages loaded above don't count as a switch).
+- **A long chat could ask for older messages just by opening** (with
+  `has-earlier`), before the reader scrolled anywhere.
+- **Screen readers no longer hear every streamed token.** The message list is
+  `role="log"`, which is a polite live region *by default*; 0.1.5 meant to stop
+  the per-token announcements by leaving `aria-live` off it, which kept it
+  live. It now says `aria-live="off"` (Chrome's accessibility tree showed
+  `live="polite"` before, none after). The settled reply is still announced
+  once.
+- **`openAIAdapter` with `n > 1`** mixed other choices into the answer when a
+  server sent each choice in its own chunk (it always read `choices[0]`). Only
+  choice 0 is the answer now.
+- **Saved steps are never trusted.** A conversation restored from an app's
+  storage with broken steps (not a list, junk entries, garbage positions or
+  times, unknown step types) renders what it can and skips the rest — before,
+  some of these crashed the whole chat or dropped the answer text. Backends
+  sending the wrong types (a number as reasoning, an Error object as a tool
+  error) are handled the same way.
+- **Right-to-left.** The reasoning column and tool rows mirror in an RTL page
+  (the duration at the far end, the error under the name, the rule on the
+  right) — they used physical left/right CSS.
+- **Keyboard focus ring** on the new controls uses the component's own ring
+  (a test now sweeps every focusable control, so a new one can't miss it).
+
 ## [0.6.0] - 2026-10-08
 
 Files in a reply, a visible copy, and two fixes found in the admin dashboard.
@@ -574,7 +669,8 @@ Initial public release.
 - Accessibility: ARIA live region, keyboard support, reduced-motion.
 - Licensed under MPL-2.0.
 
-[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/MahmoudSr/ai-chat-element/compare/v0.3.0...v0.4.0

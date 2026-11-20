@@ -125,3 +125,20 @@ export const asideIcon = svg`
     <rect x="3" y="4" width="18" height="16" rx="2"></rect>
     <line x1="9" y1="4" x2="9" y2="20"></line>
   </svg>`;
+
+/** Spinner — a tool call in progress (rotated by CSS). */
+export const spinnerIcon = svg`
+  <svg class="icon icon--spin" viewBox=${base.viewBox} width="16" height="16"
+       fill=${base.fill} stroke=${base.stroke} stroke-width="2.25"
+       stroke-linecap="round" aria-hidden="true">
+    <path d="M21 12a9 9 0 1 1-6.22-8.56"></path>
+  </svg>`;
+
+/** Circle with a bar — a tool call that stopped without an outcome. */
+export const stopIcon = svg`
+  <svg class="icon" viewBox=${base.viewBox} width="16" height="16"
+       fill=${base.fill} stroke=${base.stroke} stroke-width="2"
+       stroke-linecap="round" aria-hidden="true">
+    <circle cx="12" cy="12" r="9"></circle>
+    <line x1="8" y1="12" x2="16" y2="12"></line>
+  </svg>`;

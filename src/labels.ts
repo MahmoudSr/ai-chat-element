@@ -78,6 +78,30 @@ export interface ChatLabels {
   openAside: string;
   /** The same button, and the backdrop, while the drawer is open. */
   closeAside: string;
+  /** A reply's reasoning while it is still being written. */
+  thinking: string;
+  /** Finished reasoning. `{duration}` becomes e.g. `12s` or `1m 5s`. */
+  thoughtFor: string;
+  /** Names the reasoning region; also the heading when no duration is known. */
+  thoughtProcess: string;
+  /** A tool call the model is still preparing (its arguments streaming in). */
+  toolPending: string;
+  /** A tool call that is running. */
+  toolRunning: string;
+  /** A tool call that finished. */
+  toolSuccess: string;
+  /** A tool call that failed. */
+  toolError: string;
+  /** A tool call that was running when the reply ended or was stopped, with no outcome. */
+  toolIncomplete: string;
+  /** A tool call the model asked for that never started (e.g. one your app is meant to run). */
+  toolNotRun: string;
+  /** Heading over a tool call's arguments. */
+  toolInput: string;
+  /** Heading over a tool call's result. */
+  toolOutput: string;
+  /** Under a tool value too long to show whole. `{count}` is how many characters are hidden. */
+  moreCharacters: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -114,4 +138,16 @@ export const DEFAULT_LABELS: ChatLabels = {
   loadingEarlier: 'Loading earlier messages…',
   openAside: 'Show conversations',
   closeAside: 'Hide conversations',
+  thinking: 'Thinking…',
+  thoughtFor: 'Thought for {duration}',
+  thoughtProcess: 'Thought process',
+  toolPending: 'Preparing…',
+  toolRunning: 'Running…',
+  toolSuccess: 'Done',
+  toolError: 'Failed',
+  toolIncomplete: "Didn't finish",
+  toolNotRun: 'Not run',
+  toolInput: 'Input',
+  toolOutput: 'Result',
+  moreCharacters: '… and {count} more characters. Copy has all of it.',
 };

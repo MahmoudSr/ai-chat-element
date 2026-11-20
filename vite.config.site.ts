@@ -22,8 +22,8 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        index: resolve(__dirname, 'index.html'),
-        playground: resolve(__dirname, 'examples/playground.html'),
+        index: resolve(import.meta.dirname, 'index.html'),
+        playground: resolve(import.meta.dirname, 'examples/playground.html'),
       },
     },
   },
