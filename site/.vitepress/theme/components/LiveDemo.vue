@@ -21,13 +21,16 @@ let disposed = false;
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+const ctx = { log: (text: string) => (lastEvent.value = text) };
+
 function play() {
   const el = chat.value;
   if (!el) return;
+  lastEvent.value = '';
+  if (s.play) return s.play(el, ctx);
   el.stop?.();
   el.messages = [];
-  lastEvent.value = '';
-  void el.send(s.ask);
+  if (s.ask) void el.send(s.ask);
 }
 
 function summarize(name: string, detail: any): string {
@@ -46,7 +49,7 @@ onMounted(async () => {
   if (disposed || !host.value) return;
 
   // Attributes go in as real HTML, exactly as a page would write them.
-  host.value.innerHTML = `<ai-chat ${s.attrs}></ai-chat>`;
+  host.value.innerHTML = `<ai-chat ${s.attrs}>${s.slot ?? ''}</ai-chat>`;
   const el = host.value.querySelector('ai-chat') as any;
   el.setAttribute('theme', isDark.value ? 'dark' : 'light');
   el.transport = mod.functionAdapter((messages: any, signal: AbortSignal) =>
@@ -60,6 +63,7 @@ onMounted(async () => {
     });
   }
   chat.value = el;
+  s.setup?.(el, ctx);
   play();
 });
 

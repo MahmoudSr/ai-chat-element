@@ -49,6 +49,11 @@ const docsSidebar = [
       { text: 'Reasoning and tool calls', link: '/features/reasoning-tools' },
       { text: 'Attachments', link: '/features/attachments' },
       { text: 'Message actions', link: '/features/message-actions' },
+      { text: 'History sidebar', link: '/features/history' },
+      { text: 'Long conversations', link: '/features/long-conversations' },
+      { text: 'Background streaming', link: '/features/background-streaming' },
+      { text: 'Header, names and avatars', link: '/features/header-avatars' },
+      { text: 'Keyboard and accessibility', link: '/features/accessibility' },
     ],
   },
 ];
