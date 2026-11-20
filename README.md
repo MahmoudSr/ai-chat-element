@@ -472,8 +472,11 @@ The next three days cool off slightly.
 
 **With the built-in adapters it's automatic.** Nothing to configure:
 
-- `anthropicAdapter` — thinking blocks (turn thinking on with `params`, e.g.
-  `params: { thinking: { type: 'enabled', budget_tokens: 2048 } }`), `tool_use`,
+- `anthropicAdapter` — thinking blocks (turn thinking on with `params`; on
+  current Claude models that is
+  `params: { thinking: { type: 'adaptive', display: 'summarized' } }` plus a
+  bigger `maxTokens` than the 1024 default. Without `display: 'summarized'` the
+  thinking text comes back empty and the panel only says "Thinking…"), `tool_use`,
   and Anthropic's server tools (web search, code execution) and MCP calls, which
   arrive with their results.
 - `openAIAdapter` — `reasoning_content` / `reasoning` fields (DeepSeek, vLLM,
