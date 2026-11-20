@@ -118,9 +118,15 @@ describe('StreamingMarkdown equivalence', () => {
       return max;
     };
 
-    const before = worst((s) => { renderMarkdown(s, 'Copy'); });
-    const sm = new StreamingMarkdown('Copy');
-    const after = worst((s) => { sm.render(s); });
+    // Best of three passes per path. One pass's worst frame can be a single GC
+    // pause (seen: a 10ms spike in a ~1.3ms series failed this on an otherwise
+    // healthy run). A pause won't land in all three passes; a real regression
+    // (streaming as slow as re-parsing) is slow in every pass and still fails.
+    const best = (fn: (s: string) => void, fresh: () => void = () => {}) =>
+      Math.min(...[0, 1, 2].map(() => { fresh(); return worst(fn); }));
+    const before = best((s) => { renderMarkdown(s, 'Copy'); });
+    let sm = new StreamingMarkdown('Copy');
+    const after = best((s) => { sm.render(s); }, () => { sm = new StreamingMarkdown('Copy'); });
 
     // The metric that matters is the WORST frame, not the average.
     expect(after, `worst frame ${after.toFixed(1)}ms should be well under ${before.toFixed(1)}ms`)
