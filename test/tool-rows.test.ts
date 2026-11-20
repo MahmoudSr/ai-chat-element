@@ -162,6 +162,37 @@ describe('tool-call rows', () => {
     c.finish({});
   });
 
+  it('a huge result opens fast: its start is shown, Copy takes all of it', async () => {
+    // Red-on-old: a 0.9MB result went through markdown + sanitize + highlight
+    // on open and froze the page for 3.8s; shown whole, Chrome still froze
+    // ~0.7s laying it out.
+    const big = Array.from({ length: 9000 }, (_, i) => ({ id: i, name: `row ${i}`, note: 'lorem ipsum dolor sit amet' }));
+    const full = JSON.stringify(big, null, 2);
+    const el = mount();
+    el.messages = [{ id: 'm', role: 'assistant', content: 'x', createdAt: 0,
+      steps: [{ type: 'tool', id: 't', name: 'dump', state: 'success', at: 0, startedAt: 0, endedAt: 1, output: big }] }];
+    await el.updateComplete;
+    const t0 = performance.now();
+    header(el)!.click();
+    await el.updateComplete;
+    expect(performance.now() - t0, 'opens without freezing').toBeLessThan(500);
+    const out = body(el)!.querySelector('[part~="tool-output"]')!;
+    const shown = out.querySelector('code')!.textContent!;
+    expect(shown.length, 'only the start is laid out').toBeLessThanOrEqual(20_000);
+    expect(shown.startsWith('[\n  {\n    "id": 0,')).toBe(true);
+    expect(out.querySelector('.tool__more')!.textContent).toContain((full.length - 20_000).toLocaleString());
+
+    const write = vi.fn(() => Promise.resolve());
+    const orig = navigator.clipboard.writeText;
+    Object.defineProperty(navigator.clipboard, 'writeText', { value: write, configurable: true });
+    try {
+      out.querySelector<HTMLButtonElement>('.code-block__copy')!.click();
+      expect(write).toHaveBeenCalledWith(full);
+    } finally {
+      Object.defineProperty(navigator.clipboard, 'writeText', { value: orig, configurable: true });
+    }
+  });
+
   it('a value containing a code fence stays inside its block', async () => {
     const el = mount();
     el.messages = [{

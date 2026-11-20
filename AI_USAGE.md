@@ -366,7 +366,8 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `loadEarlier`, `loadingEarlier`, `openAside`, `closeAside`, `thinking`,
   `thoughtFor` (uses `{duration}`, e.g. `12s`), `thoughtProcess`, `toolPending`,
   `toolRunning`, `toolSuccess`, `toolError`, `toolIncomplete`, `toolNotRun`, `toolInput`,
-  `toolOutput`, `attach`,
+  `toolOutput`, `moreCharacters` (uses `{count}`; under a tool value too long to
+  show whole — Copy still copies all of it), `attach`,
   `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
   three `attach*` messages use `{name}` as a filename placeholder).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,

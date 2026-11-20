@@ -25,7 +25,9 @@ scroll fixes found by testing long replies in a real browser.
 - **Tool calls.** One row per call: status icon, name (or `title`), state
   (*Preparing… / Running… / Done / Failed*), live duration. It opens to the
   call's **Input** and **Result** as highlighted JSON with a copy button;
-  arguments show while they stream in; a failed call shows its error without
+  arguments show while they stream in; a value too long to show whole (over
+  20,000 characters) shows its start and Copy takes all of it (new label
+  `moreCharacters`); a failed call shows its error without
   being opened; a call cut off mid-run reads *Didn't finish* and one that never
   started *Not run* (never a spinner forever, even after a reload). New
   attribute **`tools="collapsed|expanded|hidden"`**, property

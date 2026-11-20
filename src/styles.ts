@@ -857,6 +857,7 @@ export const chatStyles = css`
   }
   .tool__section .markdown .code-block { margin: 0; }
   .tool__section pre { max-height: var(--ai-chat-tool-output-max-height); overflow: auto; }
+  .tool__more { margin-top: 4px; color: var(--ai-chat-muted); font-size: 0.85em; }
 
   .message__error {
     margin-top: 8px;

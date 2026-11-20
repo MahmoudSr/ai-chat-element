@@ -100,6 +100,8 @@ export interface ChatLabels {
   toolInput: string;
   /** Heading over a tool call's result. */
   toolOutput: string;
+  /** Under a tool value too long to show whole. `{count}` is how many characters are hidden. */
+  moreCharacters: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -147,4 +149,5 @@ export const DEFAULT_LABELS: ChatLabels = {
   toolNotRun: 'Not run',
   toolInput: 'Input',
   toolOutput: 'Result',
+  moreCharacters: '… and {count} more characters. Copy has all of it.',
 };

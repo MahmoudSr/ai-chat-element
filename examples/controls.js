@@ -264,6 +264,7 @@ export const CONTROLS = [
   { g: 'Labels (i18n)', kind: 'label', key: 'toolNotRun', type: 'text', def: 'Not run' },
   { g: 'Labels (i18n)', kind: 'label', key: 'toolInput', type: 'text', def: 'Input' },
   { g: 'Labels (i18n)', kind: 'label', key: 'toolOutput', type: 'text', def: 'Result' },
+  { g: 'Labels (i18n)', kind: 'label', key: 'moreCharacters', type: 'text', def: '… and {count} more characters. Copy has all of it.' },
 
   // ---------- Host page (not the component) ----------
   { g: 'Host page', kind: 'frame', key: 'frameRadius', css: 'borderRadius', type: 'range', def: 8, min: 0, max: 28, fmt: px, label: 'wrapper radius',

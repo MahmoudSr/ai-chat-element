@@ -1100,6 +1100,7 @@ chat.labels = {
   toolNotRun: 'No ejecutada',
   toolInput: 'Entrada',
   toolOutput: 'Resultado',
+  moreCharacters: '… y {count} caracteres más. Copiar los incluye todos.',
   // Attachment strings ({name} is replaced with the filename):
   attach: 'Adjuntar archivos',
   removeAttachment: 'Quitar adjunto',

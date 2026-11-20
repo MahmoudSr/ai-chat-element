@@ -36,6 +36,9 @@ import {
   stopIcon,
 } from './icons.js';
 
+/** A tool value longer than this (characters) shows its start; Copy has the rest. */
+const VALUE_SHOW_LIMIT = 20_000;
+
 let idCounter = 0;
 const nextId = () =>
   `msg-${Date.now().toString(36)}-${(idCounter++).toString(36)}`;
@@ -856,11 +859,31 @@ export class AiChat extends LitElement {
         lang = 'text';
       }
     }
+    // A huge value can't be shown whole: highlighting costs ~2ms per KB, and
+    // even plain, laying out a 1.4MB block froze Chrome for ~0.7s (a 0.9MB
+    // result used to freeze it for 3.8s). Show the start, say how much more
+    // there is, and let Copy take the full value.
+    let more = 0;
+    if (text.length > VALUE_SHOW_LIMIT) {
+      more = text.length - VALUE_SHOW_LIMIT;
+      this._fullValues.set(key, text);
+      text = text.slice(0, VALUE_SHOW_LIMIT);
+    } else {
+      this._fullValues.delete(key);
+    }
     // A fence longer than any backtick run inside, so the value can't close it.
     const longest = Math.max(2, ...[...text.matchAll(/`+/g)].map((r) => r[0].length));
     const fence = '`'.repeat(longest + 1);
-    return this._markdownBlock(key, `${fence}${lang}\n${text}\n${fence}`, false);
+    const block = this._markdownBlock(key, `${fence}${lang}\n${text}\n${fence}`, false);
+    if (!more) return block;
+    return html`<div class="tool__value" data-full-key=${key}>
+      ${block}
+      <div class="tool__more">${this._labels.moreCharacters.replace('{count}', more.toLocaleString())}</div>
+    </div>`;
   }
+
+  /** Full text of values shown cut short, by block key, for the Copy button. */
+  private _fullValues = new Map<string, string>();
 
   /**
    * The app's own rendering of a tool's result, from `renderTool`. Cached per
@@ -1841,8 +1864,12 @@ export class AiChat extends LitElement {
     const target = e.target as HTMLElement;
     const btn = target.closest('.code-block__copy') as HTMLButtonElement | null;
     if (!btn) return;
+    // A tool value shown cut short copies in full.
+    const fullKey = (btn.closest('[data-full-key]') as HTMLElement | null)?.dataset.fullKey;
     const code =
-      btn.closest('.code-block')?.querySelector('code')?.textContent ?? '';
+      (fullKey && this._fullValues.get(fullKey)) ??
+      btn.closest('.code-block')?.querySelector('code')?.textContent ??
+      '';
     const { copy, copied } = this._labels;
     void navigator.clipboard?.writeText(code).then(() => {
       btn.textContent = copied;
