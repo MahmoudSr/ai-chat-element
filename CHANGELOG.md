@@ -77,6 +77,12 @@ scroll fixes found by testing long replies in a real browser.
   message (older messages loaded above don't count as a switch).
 - **A long chat could ask for older messages just by opening** (with
   `has-earlier`), before the reader scrolled anywhere.
+- **Saved steps are never trusted.** A conversation restored from an app's
+  storage with broken steps (not a list, junk entries, garbage positions or
+  times, unknown step types) renders what it can and skips the rest — before,
+  some of these crashed the whole chat or dropped the answer text. Backends
+  sending the wrong types (a number as reasoning, an Error object as a tool
+  error) are handled the same way.
 - **Keyboard focus ring** on the new controls uses the component's own ring
   (a test now sweeps every focusable control, so a new one can't miss it).
 

@@ -17,7 +17,7 @@ import { renderMarkdown, sanitizeIcon, StreamingMarkdown, type ImagePolicy } fro
 import { chatStyles } from './styles.js';
 import { hljsTheme } from './markdown/hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
-import { addReasoning, closeReasoning, settleSteps, toolUnfinished, upsertTool } from './steps.js';
+import { addReasoning, closeReasoning, sanitizeSteps, settleSteps, toolUnfinished, upsertTool } from './steps.js';
 import {
   chevronDownIcon,
   sendIcon,
@@ -654,10 +654,26 @@ export class AiChat extends LitElement {
 
   /** The steps a message shows, given the `reasoning` setting. */
   private _visibleSteps(m: ChatMessage): MessageStep[] {
-    if (!m.steps?.length) return [];
-    return m.steps.filter((s) =>
+    const steps = this._cleanSteps(m.steps);
+    if (!steps.length) return steps;
+    return steps.filter((s) =>
       s.type === 'reasoning' ? this.reasoning !== 'hidden' : this.tools !== 'hidden',
     );
+  }
+
+  /**
+   * A message's steps, safe to render (see sanitizeSteps), cached per steps
+   * array. Steps are replaced, never mutated, so a new array means new steps.
+   */
+  private _cleanStepsCache = new WeakMap<object, MessageStep[]>();
+  private _cleanSteps(steps: unknown): MessageStep[] {
+    if (!Array.isArray(steps) || steps.length === 0) return [];
+    let clean = this._cleanStepsCache.get(steps);
+    if (!clean) {
+      clean = sanitizeSteps(steps);
+      this._cleanStepsCache.set(steps, clean);
+    }
+    return clean;
   }
 
   /**
@@ -691,7 +707,7 @@ export class AiChat extends LitElement {
   private _stepOpen = new Map<string, boolean>();
 
   private _renderReasoning(m: ChatMessage, step: ReasoningStep) {
-    const key = `${m.id}/${step.id}`;
+    const key = `${m.id}/reasoning:${step.id}`;
     const live = !!m.streaming && step.endedAt === undefined;
     const hasText = step.text.length > 0;
     const open = hasText && (this._stepOpen.get(key) ?? this.reasoning === 'expanded');
@@ -741,7 +757,7 @@ export class AiChat extends LitElement {
    * `renderTool` callback can replace the result with the app's own element.
    */
   private _renderTool(m: ChatMessage, tool: ToolStep) {
-    const key = `${m.id}/${tool.id}`;
+    const key = `${m.id}/tool:${tool.id}`;
     const labels = this._labels;
     const unfinished = toolUnfinished(tool, m);
     const live = !!m.streaming && (tool.state === 'pending' || tool.state === 'running');
@@ -787,7 +803,7 @@ export class AiChat extends LitElement {
               ?disabled=${!hasBody}
               @click=${() => this._toggleStep(key, open)}>
         <span class="tool__status" part="tool-status" aria-hidden="true">${icon}</span>
-        <span class="tool__name" part="tool-name">${tool.title || tool.name}</span>
+        <span class="tool__name" part="tool-name">${tool.title || tool.name || tool.id}</span>
         <span class="tool__state">${stateLabel}</span>
         ${time ? html`<span class="tool__time">${time}</span>` : nothing}
         ${hasBody ? html`<span class="tool__chevron" aria-hidden="true">${chevronDownIcon}</span>` : nothing}
@@ -870,13 +886,13 @@ export class AiChat extends LitElement {
   /** "search: Done, deploy: Failed" — what a turn of only tool calls did, for the screen reader. */
   private _toolSummary(m: ChatMessage): string {
     const l = this._labels;
-    return (m.steps ?? [])
+    return this._cleanSteps(m.steps)
       .filter((s): s is ToolStep => s.type === 'tool')
       .map((t) => {
         const state = toolUnfinished(t, m)
           ? t.state === 'pending' ? l.toolNotRun : l.toolIncomplete
           : t.state === 'success' ? l.toolSuccess : t.state === 'error' ? l.toolError : l.toolRunning;
-        return `${t.title || t.name}: ${state}`;
+        return `${t.title || t.name || t.id}: ${state}`;
       })
       .join(', ');
   }
@@ -896,7 +912,7 @@ export class AiChat extends LitElement {
    */
   private _liveTimer?: number;
   private _syncLiveTimer(): void {
-    const live = this.messages.some((m) => m.streaming && m.steps?.some((s) => s.endedAt === undefined));
+    const live = this.messages.some((m) => m.streaming && this._cleanSteps(m.steps).some((s) => s.endedAt === undefined));
     if (live && this._liveTimer === undefined) {
       this._liveTimer = window.setInterval(() => this.requestUpdate(), 1000);
     } else if (!live && this._liveTimer !== undefined) {
@@ -1314,6 +1330,7 @@ export class AiChat extends LitElement {
           detach();
         }
         if (chunk.type === 'delta') {
+          if (typeof chunk.delta !== 'string') continue; // a backend can send anything
           update((m) => {
             // Answer text resuming ends any reasoning in progress.
             const c = closeReasoning(m, Date.now());

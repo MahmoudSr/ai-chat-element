@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { cleanupAll, controllable, mount, until } from './helpers.ts';
-import { addReasoning, closeReasoning, settleSteps, upsertTool } from '../src/steps.ts';
+import { addReasoning, closeReasoning, sanitizeSteps, settleSteps, upsertTool } from '../src/steps.ts';
 import { functionAdapter } from '../src/adapters/function.ts';
 import type { ChatMessage, ReasoningStep, StreamChunk, ToolStep } from '../src/types.ts';
 
@@ -71,6 +71,16 @@ describe('step rules (pure)', () => {
   it('closing with nothing open returns the same message (no per-token allocation)', () => {
     const m = msg('hi');
     expect(closeReasoning(m, 1)).toBe(m);
+  });
+
+  it('sanitizeSteps keeps well-formed steps as the SAME objects, repairs the rest, drops junk', () => {
+    const good = upsertTool(addReasoning(msg('x'), { type: 'reasoning', delta: 'r' }, 1), { type: 'tool', id: 't', name: 'n' }, 2).steps!;
+    const clean = sanitizeSteps(good);
+    expect(clean[0]).toBe(good[0]); // identity: renderTool's cache depends on it
+    expect(clean[1]).toBe(good[1]);
+    const repaired = sanitizeSteps([{ type: 'tool', id: 7, at: Number.NaN }, null, 'x', { type: 'future' }]);
+    expect(repaired).toHaveLength(1);
+    expect(repaired[0]).toMatchObject({ type: 'tool', id: '7', name: '', state: 'running', at: 0 });
   });
 
   it('marks redacted reasoning', () => {
