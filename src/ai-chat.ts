@@ -513,6 +513,14 @@ export class AiChat extends LitElement {
    * user's scroll during streaming.
    */
   private _stickToBottom = true;
+  /**
+   * True once the READER has scrolled up, until they're back at the bottom.
+   * Auto-loading older messages keys off this, not `_stickToBottom`: the pin is
+   * also written by the observers, and while a long chat opens the bottom one can
+   * report "not in view" before the open-at-bottom scroll lands. Read as "the
+   * reader went back", that fetched history nobody scrolled to.
+   */
+  private _readingBack = false;
   private _bottomObserver?: IntersectionObserver;
 
   @query('.messages') private _scrollEl!: HTMLElement;
@@ -745,6 +753,7 @@ export class AiChat extends LitElement {
     // nothing to scroll, so clicking it does nothing and the observer never
     // re-fires to hide it). Reset the scroll-follow state explicitly.
     this._stickToBottom = true;
+    this._readingBack = false;
     this._showJump = false;
     if (this._textarea) {
       this._textarea.style.height = 'auto';
@@ -857,6 +866,7 @@ export class AiChat extends LitElement {
 
     // Sending always snaps the user back to the latest turn.
     this._stickToBottom = true;
+    this._readingBack = false;
     this._showJump = false;
     const userMsg: ChatMessage = {
       id: nextId(),
@@ -1373,7 +1383,7 @@ export class AiChat extends LitElement {
     // in view before the first scroll lands; that is not the reader going back.
     // A short one that doesn't fill the view is: load until it does.
     const overflows = el ? el.scrollHeight > el.clientHeight : false;
-    if (this._stickToBottom && overflows) return;
+    if (overflows && !this._readingBack) return;
     this._requestEarlier();
   }
 
@@ -1596,11 +1606,13 @@ export class AiChat extends LitElement {
     const atBottom = el.scrollHeight - top - el.clientHeight <= 2;
     if (!grew && !atBottom && top < this._lastScrollTop - 1) {
       this._stickToBottom = false;
+      this._readingBack = true;
     }
+    if (atBottom) this._readingBack = false;
     // The top observer only reports CHANGES: on a chat that overflows by less
     // than the look-ahead, the top is "in view" from the start (skipped then,
     // while pinned) and never reported again. Judge by where the reader is.
-    if (!this._stickToBottom && top <= EARLIER_LOOKAHEAD_PX) this._autoLoadEarlier();
+    if (this._readingBack && top <= EARLIER_LOOKAHEAD_PX) this._autoLoadEarlier();
     this._lastScrollTop = top;
     this._lastScrollHeight = el.scrollHeight;
   }
