@@ -28,23 +28,50 @@ const fence = '```';
 
 export const strips: Strip[] = [
   {
-    id: 'html',
-    name: 'HTML',
+    id: 'svelte',
+    name: 'Svelte',
     kind: 'framework',
-    code: 'AC-01',
-    chips: ['#0E2A6B', '#1B44B8', '#2F5BFF', '#6E8BFF', '#A9BBFF', '#D7E0FF'],
-    theme: { '--ai-chat-accent': '#2F5BFF', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '8px' },
-    ask: 'Can I use it without a build step?',
-    answer: `Yes. Load it from a CDN and use the tag:
+    code: 'AC-05',
+    chips: ['#5A4300', '#A07A00', '#F2C230', '#F6D466', '#FAE6A3', '#FDF4D6'],
+    theme: { '--ai-chat-accent': '#F2C230', '--ai-chat-accent-fg': '#16181D', '--ai-chat-radius': '16px' },
+    ask: 'And Svelte?',
+    answer: `Svelte renders custom elements natively. Import once and bind the element:
 
-${fence}html
-<ai-chat></ai-chat>
-<script type="module">
-  import 'https://esm.sh/ai-chat-element@0.7.0';
-</script>
+${fence}svelte
+<ai-chat bind:this={chat}></ai-chat>
 ${fence}
 
-Then set \`chat.transport\` to talk to a model.`,
+Set \`chat.transport\` in \`onMount\`.`,
+  },
+  {
+    id: 'angular',
+    name: 'Angular',
+    kind: 'framework',
+    code: 'AC-04',
+    chips: ['#5C0B2E', '#C2185B', '#D81E6B', '#EC5F98', '#F5A3C4', '#FCDDEA'],
+    theme: { '--ai-chat-accent': '#C2185B', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '4px' },
+    ask: 'What do I need in Angular?',
+    answer: `Add \`CUSTOM_ELEMENTS_SCHEMA\` to the component that uses it, and bind the dash form of events:
+
+${fence}html
+<ai-chat (ai-chat-message)="onMessage($event)"></ai-chat>
+${fence}`,
+  },
+  {
+    id: 'vue',
+    name: 'Vue',
+    kind: 'framework',
+    code: 'AC-03',
+    chips: ['#5A2400', '#C2410C', '#FF5A1F', '#FF8A5C', '#FFBC9E', '#FFE4D7'],
+    theme: { '--ai-chat-accent': '#C2410C', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '6px' },
+    ask: 'Does this work in my Vue app?',
+    answer: `Yes. Tell Vue that \`ai-chat\` is a custom element, then use it like any tag:
+
+${fence}ts
+vue({ template: { compilerOptions: {
+  isCustomElement: (tag) => tag === 'ai-chat',
+} } });
+${fence}`,
   },
   {
     id: 'react',
@@ -65,50 +92,23 @@ return <ai-chat ref={ref} />;
 ${fence}`,
   },
   {
-    id: 'vue',
-    name: 'Vue',
+    id: 'html',
+    name: 'HTML',
     kind: 'framework',
-    code: 'AC-03',
-    chips: ['#5A2400', '#C2410C', '#FF5A1F', '#FF8A5C', '#FFBC9E', '#FFE4D7'],
-    theme: { '--ai-chat-accent': '#C2410C', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '6px' },
-    ask: 'Does this work in my Vue app?',
-    answer: `Yes. Tell Vue that \`ai-chat\` is a custom element, then use it like any tag:
-
-${fence}ts
-vue({ template: { compilerOptions: {
-  isCustomElement: (tag) => tag === 'ai-chat',
-} } });
-${fence}`,
-  },
-  {
-    id: 'angular',
-    name: 'Angular',
-    kind: 'framework',
-    code: 'AC-04',
-    chips: ['#5C0B2E', '#C2185B', '#D81E6B', '#EC5F98', '#F5A3C4', '#FCDDEA'],
-    theme: { '--ai-chat-accent': '#C2185B', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '4px' },
-    ask: 'What do I need in Angular?',
-    answer: `Add \`CUSTOM_ELEMENTS_SCHEMA\` to the component that uses it, and bind the dash form of events:
+    code: 'AC-01',
+    chips: ['#0E2A6B', '#1B44B8', '#2F5BFF', '#6E8BFF', '#A9BBFF', '#D7E0FF'],
+    theme: { '--ai-chat-accent': '#2F5BFF', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '8px' },
+    ask: 'Can I use it without a build step?',
+    answer: `Yes. Load it from a CDN and use the tag:
 
 ${fence}html
-<ai-chat (ai-chat-message)="onMessage($event)"></ai-chat>
-${fence}`,
-  },
-  {
-    id: 'svelte',
-    name: 'Svelte',
-    kind: 'framework',
-    code: 'AC-05',
-    chips: ['#5A4300', '#A07A00', '#F2C230', '#F6D466', '#FAE6A3', '#FDF4D6'],
-    theme: { '--ai-chat-accent': '#F2C230', '--ai-chat-accent-fg': '#16181D', '--ai-chat-radius': '16px' },
-    ask: 'And Svelte?',
-    answer: `Svelte renders custom elements natively. Import once and bind the element:
-
-${fence}svelte
-<ai-chat bind:this={chat}></ai-chat>
+<ai-chat></ai-chat>
+<script type="module">
+  import 'https://esm.sh/ai-chat-element@0.7.0';
+</script>
 ${fence}
 
-Set \`chat.transport\` in \`onMount\`.`,
+Then set \`chat.transport\` to talk to a model.`,
   },
   {
     id: 'openai',
@@ -192,5 +192,10 @@ ${fence}`,
   },
 ];
 
+/**
+ * Strips are in on-screen order, left to right: frameworks fan out to the left of
+ * the card, models to the right, the most common choice of each (HTML, OpenAI)
+ * in the inner slot right beside it.
+ */
 /** The strip the fan opens on. */
 export const DEFAULT_STRIP = 'html';

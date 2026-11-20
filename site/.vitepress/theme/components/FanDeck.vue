@@ -203,12 +203,12 @@ onMounted(async () => {
   color: var(--fd-ink);
 }
 .fd-strip:hover {
-  --lift: -10px;
+  --lift: -8px;
   box-shadow: var(--fd-lift-high);
 }
 /* State by form: the turned strip slides out of the deck, and its tab is struck through with a notch. */
 .fd-strip.is-out {
-  --lift: -34px;
+  --lift: -12px;
   box-shadow: var(--fd-lift-high);
 }
 .fd-strip.is-out .fd-tab::after {
