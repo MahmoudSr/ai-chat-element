@@ -14,7 +14,7 @@ import { strips, DEFAULT_STRIP, type Strip } from '../demo/decks';
 // The innermost slots must clear the card, or those strips hide behind it; on
 // a narrower window the strips are shorter, so the fan opens a little wider.
 const SLOTS = [-72, -61.5, -51, -40.5, -30, 30, 40.5, 51, 61.5, 72];
-const SLOTS_NARROW = [-74, -64.5, -55, -45.5, -36, 36, 45.5, 55, 64.5, 74];
+const SLOTS_NARROW = [-75, -66, -57, -48, -39, 39, 48, 57, 66, 75];
 const narrow = ref(false);
 const slots = computed(() => (narrow.value ? SLOTS_NARROW : SLOTS));
 
@@ -133,7 +133,6 @@ function select(i: number, focus = false) {
   applyStrip(current.value);
   if (focus) nextTick(() => stripEls.value[sel.value]?.focus({ preventScroll: true }));
   nextTick(() => revealSelected(true));
-  setTimeout(hideCoveredCodes, 750);
 }
 
 function onKey(e: KeyboardEvent) {
@@ -165,13 +164,20 @@ onMounted(async () => {
   el.transport = functionAdapter(demoStream);
   el.labels = { emptyHeading: 'Ask the demo something' };
   applyStrip(current.value);
-  const mq = matchMedia('(max-width: 1180px)');
+  const mq = matchMedia('(max-width: 1366px)');
   narrow.value = mq.matches;
   mq.addEventListener('change', (e) => {
     narrow.value = e.matches;
-    setTimeout(hideCoveredCodes, 750);
   });
   hideCoveredCodes();
+  // Strips turn (to their narrow slots, or when one slides out); check again
+  // when a turn actually ends rather than guessing how long it takes.
+  let settle: ReturnType<typeof setTimeout> | undefined;
+  hero.value?.addEventListener('transitionend', (e) => {
+    if (e.propertyName !== 'transform' || !(e.target as Element).classList?.contains('fd-strip')) return;
+    clearTimeout(settle);
+    settle = setTimeout(hideCoveredCodes, 30);
+  });
   revealSelected(false);
   resizeObserver = new ResizeObserver(hideCoveredCodes);
   if (hero.value) resizeObserver.observe(hero.value);
@@ -218,6 +224,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
           :theme="isDark ? 'dark' : 'light'"
           show-names="false"
           show-timestamps="false"
+          show-copy="false"
           placeholder="Ask the demo something…"
         ></ai-chat>
       </div>
@@ -335,6 +342,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   line-height: 1.1;
 }
 .fd-tab span {
+  /* As wide as its text, so the visibility check samples the text itself. */
+  align-self: flex-start;
   font: 500 11px/1.2 var(--fd-mono);
   color: var(--fd-ink-3);
 }
@@ -623,9 +632,11 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   }
 }
 
-@media (min-width: 961px) and (max-height: 760px) {
+/* A short window gives the lede's lines to the chat: the headline, the
+   install row and the strips already say what this is. */
+@media (min-width: 961px) and (max-height: 800px) {
   .fd-lede {
-    font-size: 15px;
+    display: none;
   }
 }
 

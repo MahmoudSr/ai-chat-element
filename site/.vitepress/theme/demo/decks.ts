@@ -35,13 +35,11 @@ export const strips: Strip[] = [
     chips: ['#5A4300', '#8F6D00', '#F2C230', '#F6D466', '#FAE6A3', '#FDF4D6'],
     theme: { '--ai-chat-accent': '#F2C230', '--ai-chat-accent-fg': '#16181D', '--ai-chat-radius': '16px' },
     ask: 'And Svelte?',
-    answer: `Svelte renders custom elements natively. Import once and bind the element:
+    answer: `Svelte renders custom elements natively. Bind the element and set \`chat.transport\` in \`onMount\`:
 
 ${fence}svelte
 <ai-chat bind:this={chat}></ai-chat>
-${fence}
-
-Set \`chat.transport\` in \`onMount\`.`,
+${fence}`,
   },
   {
     id: 'angular',
@@ -81,14 +79,12 @@ ${fence}`,
     chips: ['#063F33', '#0A7A60', '#0FA37F', '#4CC7A5', '#94E0CB', '#D3F3EA'],
     theme: { '--ai-chat-accent': '#0A7A60', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '12px' },
     ask: 'How do I use it in React?',
-    answer: `Render the tag and set the transport in an effect, since it's an object, not an attribute:
+    answer: `Set the transport in an effect (it's an object, not an attribute), then render the tag:
 
 ${fence}tsx
 useEffect(() => {
-  // myStream: your async generator that yields text
   ref.current!.transport = functionAdapter(myStream);
 }, []);
-
 return <ai-chat ref={ref} />;
 ${fence}`,
   },
@@ -100,16 +96,14 @@ ${fence}`,
     chips: ['#0E2A6B', '#1B44B8', '#2F5BFF', '#6E8BFF', '#A9BBFF', '#D7E0FF'],
     theme: { '--ai-chat-accent': '#2F5BFF', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '8px' },
     ask: 'Can I use it without a build step?',
-    answer: `Yes. Load it from a CDN and use the tag:
+    answer: `Yes. Load it from a CDN, then set \`chat.transport\` to talk to a model:
 
 ${fence}html
 <ai-chat></ai-chat>
 <script type="module">
   import 'https://esm.sh/ai-chat-element@0.7.0';
 </script>
-${fence}
-
-Then set \`chat.transport\` to talk to a model.`,
+${fence}`,
   },
   {
     id: 'openai',
@@ -119,13 +113,11 @@ Then set \`chat.transport\` to talk to a model.`,
     chips: ['#003C49', '#00788F', '#0096B5', '#4CB8CF', '#97D6E4', '#D5EEF4'],
     theme: { '--ai-chat-accent': '#00788F', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '8px' },
     ask: 'Connect it to OpenAI.',
-    answer: `Use the OpenAI-compatible adapter. It also works with Groq, OpenRouter, LM Studio and vLLM:
+    answer: `Use the OpenAI-compatible adapter (Groq, OpenRouter, LM Studio and vLLM too). In production, keep the key on your server:
 
 ${fence}js
 chat.transport = openAIAdapter({ model: 'gpt-4o-mini', apiKey });
-${fence}
-
-In production, keep the key on your server and use \`functionAdapter\`.`,
+${fence}`,
   },
   {
     id: 'anthropic',
@@ -135,7 +127,7 @@ In production, keep the key on your server and use \`functionAdapter\`.`,
     chips: ['#4A1A0E', '#A8502E', '#C4673F', '#D8916F', '#E9BFA9', '#F6E3D8'],
     theme: { '--ai-chat-accent': '#A8502E', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '10px' },
     ask: 'Can it show Claude thinking?',
-    answer: `Yes. The Anthropic adapter streams thinking and tool calls, shown in a collapsible "Thought for 12s" panel. Ask for a thinking summary, or the text comes back empty:
+    answer: `Yes, in a collapsible "Thought for 12s" panel. Ask for a summary, or the thinking comes back empty:
 
 ${fence}js
 chat.transport = anthropicAdapter({
@@ -170,7 +162,7 @@ ${fence}`,
     chips: ['#3A0F52', '#7A2E9E', '#9B45C4', '#B97BD6', '#D7B3E8', '#F0E3F7'],
     theme: { '--ai-chat-accent': '#7A2E9E', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '8px' },
     ask: 'Can I switch between many models?',
-    answer: `Any OpenAI-compatible endpoint works, so a router like OpenRouter gives you hundreds of models behind one adapter:
+    answer: `Any OpenAI-compatible endpoint works, so OpenRouter gives you hundreds of models:
 
 ${fence}js
 chat.transport = openAIAdapter({
@@ -187,20 +179,11 @@ ${fence}`,
     chips: ['#23300A', '#4D7A12', '#6A9A1F', '#94BE52', '#C3DD99', '#E7F2D6'],
     theme: { '--ai-chat-accent': '#4D7A12', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '8px' },
     ask: 'We have our own backend.',
-    answer: `Wrap it in \`functionAdapter\` and yield text as it arrives. Your key stays on your server:
+    answer: `Wrap it in \`functionAdapter\` and yield text as it arrives; your key stays on your server. The full example is in the Quick start.
 
 ${fence}js
 chat.transport = functionAdapter(async function* (messages, signal) {
-  const res = await fetch('/api/chat', {
-    method: 'POST', signal, body: JSON.stringify(messages),
-  });
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    yield decoder.decode(value);
-  }
+  // fetch your /api/chat with the signal, yield each text chunk
 });
 ${fence}`,
   },

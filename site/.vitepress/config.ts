@@ -33,7 +33,7 @@ const docsSidebar = [
     ],
   },
   {
-    text: 'Connect a model',
+    text: 'Models',
     items: [
       { text: 'Overview', link: '/models/' },
       { text: 'OpenAI-compatible', link: '/models/openai' },
