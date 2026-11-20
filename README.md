@@ -250,8 +250,13 @@ chat.transport = openAIAdapter({
   apiKey: '…',                                           // dev/local only — see note above
   baseURL: 'http://localhost:11434/v1/chat/completions', // e.g. local Ollama
   params: { temperature: 0.7 },                          // passed to the API
+  thinkTags: true,      // default; a reply that starts with <think>…</think> shows as reasoning
 });
 ```
+
+Reasoning (`reasoning_content` or `reasoning`, depending on the server) and
+`tool_calls` in the stream show as a reasoning panel and tool-call rows on their
+own — see [Reasoning & tool calls](#reasoning--tool-calls).
 
 ### Anthropic
 

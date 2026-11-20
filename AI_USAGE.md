@@ -80,9 +80,16 @@ chat.transport = functionAdapter(async function* (messages, signal) {
 | `anthropicAdapter` | Anthropic Messages API.                                        |
 | `functionAdapter`  | Any custom backend — wrap an async generator of text chunks.   |
 
-**Adapter options.** `openAIAdapter({ model, apiKey?, baseURL?, headers?, params? })`
+**Adapter options.** `openAIAdapter({ model, apiKey?, baseURL?, headers?, params?, thinkTags? })`
 and `anthropicAdapter({ model, apiKey?, baseURL?, headers?, maxTokens?, params?,
 browserAccess? })`. `model` is the only required one. Notes:
+
+- Both adapters show the model's reasoning and tool calls as steps on their own
+  (OpenAI-compatible: `reasoning_content` / `reasoning` fields and `tool_calls`;
+  Anthropic: thinking blocks, `tool_use`, and server tools like web search).
+- `thinkTags` (OpenAI-compatible only, default `true`) shows a reply that STARTS
+  with `<think>…</think>` as reasoning (models that emit thinking inline). A
+  `<think>` later in a reply stays text. Set `false` to keep it all as text.
 
 - `params` is merged into the request body — sampling options go here.
 - `headers` adds request headers, e.g. for a proxy that injects auth server-side.
