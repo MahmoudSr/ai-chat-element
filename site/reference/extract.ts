@@ -26,7 +26,11 @@ export interface Sources {
   labels: Record<string, string>;
 }
 
-export function extractApi({ styles, chat, icons, labels }: Sources): ApiData {
+export function extractApi({ styles: source, chat, icons, labels }: Sources): ApiData {
+  // Comments first: they quote declarations ("a bolder ring is just
+  // --ai-chat-focus-width: 3px, ...") that would otherwise be read as the
+  // real default, with the rest of the comment swallowed into it.
+  const styles = source.replace(/\/\*[\s\S]*?\*\//g, '');
   // Every --ai-chat-* declaration, with its default value. A variable that is
   // only read with a fallback (var(--x, fallback)) is listed with the fallback.
   const cssVars = new Map<string, string>();

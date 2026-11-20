@@ -140,6 +140,23 @@ describe('the docs site only names real API', () => {
       );
     });
 
+    // Each listed default must be a real declaration (or var() fallback) of
+    // that variable, never text from a comment. A comment in styles.ts quotes
+    // "--ai-chat-focus-width: 3px, a different hue is ..." and the reference
+    // once showed that sentence, plus the next declaration, as the default.
+    it('every CSS variable default is a real declaration, not comment text', () => {
+      const code = styles.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ');
+      const bad = api.cssVars
+        .filter((v) => {
+          if (!v.value || /\/\*|\*\//.test(v.value)) return true;
+          const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          return !new RegExp(`${esc(v.name)}: ${esc(v.value)};|var\\(${esc(v.name)}, ${esc(v.value)}\\)`).test(code);
+        })
+        .map((v) => `${v.name} = ${v.value}`);
+      expect(bad).toEqual([]);
+      expect(api.cssVars.find((v) => v.name === '--ai-chat-focus-width')?.value).toBe('2px');
+    });
+
     const check = (label: string, names: string[], described: Record<string, unknown>) => {
       const have = new Set(Object.keys(described));
       const real = new Set(names);
