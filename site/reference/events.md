@@ -5,7 +5,7 @@ description: "Every ai-chat event: when it fires, whether it can be cancelled an
 <script setup>
 import { data } from './api.data'
 import { eventDescriptions as d } from './descriptions'
-import { fmt } from './fmt'
+import { fmt, words } from './fmt'
 </script>
 
 # Events
@@ -27,7 +27,7 @@ chat.addEventListener('ai-chat:message', (e) => save(e.detail.message));
   <tbody>
     <tr v-for="e in data.events" :key="e" :id="e.replace(':', '-')">
       <td><code>{{ e }}</code></td>
-      <td><span v-html="fmt(d[e].text)"></span><code class="fd-detail">{{ d[e].detail }}</code></td>
+      <td><span v-html="fmt(d[e].text)"></span><code class="fd-detail" v-html="words(d[e].detail)"></code></td>
     </tr>
   </tbody>
 </table>

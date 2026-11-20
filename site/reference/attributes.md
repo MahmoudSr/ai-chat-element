@@ -5,7 +5,7 @@ description: "Every ai-chat attribute with its property name, default value and 
 <script setup>
 import { data } from './api.data'
 import { attributeDescriptions as d } from './descriptions'
-import { fmt } from './fmt'
+import { fmt, words } from './fmt'
 </script>
 
 # Attributes
@@ -21,7 +21,7 @@ Generated from the source: {{ data.attributes.length }} attributes.
   <tbody>
     <tr v-for="a in data.attributes" :key="a.name" :id="a.name">
       <td><code>{{ a.name }}</code><span class="fd-sub"><code>.{{ a.property }}</code></span></td>
-      <td><code class="fd-wrap">{{ a.type }}</code><span v-if="a.default" class="fd-sub">default <code>{{ a.default }}</code></span></td>
+      <td><code class="fd-wrap" v-html="words(a.type)"></code><span v-if="a.default" class="fd-sub">default <code>{{ a.default }}</code></span></td>
       <td v-html="fmt(d[a.name])"></td>
     </tr>
   </tbody>

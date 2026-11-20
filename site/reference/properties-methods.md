@@ -5,7 +5,7 @@ description: "The ai-chat properties set from JavaScript, like transport, messag
 <script setup>
 import { data } from './api.data'
 import { propertyDescriptions as pd, methodDescriptions as md } from './descriptions'
-import { fmt } from './fmt'
+import { fmt, words } from './fmt'
 </script>
 
 # Properties and methods
@@ -20,7 +20,7 @@ as attributes. Every [attribute](./attributes) is a property too.
   <tbody>
     <tr v-for="p in data.properties" :key="p.name" :id="p.name">
       <td><code>.{{ p.name }}</code></td>
-      <td><code class="fd-wrap">{{ p.type }}</code></td>
+      <td><code class="fd-wrap" v-html="words(p.type)"></code></td>
       <td v-html="fmt(pd[p.name])"></td>
     </tr>
   </tbody>
@@ -34,7 +34,7 @@ Signatures as written in the source.
   <thead><tr><th>Method</th><th>What it does</th></tr></thead>
   <tbody>
     <tr v-for="m in data.methods" :key="m.name" :id="m.name">
-      <td><code class="fd-wrap">{{ m.signature }}</code></td>
+      <td><code class="fd-wrap" v-html="words(m.signature)"></code></td>
       <td v-html="fmt(md[m.name])"></td>
     </tr>
   </tbody>

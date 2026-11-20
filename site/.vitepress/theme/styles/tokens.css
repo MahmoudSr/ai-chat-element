@@ -21,8 +21,8 @@
   --fd-chip-customize: #c2410c;
   --fd-chip-reference: #2c3039;
 
-  --fd-font: 'Archivo', ui-sans-serif, system-ui, sans-serif;
-  --fd-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --fd-font: 'Archivo Variable', ui-sans-serif, system-ui, sans-serif;
+  --fd-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', Menlo, monospace;
 
   --fd-radius: 10px;
   --fd-lift: 0 2px 3px rgb(22 24 29 / 0.12), 0 8px 24px rgb(22 24 29 / 0.1);
@@ -277,13 +277,23 @@ html {
   max-width: none;
 }
 
-/* Long code in a table cell (a default value, an event's detail) may wrap. */
+/* Long code in a table cell (a default value, a type) wraps, but only
+   between words: break-word, not anywhere. "anywhere" also lets the table
+   size the column as if one letter were enough, so the column collapsed and
+   var(--ai-chat-border-width) broke into four lines. As an inline-block it
+   stays one pill instead of one pill per line. */
 .vp-doc td code.fd-wrap,
 .vp-doc td:first-child code.fd-wrap {
+  display: inline-block;
+  max-width: 100%;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 .vp-doc td:first-child code {
+  white-space: nowrap;
+}
+/* One unbreakable piece of a long code value (see words() in fmt.ts). */
+.vp-doc .fd-word {
   white-space: nowrap;
 }
 
@@ -329,7 +339,7 @@ html {
   max-width: 100%;
   margin-top: 8px;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 /* Line breaks: headings split into even lines, prose avoids a lonely last
@@ -387,12 +397,22 @@ html {
     display: inline;
     margin: 0 0 0 8px;
   }
+  /* Code in a card is its own box, never wider than the card: one that fits
+     moves to the next line whole (so conversation-id never splits at its
+     hyphen), and only one longer than the card, like an endpoint URL, wraps
+     inside its box. */
+  .vp-doc table td code {
+    display: inline-block;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   /* Only the long values wrap (types, defaults, payloads); a name like
      conversation-id stays whole. */
   .vp-doc table.fd-ref td code.fd-wrap,
   .vp-doc table.fd-ref td code.fd-detail {
     white-space: normal;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
   }
 }
 
