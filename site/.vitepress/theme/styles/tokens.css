@@ -76,6 +76,19 @@
 
 html {
   scrollbar-color: var(--fd-rule-strong) transparent;
+  /* Reserve the scrollbar's width on every page. The one-screen home page has
+     no scrollbar and the docs pages do, so without this the whole header slid
+     sideways when moving between them. */
+  scrollbar-gutter: stable;
+}
+
+/* Same header on every page: VitePress widens the logo column to the sidebar
+   only on pages that have one, which made Search jump between home and docs. */
+@media (min-width: 960px) {
+  .VPNavBar .container > .title {
+    min-width: calc(var(--vp-sidebar-width) - 2rem);
+    max-width: calc(var(--vp-sidebar-width) - 2rem);
+  }
 }
 
 :focus-visible {
