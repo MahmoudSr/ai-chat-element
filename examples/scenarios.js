@@ -107,6 +107,31 @@ export const SCENARIOS = {
   },
 
   /** Sanitization check: none of this should execute or escape the bubble. */
+  /**
+   * A reasoning model: it thinks for a few seconds (streamed as reasoning
+   * chunks, with a little markdown), answers, thinks again mid-answer, then
+   * finishes. Open the "Thinking…" toggle while it runs.
+   */
+  async *reasoning(messages, signal) {
+    const think = async function* (text, delay = 45) {
+      for (const w of text.split(/(\s+)/)) {
+        await sleep(delay, signal);
+        yield { type: 'reasoning', delta: w };
+      }
+    };
+    yield* think('The user wants to know how this panel behaves. Let me plan:\n\n' +
+      '1. Show **"Thinking…"** with a live timer while I reason.\n' +
+      '2. Collapse to **"Thought for Ns"** once the answer starts.\n' +
+      '3. Keep the toggle where the reader left it, even while streaming.\n\n' +
+      'I should also mention the `reasoning` attribute.');
+    yield* stream('Here is how reasoning shows: the toggle above this text holds what I thought ' +
+      'before answering, collapsed by default so the answer stays front and center.\n\n', signal, 25);
+    yield* think('Now a second, shorter thought in the middle of the answer — it should get its own toggle, ' +
+      'placed right here between the two paragraphs.', 40);
+    yield* stream('Reasoning that happens mid-answer gets its own toggle, in place. Set `reasoning="expanded"` ' +
+      'to open them by default, or `reasoning="hidden"` to hide them.', signal, 25);
+  },
+
   async *xss(messages, signal) {
     yield* stream(
       `Security check — all of the following must render as inert text, never execute:\n\n` +

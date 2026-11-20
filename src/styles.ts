@@ -62,6 +62,11 @@ export const chatStyles = css`
     --ai-chat-heading-fg: inherit;
     --ai-chat-marker-color: var(--ai-chat-muted);
     --ai-chat-blockquote-border: var(--ai-chat-border);
+    /* Reasoning ("thinking") panel: quieter than the answer by default. */
+    --ai-chat-reasoning-color: var(--ai-chat-muted);
+    --ai-chat-reasoning-font-size: 0.92em;
+    --ai-chat-reasoning-border-color: var(--ai-chat-border);
+    --ai-chat-reasoning-max-height: 320px;
 
     /* ---- Corner rounding ----
        ONE knob controls every rounded corner: --ai-chat-radius. Change it and
@@ -704,6 +709,62 @@ export const chatStyles = css`
      error) — muted so it reads as a system note, not real reply text. */
   .empty-response { color: var(--ai-chat-muted); font-style: italic; }
 
+  /* ---- Reasoning ("thinking") ----
+     A one-line toggle above (or between) the answer; the reasoning itself
+     sits behind it in a quieter, capped, scrollable column. */
+  .reasoning { margin: 2px 0 8px; }
+  .reasoning:last-child { margin-bottom: 2px; }
+  /* Between two stretches of answer: even space above and below. */
+  .markdown + .reasoning { margin-top: 8px; }
+  .reasoning__trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+    margin-left: -4px;
+    border: 0;
+    background: none;
+    font: inherit;
+    font-size: var(--ai-chat-reasoning-font-size);
+    color: var(--ai-chat-reasoning-color);
+    border-radius: var(--ai-chat-radius-sm);
+    cursor: pointer;
+  }
+  .reasoning__trigger:hover:not(:disabled) { color: var(--ai-chat-fg); }
+  .reasoning__trigger:disabled { cursor: default; }
+  .reasoning__time { font-variant-numeric: tabular-nums; opacity: 0.75; }
+  .reasoning__chevron { display: inline-flex; transition: transform 0.15s ease; }
+  .reasoning__chevron .icon { width: 14px; height: 14px; }
+  .reasoning--open .reasoning__chevron { transform: rotate(180deg); }
+  /* While it thinks, a soft light sweeps across the label. */
+  .reasoning--live .reasoning__label {
+    background: linear-gradient(
+      90deg,
+      var(--ai-chat-reasoning-color) 0%,
+      var(--ai-chat-reasoning-color) 40%,
+      var(--ai-chat-fg) 50%,
+      var(--ai-chat-reasoning-color) 60%,
+      var(--ai-chat-reasoning-color) 100%
+    );
+    background-size: 250% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: reasoning-shimmer 1.8s linear infinite;
+  }
+  @keyframes reasoning-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+  .reasoning__content {
+    margin: 6px 0 4px;
+    padding: 0 0 0 12px;
+    border-left: 2px solid var(--ai-chat-reasoning-border-color);
+    color: var(--ai-chat-reasoning-color);
+    font-size: var(--ai-chat-reasoning-font-size);
+    max-height: var(--ai-chat-reasoning-max-height);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .reasoning__content[hidden] { display: none; }
+
   .message__error {
     margin-top: 8px;
     display: flex;
@@ -1248,6 +1309,7 @@ export const chatStyles = css`
   .file-card:focus-visible,
   .message__edit-input:focus-visible,
   .message__edit-btn:focus-visible,
+  .reasoning__trigger:focus-visible,
   .composer__box:focus-within {
     outline: var(--ai-chat-focus-width) solid var(--ai-chat-focus-color);
     outline-offset: var(--ai-chat-focus-offset);
@@ -1281,6 +1343,8 @@ export const chatStyles = css`
     .message { animation: none; }
     .messages { scroll-behavior: auto; }
     .typing i { animation: none; }
+    .reasoning--live .reasoning__label { animation: none; background: none; color: var(--ai-chat-reasoning-color); }
+    .reasoning__chevron { transition: none; }
     /* Keep the centering transform, just drop the entrance animation. */
     .jump { animation: none; }
   }

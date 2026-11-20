@@ -78,6 +78,12 @@ export interface ChatLabels {
   openAside: string;
   /** The same button, and the backdrop, while the drawer is open. */
   closeAside: string;
+  /** A reply's reasoning while it is still being written. */
+  thinking: string;
+  /** Finished reasoning. `{duration}` becomes e.g. `12s` or `1m 5s`. */
+  thoughtFor: string;
+  /** Names the reasoning region; also the heading when no duration is known. */
+  thoughtProcess: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -114,4 +120,7 @@ export const DEFAULT_LABELS: ChatLabels = {
   loadingEarlier: 'Loading earlier messages…',
   openAside: 'Show conversations',
   closeAside: 'Hide conversations',
+  thinking: 'Thinking…',
+  thoughtFor: 'Thought for {duration}',
+  thoughtProcess: 'Thought process',
 };

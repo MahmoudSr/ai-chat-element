@@ -144,7 +144,9 @@ fires `ai-chat:load-earlier`; clear it at the first message), `load-earlier`
 — only on click), `allow-images` (render images in replies — off by default because a model-written
 image URL can leak data; off, images show as alt text), `image-hosts`
 (space-separated URL prefixes images may load from with `allow-images`; only
-`https:`; array property `.imageHosts`).
+`https:`; array property `.imageHosts`), `reasoning` (`collapsed` default — a
+one-line "Thought for 12s" the reader can open — `expanded`, or `hidden`; how a
+reply's reasoning steps show).
 
 **Properties (JS only):** `.transport` (required), `.messages`, `.labels`,
 `.messageActions` (`(message) => MessageAction[]` — your own buttons in a
@@ -315,7 +317,8 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `headerTitle`, `clearChat`, `retry`, `emptyResponse`, `copyMessage`, `edit`,
   `saveEdit`, `cancelEdit`, `previewImage` (uses `{name}`), `closePreview`,
   `openFile` (uses `{name}`), `preparingFile`,
-  `loadEarlier`, `loadingEarlier`, `openAside`, `closeAside`, `attach`,
+  `loadEarlier`, `loadingEarlier`, `openAside`, `closeAside`, `thinking`,
+  `thoughtFor` (uses `{duration}`, e.g. `12s`), `thoughtProcess`, `attach`,
   `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
   three `attach*` messages use `{name}` as a filename placeholder).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
@@ -330,7 +333,8 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `composer-actions`, `composer-actions-start`, `composer-actions-end`,
   `attach-button`, `input`, `send-button`, `stop-button`, `jump-button`,
   `retry-button`, `aside-toggle`, `aside-scrim`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`, `empty-icon`,
-  `empty-heading`, `empty-body`, `error`, `empty-response`.
+  `empty-heading`, `empty-body`, `error`, `empty-response`, `reasoning`,
+  `reasoning-trigger`, `reasoning-content`.
   (`header` = the built-in bar; `header-slot` = the wrapper that also holds your
   `header` slot content and keeps the bar's padding/divider when you fill it.
   Every message row exposes both `message` and a per-role part —
@@ -371,7 +375,10 @@ Reply content (markdown; defaults derive from the palette, dark mode follows):
 (= accent), `--ai-chat-link-hover-color`, `--ai-chat-strong-fg` (inherit),
 `--ai-chat-heading-fg` (inherit), `--ai-chat-marker-color` (= muted),
 `--ai-chat-blockquote-border` (= border). Tables use tabular numerals and honour
-markdown column alignment.
+markdown column alignment. Reasoning: `--ai-chat-reasoning-color` (= muted),
+`--ai-chat-reasoning-font-size` (0.92em), `--ai-chat-reasoning-border-color`
+(= border; rule beside opened reasoning), `--ai-chat-reasoning-max-height`
+(320px; opened reasoning scrolls past it).
 
 Radius (all = --ai-chat-radius): `--ai-chat-radius` (8px), `--ai-chat-outer-radius`
 (= radius; 0 for square), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,

@@ -9,6 +9,8 @@ import type {
   Role,
   Attachment,
   MessageAction,
+  MessageStep,
+  ReasoningStep,
 } from './types.js';
 import { renderMarkdown, sanitizeIcon, StreamingMarkdown, type ImagePolicy } from './markdown/markdown.js';
 import { chatStyles } from './styles.js';
@@ -369,6 +371,14 @@ export class AiChat extends LitElement {
   @property({ type: String, attribute: 'load-earlier' })
   loadEarlier: 'scroll' | 'button' = 'scroll';
 
+  /**
+   * How a reply's reasoning ("thinking") shows: `collapsed` (default) — a
+   * one-line "Thought for 12s" the reader can open; `expanded` — open from the
+   * start; `hidden` — not shown at all. The reader's own open/close wins.
+   */
+  @property({ type: String, attribute: 'reasoning' })
+  reasoning: 'collapsed' | 'expanded' | 'hidden' = 'collapsed';
+
   /** The conversation. Bindable and reflected back out via events. */
   @property({ attribute: false })
   messages: ChatMessage[] = [];
@@ -572,13 +582,22 @@ export class AiChat extends LitElement {
    * Settled messages take the plain single-render path, untouched.
    */
   private _renderMarkdown(m: ChatMessage) {
-    if (m.streaming) {
-      let r = this._streamRenderers.get(m.id);
+    return this._markdownBlock(m.id, m.content, !!m.streaming);
+  }
+
+  /**
+   * Markdown for one piece of text. While it streams, an incremental renderer
+   * (keyed by `key`) freezes completed blocks so per-token cost stays flat;
+   * once settled, it renders once and is cached until the text changes.
+   */
+  private _markdownBlock(key: string, source: string, streaming: boolean) {
+    if (streaming) {
+      let r = this._streamRenderers.get(key);
       if (!r) {
         r = new StreamingMarkdown(this._labels.copy, this._imagePolicy);
-        this._streamRenderers.set(m.id, r);
+        this._streamRenderers.set(key, r);
       }
-      const { blocks, tail } = r.renderParts(m.content);
+      const { blocks, tail } = r.renderParts(source);
       // Each frozen block is its own node. The blocks array is append-only and
       // Lit reconciles children by index, so on a typical token every existing
       // block's unsafeHTML sees an unchanged string and does nothing — only the
@@ -589,9 +608,128 @@ export class AiChat extends LitElement {
       </div>`;
     }
     // Settled: render fully once and let the incremental state go. The map
-    // stays tiny — it only ever holds messages that are streaming right now.
-    this._streamRenderers.delete(m.id);
-    return html`<div class="markdown">${unsafeHTML(renderMarkdown(m.content, this._labels.copy, this._imagePolicy))}</div>`;
+    // stays tiny — it only ever holds text that is streaming right now.
+    this._streamRenderers.delete(key);
+    return html`<div class="markdown">${unsafeHTML(this._settledHtml(key, source))}</div>`;
+  }
+
+  /**
+   * Settled markdown, cached per key while its source is unchanged. Keys are
+   * pieces of replies WITH steps (text between steps, reasoning text); a reply
+   * without steps keeps its original single-parse path.
+   */
+  private _settledCache = new Map<string, { source: string; html: string }>();
+  private _settledHtml(key: string, source: string): string {
+    const hit = this._settledCache.get(key);
+    if (hit && hit.source === source) return hit.html;
+    const out = renderMarkdown(source, this._labels.copy, this._imagePolicy);
+    this._settledCache.set(key, { source, html: out });
+    return out;
+  }
+
+  /** The steps a message shows, given the `reasoning` setting. */
+  private _visibleSteps(m: ChatMessage): MessageStep[] {
+    if (!m.steps?.length) return [];
+    return m.steps.filter((s) => s.type === 'reasoning' && this.reasoning !== 'hidden');
+  }
+
+  /**
+   * An assistant reply. Without steps this is just its markdown. With steps,
+   * the answer text is split where each step happened, so text, reasoning and
+   * tool calls read in the order they occurred. Text before the last step is
+   * finished and renders once; only the trailing text streams.
+   */
+  private _renderAssistantContent(m: ChatMessage) {
+    const steps = this._visibleSteps(m);
+    if (!steps.length) return this._renderMarkdown(m);
+    const parts: unknown[] = [];
+    let pos = 0;
+    for (const step of steps) {
+      const at = Math.min(Math.max(step.at, pos), m.content.length);
+      if (at > pos) parts.push(this._markdownBlock(`${m.id}@${pos}`, m.content.slice(pos, at), false));
+      parts.push(this._renderStep(m, step));
+      pos = at;
+    }
+    if (pos < m.content.length) {
+      parts.push(this._markdownBlock(`${m.id}@${pos}`, m.content.slice(pos), !!m.streaming));
+    }
+    return parts;
+  }
+
+  private _renderStep(m: ChatMessage, step: MessageStep) {
+    return step.type === 'reasoning' ? this._renderReasoning(m, step) : nothing;
+  }
+
+  /** Open/closed per reasoning step, as the reader left it. */
+  private _reasoningOpen = new Map<string, boolean>();
+
+  private _renderReasoning(m: ChatMessage, step: ReasoningStep) {
+    const key = `${m.id}/${step.id}`;
+    const live = !!m.streaming && step.endedAt === undefined;
+    const hasText = step.text.length > 0;
+    const open = hasText && (this._reasoningOpen.get(key) ?? this.reasoning === 'expanded');
+    const regionId = `reasoning-${m.id}-${step.id}`;
+    const labels = this._labels;
+    let label: string;
+    let elapsed = '';
+    if (live) {
+      label = labels.thinking;
+      const ms = Date.now() - step.startedAt;
+      if (ms >= 1000) elapsed = this._formatDuration(ms);
+    } else if (step.endedAt !== undefined) {
+      label = labels.thoughtFor.replace('{duration}', this._formatDuration(step.endedAt - step.startedAt));
+    } else {
+      label = labels.thoughtProcess;
+    }
+    return html`<div class="reasoning ${live ? 'reasoning--live' : ''} ${open ? 'reasoning--open' : ''}"
+                     part="reasoning">
+      <button class="reasoning__trigger" part="reasoning-trigger" type="button"
+              aria-expanded=${hasText ? String(open) : nothing}
+              aria-controls=${hasText ? regionId : nothing}
+              ?disabled=${!hasText}
+              @click=${() => this._toggleReasoning(key, open)}>
+        <span class="reasoning__label">${label}</span>
+        ${elapsed ? html`<span class="reasoning__time">${elapsed}</span>` : nothing}
+        ${hasText ? html`<span class="reasoning__chevron" aria-hidden="true">${chevronDownIcon}</span>` : nothing}
+      </button>
+      ${
+        hasText
+          ? html`<div class="reasoning__content" part="reasoning-content" id=${regionId}
+                      role="region" aria-label=${labels.thoughtProcess} ?hidden=${!open}>
+              ${open ? this._markdownBlock(`${m.id}#${step.id}`, step.text, live) : nothing}
+            </div>`
+          : nothing
+      }
+    </div>`;
+  }
+
+  private _toggleReasoning(key: string, wasOpen: boolean): void {
+    this._reasoningOpen.set(key, !wasOpen);
+    this.requestUpdate();
+  }
+
+  /** 4s, 1m 5s. Never "0s": a step that ended still took a moment. */
+  private _formatDuration(ms: number): string {
+    const total = Math.max(1, Math.round(ms / 1000));
+    if (total < 60) return `${total}s`;
+    const min = Math.floor(total / 60);
+    const sec = total % 60;
+    return sec ? `${min}m ${sec}s` : `${min}m`;
+  }
+
+  /**
+   * A one-second tick while any reply on screen has a step still in progress,
+   * so "Thinking… 4s" counts up. Runs only then; stops when nothing is live.
+   */
+  private _liveTimer?: number;
+  private _syncLiveTimer(): void {
+    const live = this.messages.some((m) => m.streaming && m.steps?.some((s) => s.endedAt === undefined));
+    if (live && this._liveTimer === undefined) {
+      this._liveTimer = window.setInterval(() => this.requestUpdate(), 1000);
+    } else if (!live && this._liveTimer !== undefined) {
+      window.clearInterval(this._liveTimer);
+      this._liveTimer = undefined;
+    }
   }
 
   private get _imagePolicy(): ImagePolicy {
@@ -1428,6 +1566,8 @@ export class AiChat extends LitElement {
 
   override disconnectedCallback(): void {
     window.clearTimeout(this._copiedTimer);
+    window.clearInterval(this._liveTimer);
+    this._liveTimer = undefined;
     document.removeEventListener('keydown', this._onHostKeydown);
     this._bottomObserver?.disconnect();
     this._bottomObserver = undefined;
@@ -1549,6 +1689,13 @@ export class AiChat extends LitElement {
 
     // The top sentinel comes and goes with `has-earlier`; keep it observed.
     if ((this._topSentinel ?? undefined) !== this._observedTop) this._recheckTop();
+
+    if (changed.has('messages')) this._syncLiveTimer();
+    // An open reasoning box that is still being written follows its newest
+    // line, unless the reader scrolled up inside it.
+    for (const box of this.renderRoot.querySelectorAll<HTMLElement>('.reasoning--live .reasoning__content:not([hidden])')) {
+      if (box.scrollHeight - box.scrollTop - box.clientHeight < 48) box.scrollTop = box.scrollHeight;
+    }
 
   }
 
@@ -2062,20 +2209,20 @@ export class AiChat extends LitElement {
             this._editingId === m.id
               ? this._renderEditForm(m)
               : isAssistant
-                ? this._renderMarkdown(m)
+                ? this._renderAssistantContent(m)
                 : m.content
                   ? html`<div class="plain">${m.content}</div>`
                   : nothing
           }
           ${
-            m.streaming && !m.content
+            m.streaming && !m.content && !this._visibleSteps(m).length
               ? html`<span class="typing" aria-label=${this._labels.typing}><i></i><i></i><i></i></span>`
               : nothing
           }
           ${
             // Finished with no content and no error → show a placeholder instead
             // of a blank ghost bubble (e.g. an empty upstream response).
-            isAssistant && !m.streaming && !m.content && !m.error
+            isAssistant && !m.streaming && !m.content && !m.error && !this._visibleSteps(m).length
               ? html`<div class="empty-response" part="empty-response">${this._labels.emptyResponse}</div>`
               : nothing
           }

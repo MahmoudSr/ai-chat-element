@@ -349,6 +349,7 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `user-avatar-src`  | string (URL)                | —       | Image for the user's avatar on every user message. Wins over the `user-avatar` slot. |
 | `has-earlier`      | boolean                     | `false` | There are older messages than `.messages` holds: shows "Load earlier messages" at the top and fires `ai-chat:load-earlier`. See [Long conversations](#long-conversations-load-earlier). |
 | `load-earlier`     | `scroll` \| `button`        | `scroll` | With `has-earlier`: `scroll` loads as the reader nears the top (the button is there too, for keyboard users); `button` loads only on a click. |
+| `reasoning`        | `collapsed` \| `expanded` \| `hidden` | `collapsed` | How a reply's reasoning ("thinking") shows: a one-line "Thought for 12s" the reader can open, open from the start, or not at all. The reader's own open/close wins. |
 | `image-hosts`      | string (space-separated)    | —       | With `allow-images`, the URL prefixes images may load from (e.g. `https://cdn.example.com/`). Only `https:` ever loads. Also settable as an array property `.imageHosts`. |
 
 To turn a boolean attribute off, set it to `"false"` (e.g. `show-timestamps="false"`).
@@ -979,6 +980,10 @@ chat.labels = {
   // The sidebar drawer on a narrow chat:
   openAside: 'Mostrar conversaciones',
   closeAside: 'Ocultar conversaciones',
+  // A reply's reasoning ({duration} is e.g. "12s" or "1m 5s"):
+  thinking: 'Pensando…',
+  thoughtFor: 'Pensó durante {duration}',
+  thoughtProcess: 'Razonamiento',
   // Attachment strings ({name} is replaced with the filename):
   attach: 'Adjuntar archivos',
   removeAttachment: 'Quitar adjunto',
@@ -1114,6 +1119,10 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-heading-fg`          | `inherit`                   | Headings (h1-h6, sized for a chat reply)      |
 | `--ai-chat-marker-color`        | `= muted`                   | List bullets and numbers                      |
 | `--ai-chat-blockquote-border`   | `= border`                  | Blockquote left rule                          |
+| `--ai-chat-reasoning-color`     | `= muted`                   | Reasoning toggle and text                     |
+| `--ai-chat-reasoning-font-size` | `0.92em`                    | Reasoning toggle and text size                |
+| `--ai-chat-reasoning-border-color` | `= border`               | Rule beside opened reasoning                  |
+| `--ai-chat-reasoning-max-height` | `320px`                    | Opened reasoning scrolls past this height     |
 
 Tables use tabular numerals so money and counts line up, and honour markdown
 column alignment (`|--:|` right-aligns a number column).
@@ -1207,7 +1216,8 @@ For styling that a variable can't reach, target the shadow parts with
 `composer-actions`, `composer-actions-start`,
 `composer-actions-end`, `attach-button`, `input`, `send-button`, `stop-button`,
 `jump-button`, `retry-button`, `aside-toggle`, `aside-scrim`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`,
-`empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`.
+`empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`,
+`reasoning`, `reasoning-trigger`, `reasoning-content`.
 
 `message-actions` is the per-message actions row; `action-button` targets every
 button in it, with `copy-button` / `edit-button` for the built-ins specifically.
