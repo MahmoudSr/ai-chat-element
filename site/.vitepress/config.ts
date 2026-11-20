@@ -65,6 +65,19 @@ const docsSidebar = [
       { text: 'Labels and translation', link: '/customize/labels' },
     ],
   },
+  {
+    text: 'Reference',
+    items: [
+      { text: 'Attributes', link: '/reference/attributes' },
+      { text: 'Properties and methods', link: '/reference/properties-methods' },
+      { text: 'Events', link: '/reference/events' },
+      { text: 'CSS variables', link: '/reference/css-variables' },
+      { text: 'Parts', link: '/customize/parts#all-71-parts' },
+      { text: 'Slots', link: '/customize/slots#all-19-slots' },
+      { text: 'Labels', link: '/customize/labels#all-45-labels' },
+      { text: 'Types', link: '/reference/types' },
+    ],
+  },
 ];
 
 export default defineConfig({
@@ -119,6 +132,7 @@ export default defineConfig({
       '/models/': docsSidebar,
       '/features/': docsSidebar,
       '/customize/': docsSidebar,
+      '/reference/': docsSidebar,
     },
     socialLinks: [{ icon: 'github', link: 'https://github.com/MahmoudSr/ai-chat-element' }],
     search: { provider: 'local' },

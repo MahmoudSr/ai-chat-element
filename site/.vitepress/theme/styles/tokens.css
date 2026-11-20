@@ -276,3 +276,57 @@ html {
   gap: 6px;
   max-width: none;
 }
+
+/* Long code in a table cell (a default value, an event's detail) may wrap. */
+.vp-doc td code.fd-wrap {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.vp-doc td:first-child code {
+  white-space: nowrap;
+}
+
+/* The filter above a long reference table. */
+.fd-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 20px 0 8px;
+  font-weight: 650;
+  font-size: 14px;
+}
+.fd-filter input {
+  flex: 1;
+  max-width: 320px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--fd-rule-strong);
+  border-radius: 8px;
+  background: var(--fd-card);
+  color: var(--fd-ink);
+  font: 500 14px var(--fd-font);
+}
+.fd-filter output {
+  font: 500 12px var(--fd-mono);
+  color: var(--fd-ink-3);
+}
+
+/* Reference tables: a second line under a name (its property, its default),
+   and an event's detail shape on its own line under the description. */
+.vp-doc .fd-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--fd-ink-3);
+}
+.vp-doc .fd-sub code {
+  font-size: 11px;
+}
+.vp-doc td code.fd-detail {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

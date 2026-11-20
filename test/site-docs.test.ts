@@ -9,7 +9,16 @@ import anthropicSource from '../src/adapters/anthropic.ts?raw';
 import decks from '../site/.vitepress/theme/demo/decks.ts?raw';
 import scenarioSource from '../site/.vitepress/theme/demo/scenarios.ts?raw';
 import iconsSource from '../src/icons.ts?raw';
-import { slotDescriptions } from '../site/reference/descriptions.ts';
+import {
+  slotDescriptions,
+  cssVarDescriptions,
+  attributeDescriptions,
+  propertyDescriptions,
+  methodDescriptions,
+  eventDescriptions,
+} from '../site/reference/descriptions.ts';
+import { extractApi } from '../site/reference/extract.ts';
+import { DEFAULT_LABELS } from '../src/labels.ts';
 
 /**
  * The docs site must only name things that exist in the code. Every page under
@@ -112,11 +121,38 @@ describe('the docs site only names real API', () => {
     expect(bad).toEqual([]);
   });
 
-  it('every slot has a description, and every description is a real slot', () => {
-    const real = new Set([...(chatSource + iconsSource).matchAll(/<slot name="([a-z-]+)"/g)].map((m) => m[1]));
-    const described = new Set(Object.keys(slotDescriptions));
-    expect([...real].filter((s) => !described.has(s)), 'slots without a description').toEqual([]);
-    expect([...described].filter((s) => !real.has(s)), 'descriptions for slots that do not exist').toEqual([]);
+  describe('the generated reference is fully described', () => {
+    const api = extractApi({
+      styles,
+      chat: chatSource,
+      icons: iconsSource,
+      labels: DEFAULT_LABELS as unknown as Record<string, string>,
+    });
+
+    // The counts the README and notes quote, so the extractor can't silently
+    // start missing things (a regex that stops early lists fewer, not none).
+    it('extracts everything the source declares', () => {
+      expect(api.cssVars.length).toBe(new Set(styles.match(/--ai-chat-[a-z-]+/g)).size);
+      expect(api.attributes.length + api.properties.length).toBe(chatSource.match(/@property\(/g)!.length);
+      expect(api.slots.length).toBe(new Set([...(chatSource + iconsSource).matchAll(/<slot name="([a-z-]+)"/g)].map((m) => m[1])).size);
+      expect(api.methods.map((m) => m.name).sort()).toEqual(
+        ['addMessage', 'clear', 'isGenerating', 'openFilePicker', 'prependMessages', 'retry', 'send', 'stop'],
+      );
+    });
+
+    const check = (label: string, names: string[], described: Record<string, unknown>) => {
+      const have = new Set(Object.keys(described));
+      const real = new Set(names);
+      expect(names.filter((n) => !have.has(n)), `${label} without a description`).toEqual([]);
+      expect([...have].filter((n) => !real.has(n)), `${label} descriptions for things that don't exist`).toEqual([]);
+    };
+    it('slots', () => check('slots', api.slots, slotDescriptions));
+    it('CSS variables', () => check('vars', api.cssVars.map((v) => v.name), cssVarDescriptions));
+    it('attributes', () => check('attributes', api.attributes.map((a) => a.name), attributeDescriptions));
+    // imageHosts is an attribute, but its array form is documented as a property too.
+    it('properties', () => check('properties', [...api.properties.map((p) => p.name), 'imageHosts'], propertyDescriptions));
+    it('methods', () => check('methods', api.methods.map((m) => m.name), methodDescriptions));
+    it('events', () => check('events', api.events, eventDescriptions));
   });
 
   it('every adapter option it passes exists on that adapter', () => {
