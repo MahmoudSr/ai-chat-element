@@ -92,7 +92,8 @@ browserAccess? })`. `model` is the only required one. Notes:
   with `<think>…</think>` as reasoning (models that emit thinking inline). A
   `<think>` later in a reply stays text. Set `false` to keep it all as text.
 
-- `params` is merged into the request body — sampling options go here.
+- `params` is merged into the request body — sampling options go here. Current
+  Claude models reject `temperature`/`top_p`/`top_k`, so leave those out for Anthropic.
 - `headers` adds request headers, e.g. for a proxy that injects auth server-side.
 - `maxTokens` (Anthropic only) defaults to 1024; the API requires it.
 - `browserAccess` (Anthropic only, default `true`) opts in to the CORS header

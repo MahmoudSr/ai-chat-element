@@ -264,10 +264,11 @@ own — see [Reasoning & tool calls](#reasoning--tool-calls).
 import { anthropicAdapter } from 'ai-chat-element';
 
 chat.transport = anthropicAdapter({
-  model: 'claude-sonnet-5',
+  model: 'claude-sonnet-5-5',
   apiKey: '…',                // dev/local only — see note above
   maxTokens: 1024,            // Anthropic requires it; defaults to 1024
-  params: { temperature: 0.7 },
+  params: {},                 // added to the request body (thinking, tools…);
+                              // current Claude models reject temperature/top_p
   headers: {},                // extra request headers, e.g. for a proxy
   browserAccess: true,        // default; opts in to the CORS header needed to
                               // call Anthropic direct from a browser. Ignored

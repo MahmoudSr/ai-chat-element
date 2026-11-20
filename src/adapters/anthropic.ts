@@ -12,7 +12,7 @@ import { toAnthropicContent } from './content.js';
 export interface AnthropicAdapterOptions {
   /** API key. WARNING: exposing a key in the browser is insecure — prefer a proxy. */
   apiKey?: string;
-  /** Model id, e.g. "claude-sonnet-5" or "claude-opus-4-8". */
+  /** Model id, e.g. "claude-sonnet-5-5" or "claude-opus-5-5". */
   model: string;
   /** Defaults to Anthropic's public Messages API. */
   baseURL?: string;
@@ -20,7 +20,10 @@ export interface AnthropicAdapterOptions {
   headers?: Record<string, string>;
   /** Max tokens to generate. Anthropic requires this; defaults to 1024. */
   maxTokens?: number;
-  /** Passed through to the request body (temperature, top_p, ...). */
+  /**
+   * Passed through to the request body (thinking, tools, metadata, ...).
+   * Current Claude models reject temperature / top_p / top_k.
+   */
   params?: Record<string, unknown>;
   /**
    * When calling Anthropic directly from a browser you must opt in to CORS.
