@@ -44,7 +44,8 @@
     "verify:bundling": "node scripts/verify-bundling.mjs",
     "docs:dev": "vitepress dev site",
     "docs:build": "vitepress build site",
-    "docs:preview": "vitepress preview site"
+    "docs:preview": "vitepress preview site",
+    "verify:home": "node scripts/verify-home-fit.mjs"
   },
   "keywords": [
     "ai",

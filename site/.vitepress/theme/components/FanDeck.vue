@@ -18,24 +18,63 @@ import { strips, DEFAULT_STRIP, type Strip } from '../demo/decks';
 const slots = ref([-72, -61.5, -51, -40.5, -30, 30, 40.5, 51, 61.5, 72]);
 const PIVOT = 26; // px from a strip's bottom edge, as in the CSS
 const TAB = 66; // the tab's height at the strip's tip
+const NAME_TOP = 12; // the tab's top padding, above the name
+const NAME_SIDE = 10; // the tab's side padding, before the name
+const FLAT = 86; // the outermost strips may turn this far (at 90 a tab leaves the window)
 
 function fitSlots() {
   const root = hero.value;
   const card = root?.querySelector<HTMLElement>('.fd-card');
   const strip = stripEls.value[0];
+  root?.style.removeProperty('--fd-card-w');
   // On a phone the strips lie flat in a row: nothing to fit.
   if (!root || !card || !strip || getComputedStyle(root.querySelector('.fd-fan')!).position === 'static') return;
   const rad = (deg: number) => (deg * Math.PI) / 180;
-  const halfCard = card.offsetWidth / 2 + 12; // plus a little air
   const halfStrip = strip.offsetWidth / 2;
   const reach = strip.offsetHeight - PIVOT; // pivot to the strip's tip
   const tabStart = reach - TAB; // pivot to the tab's lower edge
+  const halfWindow = root.clientWidth / 2 - 8;
+
   // Smallest angle where the tab's inner lower corner is clear of the card.
-  let inner = 26;
-  while (inner < 52 && tabStart * Math.sin(rad(inner)) - halfStrip * Math.cos(rad(inner)) < halfCard) inner += 0.5;
-  // Largest angle (up to 76) whose tip still lands inside the window.
-  let outer = 76;
-  while (outer > inner + 20 && reach * Math.sin(rad(outer)) + halfStrip * Math.cos(rad(outer)) > root.clientWidth / 2 - 8) outer -= 0.5;
+  const innerFor = (cardW: number) => {
+    let a = 26;
+    while (a < 60 && tabStart * Math.sin(rad(a)) - halfStrip * Math.cos(rad(a)) < cardW / 2 + 12) a += 0.5;
+    return a;
+  };
+  // Largest angle, up to `limit`, whose tip still lands inside the window.
+  const outerFor = (limit: number) => {
+    let a = limit;
+    while (a > 40 && reach * Math.sin(rad(a)) + halfStrip * Math.cos(rad(a)) > halfWindow) a -= 0.5;
+    return a;
+  };
+
+  // Neighbours overlap toward the rivet, and each lies over the next one's
+  // tab. A name stays readable only when the turn between neighbours opens a
+  // gap as wide as the name, at the name's distance from the rivet. On a
+  // short window the strips are short, so that turn is larger.
+  const names = [...root.querySelectorAll<HTMLElement>('.fd-tab b')];
+  const nameW = Math.max(...names.map((b) => b.offsetWidth));
+  const nameY = reach - NAME_TOP - names[0].offsetHeight; // pivot to the name's lower line
+  const need = (Math.atan((nameW + NAME_SIDE + 4) / nameY) * 180) / Math.PI;
+
+  // The usual fan ends at 76deg. When the names need more spread, the outer
+  // strips lie flatter, up to FLAT; when even that isn't enough, the card
+  // gets narrower so the inner strips can turn in closer, but only while its
+  // one-line texts (the install command, the codes row) still fit whole.
+  const natural = card.offsetWidth;
+  const oneLine = [...card.querySelectorAll<HTMLElement>('.fd-cmd code, .fd-codes > span')];
+  const cut = () => oneLine.some((el) => el.scrollWidth > el.clientWidth + 1);
+  let cardW = natural;
+  let inner = innerFor(cardW);
+  while (inner + 4 * need > outerFor(FLAT)) {
+    root.style.setProperty('--fd-card-w', `${cardW - 10}px`);
+    if (cut()) break;
+    inner = innerFor((cardW -= 10));
+  }
+  if (cardW < natural) root.style.setProperty('--fd-card-w', `${cardW}px`);
+  else root.style.removeProperty('--fd-card-w');
+  const usual = Math.max(inner + 20, outerFor(76));
+  const outer = inner + 4 * need <= usual ? usual : Math.min(outerFor(FLAT), inner + 4 * need);
   const step = (outer - inner) / 4;
   const right = [0, 1, 2, 3, 4].map((k) => +(inner + k * step).toFixed(2));
   slots.value = [...right].reverse().map((x) => -x).concat(right);
@@ -189,6 +228,12 @@ onMounted(async () => {
   applyStrip(current.value);
   fitSlots();
   hideCoveredCodes();
+  // The fit measures text (the names, the install command), and the web
+  // fonts are wider than the fallback that was showing a moment ago.
+  void document.fonts.ready.then(() => {
+    fitSlots();
+    hideCoveredCodes();
+  });
   // Strips turn (to fitted slots, or when one slides out); check again
   // when a turn actually ends rather than guessing how long it takes.
   let settle: ReturnType<typeof setTimeout> | undefined;
@@ -283,8 +328,10 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
 
 <style scoped>
 .fd-hero {
-  /* Exactly one screen: the home page never scrolls on desktop. */
-  --h: max(600px, calc(100svh - var(--vp-nav-height)));
+  /* Exactly one screen: the home page doesn't scroll on desktop. The floor is
+     the shortest fan whose names all still clear each other (a 540px-tall
+     window); anything shorter scrolls a little rather than cover a name. */
+  --h: max(476px, calc(100svh - var(--vp-nav-height)));
   --pivot: 26px;
   --strip-w: clamp(84px, 7.8vw, 112px);
   position: relative;
@@ -356,6 +403,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   gap: 3px;
 }
 .fd-tab b {
+  /* As wide as its text, so the fan can be fitted to the longest name. */
+  align-self: flex-start;
   font-weight: 800;
   font-stretch: 76%;
   font-size: clamp(12px, 1.1vw, 16px);
@@ -399,7 +448,10 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   left: 50%;
   top: 18px;
   bottom: 10px;
-  width: min(580px, 40vw);
+  /* Never narrower than the install command needs (it would be cut off at
+     961-1000px); fitSlots() may narrow it further on a short window, and
+     only while that still holds. */
+  width: var(--fd-card-w, min(580px, max(408px, 40vw)));
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
@@ -633,7 +685,9 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   }
 }
 
-@media (max-width: 1180px) {
+/* A narrow window, or a very short one (short strips, and a card fitSlots()
+   narrows so the names clear each other), gets the compact card. */
+@media (max-width: 1180px), (min-width: 961px) and (max-height: 620px) {
   /* Narrower strips: set the names tighter so OPENROUTER still fits. */
   .fd-tab b {
     font-stretch: 70%;
@@ -659,6 +713,13 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
 @media (min-width: 961px) and (max-height: 800px) {
   .fd-lede {
     display: none;
+  }
+}
+
+/* Shorter still, the strips are too short for the names at full size. */
+@media (min-width: 961px) and (max-height: 580px) {
+  .fd-tab b {
+    font-size: 12px;
   }
 }
 
