@@ -484,6 +484,37 @@
       });
 
       /**
+       * The app draws "sales_by_month" results itself (the toolChart scenario):
+       * a small SVG bar chart instead of the JSON. Every other tool keeps the
+       * component's default. This is all renderTool takes.
+       */
+      chat.renderTool = (tool) => {
+        if (tool.name !== 'sales_by_month' || tool.state !== 'success' || !Array.isArray(tool.output)) return null;
+        const values = tool.output;
+        const max = Math.max(...values);
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const w = 36, gap = 10, h = 120;
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('viewBox', `0 0 ${values.length * (w + gap)} ${h + 20}`);
+        svg.setAttribute('width', String(values.length * (w + gap)));
+        svg.setAttribute('role', 'img');
+        svg.setAttribute('aria-label', `Sales by month: ${values.join(', ')}`);
+        values.forEach((v, i) => {
+          const bh = Math.round((v / max) * h);
+          const bar = document.createElementNS(ns, 'rect');
+          Object.entries({ x: i * (w + gap), y: h - bh, width: w, height: bh, rx: 4, fill: 'var(--ai-chat-accent)' })
+            .forEach(([k, val]) => bar.setAttribute(k, String(val)));
+          const label = document.createElementNS(ns, 'text');
+          Object.entries({ x: i * (w + gap) + w / 2, y: h + 15, 'text-anchor': 'middle', 'font-size': 11, fill: 'currentColor' })
+            .forEach(([k, val]) => label.setAttribute(k, String(val)));
+          label.textContent = months[i];
+          svg.append(bar, label);
+        });
+        return svg;
+      };
+
+      /**
        * Transport status lives in state, NOT written straight to the DOM.
        * Selecting a transport rebuilds the control panel, which destroys the
        * status element — an async probe that captured it would then write into

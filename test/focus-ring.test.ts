@@ -95,7 +95,10 @@ describe('keyboard focus ring', () => {
       { id: 'u', role: 'user', content: 'hi', createdAt: 1 },
       {
         id: 'a', role: 'assistant', content: 'Answer with code:\n\n```js\nx()\n```', createdAt: 2,
-        steps: [{ type: 'reasoning', id: 'reasoning-0', text: 'thoughts', at: 0, startedAt: 0, endedAt: 2000 }],
+        steps: [
+          { type: 'reasoning', id: 'reasoning-0', text: 'thoughts', at: 0, startedAt: 0, endedAt: 2000 },
+          { type: 'tool', id: 't1', name: 'search', state: 'success', args: { q: 'x' }, output: 'y', at: 0, startedAt: 0, endedAt: 1000 },
+        ],
       },
       { id: 'e', role: 'assistant', content: '', createdAt: 3, error: 'boom' },
     ];
@@ -105,6 +108,7 @@ describe('keyboard focus ring', () => {
     ].filter((n) => n.getClientRects().length > 0);
     expect(focusable.length, 'the sweep found controls').toBeGreaterThan(5);
     expect(focusable.some((n) => n.classList.contains('reasoning__trigger')), 'reasoning toggle included').toBe(true);
+    expect(focusable.some((n) => n.classList.contains('tool__header')), 'tool row included').toBe(true);
 
     await userEvent.keyboard('{Tab}'); // keyboard modality
     const missing: string[] = [];

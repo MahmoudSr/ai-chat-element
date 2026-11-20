@@ -146,13 +146,17 @@ image URL can leak data; off, images show as alt text), `image-hosts`
 (space-separated URL prefixes images may load from with `allow-images`; only
 `https:`; array property `.imageHosts`), `reasoning` (`collapsed` default — a
 one-line "Thought for 12s" the reader can open — `expanded`, or `hidden`; how a
-reply's reasoning steps show).
+reply's reasoning steps show), `tools` (same three values for tool-call rows;
+a failed call's error shows either way).
 
 **Properties (JS only):** `.transport` (required), `.messages`, `.labels`,
 `.messageActions` (`(message) => MessageAction[]` — your own buttons in a
 message's actions row, `{ id, label, icon?, disabled? }`; `icon` is SVG markup,
 sanitized; pressing one fires `ai-chat:message-action`; assign a new function
-when its result depends on changed state), `.imageHosts`.
+when its result depends on changed state), `.renderTool` (`(tool: ToolStep,
+message) => Node | null` — your own element for a tool call's result, e.g. a
+chart, instead of the JSON; `null` = default; called once per change of that
+call, not per token; a call with one starts open), `.imageHosts`.
 
 **Methods:** `send(text, attachments?)` → `Promise<boolean>` (resolves after the
 stream settles; `false` = no-op, e.g. empty text AND no attachments, or no
@@ -318,7 +322,9 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `saveEdit`, `cancelEdit`, `previewImage` (uses `{name}`), `closePreview`,
   `openFile` (uses `{name}`), `preparingFile`,
   `loadEarlier`, `loadingEarlier`, `openAside`, `closeAside`, `thinking`,
-  `thoughtFor` (uses `{duration}`, e.g. `12s`), `thoughtProcess`, `attach`,
+  `thoughtFor` (uses `{duration}`, e.g. `12s`), `thoughtProcess`, `toolPending`,
+  `toolRunning`, `toolSuccess`, `toolError`, `toolIncomplete`, `toolInput`,
+  `toolOutput`, `attach`,
   `removeAttachment`, `attachTooLarge`, `attachWrongType`, `attachTooMany` — the
   three `attach*` messages use `{name}` as a filename placeholder).
 - **Deep styling:** `::part()` hooks — `root`, `layout`, `aside`, `aside-list`,
@@ -334,7 +340,8 @@ chat.addEventListener('ai-chat:background-message', (e) => {
   `attach-button`, `input`, `send-button`, `stop-button`, `jump-button`,
   `retry-button`, `aside-toggle`, `aside-scrim`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`, `empty-icon`,
   `empty-heading`, `empty-body`, `error`, `empty-response`, `reasoning`,
-  `reasoning-trigger`, `reasoning-content`.
+  `reasoning-trigger`, `reasoning-content`, `tool`, `tool-header`, `tool-status`,
+  `tool-name`, `tool-body`, `tool-input`, `tool-output`, `tool-error`.
   (`header` = the built-in bar; `header-slot` = the wrapper that also holds your
   `header` slot content and keeps the bar's padding/divider when you fill it.
   Every message row exposes both `message` and a per-role part —
@@ -378,7 +385,12 @@ Reply content (markdown; defaults derive from the palette, dark mode follows):
 markdown column alignment. Reasoning: `--ai-chat-reasoning-color` (= muted),
 `--ai-chat-reasoning-font-size` (0.92em), `--ai-chat-reasoning-border-color`
 (= border; rule beside opened reasoning), `--ai-chat-reasoning-max-height`
-(320px; opened reasoning scrolls past it).
+(320px; opened reasoning scrolls past it). Tool calls: `--ai-chat-tool-bg`
+(fg 3%), `--ai-chat-tool-border-color` (= border), `--ai-chat-tool-radius`
+(= radius), `--ai-chat-tool-font-size` (0.9em), `--ai-chat-tool-running-color`
+(= accent), `--ai-chat-tool-success-color` (#16a34a),
+`--ai-chat-tool-error-color` (= error), `--ai-chat-tool-output-max-height`
+(320px).
 
 Radius (all = --ai-chat-radius): `--ai-chat-radius` (8px), `--ai-chat-outer-radius`
 (= radius; 0 for square), `--ai-chat-bubble-radius`, `--ai-chat-input-radius`, `--ai-chat-button-radius`,

@@ -84,6 +84,20 @@ export interface ChatLabels {
   thoughtFor: string;
   /** Names the reasoning region; also the heading when no duration is known. */
   thoughtProcess: string;
+  /** A tool call the model is still preparing (its arguments streaming in). */
+  toolPending: string;
+  /** A tool call that is running. */
+  toolRunning: string;
+  /** A tool call that finished. */
+  toolSuccess: string;
+  /** A tool call that failed. */
+  toolError: string;
+  /** A tool call that stopped without an outcome (the reply was stopped or ended first). */
+  toolIncomplete: string;
+  /** Heading over a tool call's arguments. */
+  toolInput: string;
+  /** Heading over a tool call's result. */
+  toolOutput: string;
 }
 
 export const DEFAULT_LABELS: ChatLabels = {
@@ -123,4 +137,11 @@ export const DEFAULT_LABELS: ChatLabels = {
   thinking: 'Thinking…',
   thoughtFor: 'Thought for {duration}',
   thoughtProcess: 'Thought process',
+  toolPending: 'Preparing…',
+  toolRunning: 'Running…',
+  toolSuccess: 'Done',
+  toolError: 'Failed',
+  toolIncomplete: "Didn't finish",
+  toolInput: 'Input',
+  toolOutput: 'Result',
 };

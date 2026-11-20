@@ -67,6 +67,15 @@ export const chatStyles = css`
     --ai-chat-reasoning-font-size: 0.92em;
     --ai-chat-reasoning-border-color: var(--ai-chat-border);
     --ai-chat-reasoning-max-height: 320px;
+    /* Tool-call rows. The tint derives from the text color, so dark mode follows. */
+    --ai-chat-tool-bg: color-mix(in srgb, var(--ai-chat-fg) 3%, transparent);
+    --ai-chat-tool-border-color: var(--ai-chat-border);
+    --ai-chat-tool-radius: var(--ai-chat-radius);
+    --ai-chat-tool-font-size: 0.9em;
+    --ai-chat-tool-running-color: var(--ai-chat-accent);
+    --ai-chat-tool-success-color: #16a34a;
+    --ai-chat-tool-error-color: var(--ai-chat-error);
+    --ai-chat-tool-output-max-height: 320px;
 
     /* ---- Corner rounding ----
        ONE knob controls every rounded corner: --ai-chat-radius. Change it and
@@ -514,6 +523,10 @@ export const chatStyles = css`
      .message--editing so no other message's layout changes. */
   .message--editing .message__col { width: 100%; }
   .message--editing .message__body { width: 100%; max-width: 100%; }
+  /* A reply with tool calls: full width, so the rows keep one width while the
+     text around them streams in (content-sized, they jumped as lines grew). */
+  .message--tools .message__col { width: 100%; }
+  .message--tools .message__body { width: 100%; max-width: 100%; }
 
   .message__meta {
     display: flex;
@@ -764,6 +777,84 @@ export const chatStyles = css`
     overscroll-behavior: contain;
   }
   .reasoning__content[hidden] { display: none; }
+
+  /* ---- Tool calls ----
+     One row per call: status, name, state and time on a quiet tinted strip
+     that opens to the call's input and result. */
+  .tool {
+    margin: 2px 0 8px;
+    border: var(--ai-chat-border-width) solid var(--ai-chat-tool-border-color);
+    border-radius: var(--ai-chat-tool-radius);
+    background: var(--ai-chat-tool-bg);
+    font-size: var(--ai-chat-tool-font-size);
+    overflow: hidden;
+  }
+  .tool:last-child { margin-bottom: 2px; }
+  .markdown + .tool { margin-top: 8px; }
+  .tool + .tool { margin-top: -2px; }
+  .tool__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 10px;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--ai-chat-fg);
+    text-align: left;
+    cursor: pointer;
+    border-radius: inherit;
+  }
+  .tool__header:disabled { cursor: default; }
+  .tool__header:hover:not(:disabled) { background: color-mix(in srgb, var(--ai-chat-fg) 4%, transparent); }
+  .tool__status { display: inline-flex; flex: 0 0 auto; color: var(--ai-chat-muted); }
+  .tool__status .icon { width: 16px; height: 16px; }
+  .tool--running .tool__status,
+  .tool--pending .tool__status { color: var(--ai-chat-tool-running-color); }
+  .tool--success .tool__status { color: var(--ai-chat-tool-success-color); }
+  .tool--error .tool__status { color: var(--ai-chat-tool-error-color); }
+  .tool--live .icon--spin { animation: tool-spin 0.9s linear infinite; }
+  @keyframes tool-spin { to { transform: rotate(360deg); } }
+  .tool__name {
+    font-family: var(--ai-chat-font-mono);
+    font-size: 0.95em;
+    font-weight: 600;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tool__state { color: var(--ai-chat-muted); white-space: nowrap; }
+  .tool--error .tool__state { color: var(--ai-chat-tool-error-color); }
+  .tool__time {
+    margin-left: auto;
+    color: var(--ai-chat-muted);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .tool__chevron { display: inline-flex; color: var(--ai-chat-muted); transition: transform 0.15s ease; }
+  .tool__time + .tool__chevron { margin-left: 0; }
+  .tool__state + .tool__chevron { margin-left: auto; }
+  .tool__chevron .icon { width: 14px; height: 14px; }
+  .tool--open .tool__chevron { transform: rotate(180deg); }
+  .tool__error {
+    padding: 0 10px 8px 34px;
+    color: var(--ai-chat-tool-error-color);
+    overflow-wrap: anywhere;
+  }
+  .tool__body { padding: 0 10px 10px; }
+  .tool__body[hidden] { display: none; }
+  .tool__section + .tool__section { margin-top: 8px; }
+  .tool__label {
+    margin: 2px 0 4px;
+    color: var(--ai-chat-muted);
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .tool__section .markdown .code-block { margin: 0; }
+  .tool__section pre { max-height: var(--ai-chat-tool-output-max-height); overflow: auto; }
 
   .message__error {
     margin-top: 8px;
@@ -1310,6 +1401,7 @@ export const chatStyles = css`
   .message__edit-input:focus-visible,
   .message__edit-btn:focus-visible,
   .reasoning__trigger:focus-visible,
+  .tool__header:focus-visible,
   .composer__box:focus-within {
     outline: var(--ai-chat-focus-width) solid var(--ai-chat-focus-color);
     outline-offset: var(--ai-chat-focus-offset);
@@ -1344,7 +1436,9 @@ export const chatStyles = css`
     .messages { scroll-behavior: auto; }
     .typing i { animation: none; }
     .reasoning--live .reasoning__label { animation: none; background: none; color: var(--ai-chat-reasoning-color); }
-    .reasoning__chevron { transition: none; }
+    .reasoning__chevron, .tool__chevron { transition: none; }
+    /* A still spinner reads as busy without the motion. */
+    .tool--live .icon--spin { animation: none; }
     /* Keep the centering transform, just drop the entrance animation. */
     .jump { animation: none; }
   }

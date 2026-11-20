@@ -11,12 +11,13 @@ import type {
   MessageAction,
   MessageStep,
   ReasoningStep,
+  ToolStep,
 } from './types.js';
 import { renderMarkdown, sanitizeIcon, StreamingMarkdown, type ImagePolicy } from './markdown/markdown.js';
 import { chatStyles } from './styles.js';
 import { hljsTheme } from './markdown/hljs-theme.js';
 import { DEFAULT_LABELS, type ChatLabels } from './labels.js';
-import { addReasoning, closeReasoning, settleSteps, upsertTool } from './steps.js';
+import { addReasoning, closeReasoning, settleSteps, toolUnfinished, upsertTool } from './steps.js';
 import {
   chevronDownIcon,
   sendIcon,
@@ -31,6 +32,8 @@ import {
   checkIcon,
   editIcon,
   asideIcon,
+  spinnerIcon,
+  stopIcon,
 } from './icons.js';
 
 let idCounter = 0;
@@ -379,6 +382,28 @@ export class AiChat extends LitElement {
   @property({ type: String, attribute: 'reasoning' })
   reasoning: 'collapsed' | 'expanded' | 'hidden' = 'collapsed';
 
+  /**
+   * How a reply's tool calls show: `collapsed` (default) — one row each,
+   * opened by the reader to see the input and result; `expanded` — open from
+   * the start; `hidden` — not shown at all. The reader's own open/close wins.
+   */
+  @property({ type: String, attribute: 'tools' })
+  tools: 'collapsed' | 'expanded' | 'hidden' = 'collapsed';
+
+  /**
+   * Render a tool call's result yourself — a chart, a map, a card — instead of
+   * the default JSON. Return a DOM node to use it, or null/undefined for the
+   * default. Called once per change of that call (not per token), so returning
+   * a fresh element is fine. Works the same from any framework.
+   *
+   * @example
+   * chat.renderTool = (tool) => tool.name === 'weather' && tool.state === 'success'
+   *   ? Object.assign(document.createElement('weather-card'), { data: tool.output })
+   *   : null;
+   */
+  @property({ attribute: false })
+  renderTool?: (tool: ToolStep, message: ChatMessage) => Node | null | undefined;
+
   /** The conversation. Bindable and reflected back out via events. */
   @property({ attribute: false })
   messages: ChatMessage[] = [];
@@ -630,7 +655,9 @@ export class AiChat extends LitElement {
   /** The steps a message shows, given the `reasoning` setting. */
   private _visibleSteps(m: ChatMessage): MessageStep[] {
     if (!m.steps?.length) return [];
-    return m.steps.filter((s) => s.type === 'reasoning' && this.reasoning !== 'hidden');
+    return m.steps.filter((s) =>
+      s.type === 'reasoning' ? this.reasoning !== 'hidden' : this.tools !== 'hidden',
+    );
   }
 
   /**
@@ -657,17 +684,17 @@ export class AiChat extends LitElement {
   }
 
   private _renderStep(m: ChatMessage, step: MessageStep) {
-    return step.type === 'reasoning' ? this._renderReasoning(m, step) : nothing;
+    return step.type === 'reasoning' ? this._renderReasoning(m, step) : this._renderTool(m, step);
   }
 
-  /** Open/closed per reasoning step, as the reader left it. */
-  private _reasoningOpen = new Map<string, boolean>();
+  /** Open/closed per step (reasoning or tool call), as the reader left it. */
+  private _stepOpen = new Map<string, boolean>();
 
   private _renderReasoning(m: ChatMessage, step: ReasoningStep) {
     const key = `${m.id}/${step.id}`;
     const live = !!m.streaming && step.endedAt === undefined;
     const hasText = step.text.length > 0;
-    const open = hasText && (this._reasoningOpen.get(key) ?? this.reasoning === 'expanded');
+    const open = hasText && (this._stepOpen.get(key) ?? this.reasoning === 'expanded');
     const regionId = `reasoning-${m.id}-${step.id}`;
     const labels = this._labels;
     let label: string;
@@ -687,7 +714,7 @@ export class AiChat extends LitElement {
               aria-expanded=${hasText ? String(open) : nothing}
               aria-controls=${hasText ? regionId : nothing}
               ?disabled=${!hasText}
-              @click=${() => this._toggleReasoning(key, open)}>
+              @click=${() => this._toggleStep(key, open)}>
         <span class="reasoning__label">${label}</span>
         ${elapsed ? html`<span class="reasoning__time">${elapsed}</span>` : nothing}
         ${hasText ? html`<span class="reasoning__chevron" aria-hidden="true">${chevronDownIcon}</span>` : nothing}
@@ -703,9 +730,154 @@ export class AiChat extends LitElement {
     </div>`;
   }
 
-  private _toggleReasoning(key: string, wasOpen: boolean): void {
-    this._reasoningOpen.set(key, !wasOpen);
+  private _toggleStep(key: string, wasOpen: boolean): void {
+    this._stepOpen.set(key, !wasOpen);
     this.requestUpdate();
+  }
+
+  /**
+   * One tool call: a header row (status, name, state, time) that opens to the
+   * call's input and result. Failures show their error without opening. A
+   * `renderTool` callback can replace the result with the app's own element.
+   */
+  private _renderTool(m: ChatMessage, tool: ToolStep) {
+    const key = `${m.id}/${tool.id}`;
+    const labels = this._labels;
+    const unfinished = toolUnfinished(tool, m);
+    const live = !!m.streaming && (tool.state === 'pending' || tool.state === 'running');
+    const custom = this._customToolNode(tool, m);
+    const input = tool.args !== undefined ? tool.args : tool.argsText;
+    const hasInput = input !== undefined && input !== '';
+    const hasOutput = custom != null || tool.output !== undefined;
+    const hasBody = hasInput || hasOutput;
+    const open = hasBody && (this._stepOpen.get(key) ?? (this.tools === 'expanded' || custom != null));
+    const bodyId = `tool-${m.id}-${tool.id}`;
+
+    const stateLabel = unfinished
+      ? labels.toolIncomplete
+      : tool.state === 'pending'
+        ? labels.toolPending
+        : tool.state === 'running'
+          ? labels.toolRunning
+          : tool.state === 'success'
+            ? labels.toolSuccess
+            : labels.toolError;
+    const icon = unfinished
+      ? stopIcon
+      : tool.state === 'success'
+        ? checkIcon
+        : tool.state === 'error'
+          ? alertIcon
+          : spinnerIcon;
+    let time = '';
+    if (tool.endedAt !== undefined) time = this._formatDuration(tool.endedAt - tool.startedAt);
+    else if (live && Date.now() - tool.startedAt >= 1000) time = this._formatDuration(Date.now() - tool.startedAt);
+
+    const classes = classMap({
+      tool: true,
+      [`tool--${unfinished ? 'incomplete' : tool.state}`]: true,
+      'tool--live': live,
+      'tool--open': open,
+    });
+    return html`<div class=${classes} part="tool" data-tool=${tool.name}>
+      <button class="tool__header" part="tool-header" type="button"
+              aria-expanded=${hasBody ? String(open) : nothing}
+              aria-controls=${hasBody ? bodyId : nothing}
+              ?disabled=${!hasBody}
+              @click=${() => this._toggleStep(key, open)}>
+        <span class="tool__status" part="tool-status" aria-hidden="true">${icon}</span>
+        <span class="tool__name" part="tool-name">${tool.title || tool.name}</span>
+        <span class="tool__state">${stateLabel}</span>
+        ${time ? html`<span class="tool__time">${time}</span>` : nothing}
+        ${hasBody ? html`<span class="tool__chevron" aria-hidden="true">${chevronDownIcon}</span>` : nothing}
+      </button>
+      ${tool.error ? html`<div class="tool__error" part="tool-error">${tool.error}</div>` : nothing}
+      ${
+        hasBody
+          ? html`<div class="tool__body" part="tool-body" id=${bodyId} ?hidden=${!open}>
+              ${
+                open && hasInput
+                  ? html`<div class="tool__section" part="tool-input">
+                      <div class="tool__label">${labels.toolInput}</div>
+                      ${this._codeBlock(`${key}~in`, input)}
+                    </div>`
+                  : nothing
+              }
+              ${
+                open && hasOutput
+                  ? html`<div class="tool__section" part="tool-output">
+                      <div class="tool__label">${labels.toolOutput}</div>
+                      ${custom ?? this._codeBlock(`${key}~out`, tool.output)}
+                    </div>`
+                  : nothing
+              }
+            </div>`
+          : nothing
+      }
+    </div>`;
+  }
+
+  /** A value as a highlighted, copyable code block: JSON pretty-printed, other text as-is. */
+  private _codeBlock(key: string, value: unknown) {
+    let lang = 'json';
+    let text: string;
+    if (typeof value === 'string') {
+      text = value;
+      try {
+        const parsed: unknown = JSON.parse(value);
+        if (parsed !== null && typeof parsed === 'object') text = JSON.stringify(parsed, null, 2);
+        else lang = 'text';
+      } catch {
+        // Partial JSON while the arguments stream in still reads best as JSON.
+        lang = /^\s*[[{]/.test(value) ? 'json' : 'text';
+      }
+    } else {
+      try {
+        text = JSON.stringify(value, null, 2) ?? String(value);
+      } catch {
+        text = String(value);
+        lang = 'text';
+      }
+    }
+    // A fence longer than any backtick run inside, so the value can't close it.
+    const longest = Math.max(2, ...[...text.matchAll(/`+/g)].map((r) => r[0].length));
+    const fence = '`'.repeat(longest + 1);
+    return this._markdownBlock(key, `${fence}${lang}\n${text}\n${fence}`, false);
+  }
+
+  /**
+   * The app's own rendering of a tool's result, from `renderTool`. Cached per
+   * step OBJECT: a step is replaced whenever it changes, so the callback runs
+   * once per change of that call, not once per token of the reply around it.
+   */
+  private _customTools = new WeakMap<ToolStep, Node | null>();
+  private _customToolNode(tool: ToolStep, m: ChatMessage): Node | null {
+    if (!this.renderTool) return null;
+    if (this._customTools.has(tool)) return this._customTools.get(tool)!;
+    let node: Node | null = null;
+    try {
+      const out = this.renderTool(tool, m);
+      node = out instanceof Node ? out : null;
+    } catch (error) {
+      console.error('<ai-chat>: renderTool threw for a tool call; showing the default.', error);
+    }
+    this._customTools.set(tool, node);
+    return node;
+  }
+
+
+  /** "search: Done, deploy: Failed" — what a turn of only tool calls did, for the screen reader. */
+  private _toolSummary(m: ChatMessage): string {
+    const l = this._labels;
+    return (m.steps ?? [])
+      .filter((s): s is ToolStep => s.type === 'tool')
+      .map((t) => {
+        const state = toolUnfinished(t, m)
+          ? l.toolIncomplete
+          : t.state === 'success' ? l.toolSuccess : t.state === 'error' ? l.toolError : l.toolRunning;
+        return `${t.title || t.name}: ${state}`;
+      })
+      .join(', ');
   }
 
   /** 4s, 1m 5s. Never "0s": a step that ended still took a moment. */
@@ -1233,6 +1405,8 @@ export class AiChat extends LitElement {
           this._announce(final.error);
         } else if (final && !final.content && !final.steps?.length) {
           this._announce(this._labels.emptyResponse);
+        } else if (final && !final.content) {
+          this._announce(this._toolSummary(final));
         } else if (final) {
           this._announce(final.content);
         }
@@ -2148,6 +2322,8 @@ export class AiChat extends LitElement {
       // Lets the bubble stretch for a comfortable editing width (CSS scopes the
       // widening to this message only).
       'message--editing': this._editingId === m.id,
+      // Tool rows take the full width, so they don't grow with the text streaming around them.
+      'message--tools': this._visibleSteps(m).some((s) => s.type === 'tool'),
     });
     const isAssistant = m.role === 'assistant';
     // Avatars are opt-in: provide an `assistant-avatar` / `user-avatar` slot to

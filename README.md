@@ -350,6 +350,7 @@ const upstream = await fetch('https://api.openai.com/v1/chat/completions', {
 | `has-earlier`      | boolean                     | `false` | There are older messages than `.messages` holds: shows "Load earlier messages" at the top and fires `ai-chat:load-earlier`. See [Long conversations](#long-conversations-load-earlier). |
 | `load-earlier`     | `scroll` \| `button`        | `scroll` | With `has-earlier`: `scroll` loads as the reader nears the top (the button is there too, for keyboard users); `button` loads only on a click. |
 | `reasoning`        | `collapsed` \| `expanded` \| `hidden` | `collapsed` | How a reply's reasoning ("thinking") shows: a one-line "Thought for 12s" the reader can open, open from the start, or not at all. The reader's own open/close wins. |
+| `tools`            | `collapsed` \| `expanded` \| `hidden` | `collapsed` | How a reply's tool calls show: one row each that opens to the input and result, open from the start, or not at all. Errors show either way. |
 | `image-hosts`      | string (space-separated)    | —       | With `allow-images`, the URL prefixes images may load from (e.g. `https://cdn.example.com/`). Only `https:` ever loads. Also settable as an array property `.imageHosts`. |
 
 To turn a boolean attribute off, set it to `"false"` (e.g. `show-timestamps="false"`).
@@ -362,6 +363,7 @@ Set via JS only (they hold objects/arrays):
 | `.messages`  | `ChatMessage[]`       | The conversation (read or seed it).                |
 | `.labels`    | `Partial<ChatLabels>` | Override any UI/accessibility strings (see below). |
 | `.messageActions` | `(message: ChatMessage) => MessageAction[]` | Your own buttons in each message's actions row. See [Message actions](#message-actions-copy--edit). |
+| `.renderTool` | `(tool: ToolStep, message: ChatMessage) => Node \| null` | Render a tool call's result yourself (a chart, a map) instead of the JSON. Return `null` for the default. Called once per change of that call, not per token. |
 | `.imageHosts` | `string[]`           | Same as the `image-hosts` attribute. |
 
 **Methods:**
@@ -984,6 +986,14 @@ chat.labels = {
   thinking: 'Pensando…',
   thoughtFor: 'Pensó durante {duration}',
   thoughtProcess: 'Razonamiento',
+  // Tool calls:
+  toolPending: 'Preparando…',
+  toolRunning: 'Ejecutando…',
+  toolSuccess: 'Listo',
+  toolError: 'Falló',
+  toolIncomplete: 'No terminó',
+  toolInput: 'Entrada',
+  toolOutput: 'Resultado',
   // Attachment strings ({name} is replaced with the filename):
   attach: 'Adjuntar archivos',
   removeAttachment: 'Quitar adjunto',
@@ -1123,6 +1133,14 @@ never on a mouse click. Subtle by default; tune it to taste.
 | `--ai-chat-reasoning-font-size` | `0.92em`                    | Reasoning toggle and text size                |
 | `--ai-chat-reasoning-border-color` | `= border`               | Rule beside opened reasoning                  |
 | `--ai-chat-reasoning-max-height` | `320px`                    | Opened reasoning scrolls past this height     |
+| `--ai-chat-tool-bg`             | `fg 3%`                     | Tool-call row background                      |
+| `--ai-chat-tool-border-color`   | `= border`                  | Tool-call row border                          |
+| `--ai-chat-tool-radius`         | `= radius`                  | Tool-call row corners                         |
+| `--ai-chat-tool-font-size`      | `0.9em`                     | Tool-call row text size                       |
+| `--ai-chat-tool-running-color`  | `= accent`                  | Spinner while a call runs                     |
+| `--ai-chat-tool-success-color`  | `#16a34a`                   | Tick on a finished call                       |
+| `--ai-chat-tool-error-color`    | `= error`                   | Icon, state and message of a failed call      |
+| `--ai-chat-tool-output-max-height` | `320px`                  | Input/result blocks scroll past this height   |
 
 Tables use tabular numerals so money and counts line up, and honour markdown
 column alignment (`|--:|` right-aligns a number column).
@@ -1217,7 +1235,8 @@ For styling that a variable can't reach, target the shadow parts with
 `composer-actions-end`, `attach-button`, `input`, `send-button`, `stop-button`,
 `jump-button`, `retry-button`, `aside-toggle`, `aside-scrim`, `custom-action`, `load-earlier`, `load-earlier-row`, `empty`,
 `empty-icon`, `empty-heading`, `empty-body`, `error`, `empty-response`,
-`reasoning`, `reasoning-trigger`, `reasoning-content`.
+`reasoning`, `reasoning-trigger`, `reasoning-content`, `tool`, `tool-header`,
+`tool-status`, `tool-name`, `tool-body`, `tool-input`, `tool-output`, `tool-error`.
 
 `message-actions` is the per-message actions row; `action-button` targets every
 button in it, with `copy-button` / `edit-button` for the built-ins specifically.
