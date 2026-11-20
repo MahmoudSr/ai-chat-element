@@ -85,7 +85,8 @@ ${fence}`,
 
 ${fence}tsx
 useEffect(() => {
-  ref.current!.transport = functionAdapter(stream);
+  // myStream: your async generator that yields text
+  ref.current!.transport = functionAdapter(myStream);
 }, []);
 
 return <ai-chat ref={ref} />;
@@ -134,10 +135,14 @@ In production, keep the key on your server and use \`functionAdapter\`.`,
     chips: ['#4A1A0E', '#A8502E', '#C4673F', '#D8916F', '#E9BFA9', '#F6E3D8'],
     theme: { '--ai-chat-accent': '#A8502E', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '10px' },
     ask: 'Can it show Claude thinking?',
-    answer: `Yes. The Anthropic adapter streams thinking and tool calls as steps, shown in a collapsible reasoning panel:
+    answer: `Yes. The Anthropic adapter streams thinking and tool calls, shown in a collapsible "Thought for 12s" panel. Ask for a thinking summary, or the text comes back empty:
 
 ${fence}js
-chat.transport = anthropicAdapter({ model: 'claude-sonnet-5', apiKey });
+chat.transport = anthropicAdapter({
+  model: 'claude-sonnet-5-5',
+  maxTokens: 8000,
+  params: { thinking: { type: 'adaptive', display: 'summarized' } },
+});
 ${fence}`,
   },
   {
@@ -182,11 +187,20 @@ ${fence}`,
     chips: ['#23300A', '#4D7A12', '#6A9A1F', '#94BE52', '#C3DD99', '#E7F2D6'],
     theme: { '--ai-chat-accent': '#4D7A12', '--ai-chat-accent-fg': '#FFFFFF', '--ai-chat-radius': '8px' },
     ask: 'We have our own backend.',
-    answer: `Wrap it in \`functionAdapter\`: yield text as it streams, and your key never reaches the browser.
+    answer: `Wrap it in \`functionAdapter\` and yield text as it arrives. Your key stays on your server:
 
 ${fence}js
 chat.transport = functionAdapter(async function* (messages, signal) {
-  yield* streamFrom('/api/chat', messages, signal);
+  const res = await fetch('/api/chat', {
+    method: 'POST', signal, body: JSON.stringify(messages),
+  });
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    yield decoder.decode(value);
+  }
 });
 ${fence}`,
   },
