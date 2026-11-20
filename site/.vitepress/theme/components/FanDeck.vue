@@ -254,7 +254,8 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
 </script>
 
 <template>
-  <section ref="hero" class="fd-hero" aria-labelledby="fd-title">
+  <!-- The home page is this one screen, so it is the page's main landmark. -->
+  <main ref="hero" class="fd-hero" aria-labelledby="fd-title">
     <div class="fd-fan" role="radiogroup" aria-label="Show the chat in a framework or with a model">
       <button
         v-for="(strip, i) in strips"
@@ -266,13 +267,14 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         :class="[`is-${strip.kind}`, { 'is-out': i === sel }]"
         :style="{ '--a': `${slots[i]}deg` }"
         :aria-checked="i === sel"
-        :aria-label="`${strip.name} (${strip.kind})`"
         :tabindex="i === sel ? 0 : -1"
         @click="select(i)"
         @keydown="onKey"
       >
         <span class="fd-tab">
-          <b>{{ strip.name }}</b>
+          <!-- The accessible name is this visible text (so voice control can
+               say what it sees), plus the kind for screen readers. -->
+          <b>{{ strip.name }}<span class="visually-hidden"> ({{ strip.kind }})</span></b>
           <span>{{ strip.code }}</span>
         </span>
         <span
@@ -323,7 +325,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
         </p>
       </div>
     </div>
-  </section>
+  </main>
 </template>
 
 <style scoped>
