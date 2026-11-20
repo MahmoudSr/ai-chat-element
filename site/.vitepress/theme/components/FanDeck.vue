@@ -349,6 +349,18 @@ onBeforeUnmount(() => resizeObserver?.disconnect());
   font: 600 11px var(--fd-mono);
 }
 
+/* Dark mode: the page and the live chat go dark, but the strips keep their
+   white card stock, like a paint fan deck lying on a dark desk. */
+:global(.dark .fd-hero .fd-strip) {
+  --fd-card: #f4f5f7;
+  --fd-ink: #16181d;
+  --fd-ink-3: #5d6270;
+  color: #16181d;
+}
+:global(.dark .fd-hero .fd-strip.is-out .fd-tab::after) {
+  background: #16181d;
+}
+
 /* ---- the pulled card: the product ---- */
 .fd-card {
   position: absolute;

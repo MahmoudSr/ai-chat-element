@@ -55,6 +55,8 @@
 }
 
 .dark {
+  /* Graphite would vanish on the dark nav and sidebar. */
+  --fd-chip-reference: #8b909c;
   --fd-ground: #0f1013;
   --fd-card: #17191e;
   --fd-ink: #eceef2;
