@@ -200,3 +200,16 @@ html {
   font-size: 0.86em;
   border-radius: 4px;
 }
+
+/* Tables: the description column gets the room, and code never breaks in
+   the middle of an identifier (claude-opus- / 5-5). */
+.vp-doc table {
+  display: table;
+  width: 100%;
+}
+.vp-doc td:last-child {
+  min-width: 18em;
+}
+.vp-doc td code {
+  white-space: nowrap;
+}

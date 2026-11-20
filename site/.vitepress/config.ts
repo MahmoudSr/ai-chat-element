@@ -10,6 +10,40 @@ import { defineConfig } from 'vitepress';
  * The live <ai-chat> demos import the component from ../src directly, so the
  * site always documents the code in this commit, never a stale published build.
  */
+
+/** One sidebar for every docs page, in reading order. */
+const docsSidebar = [
+  {
+    text: 'Get started',
+    items: [
+      { text: 'Introduction', link: '/guide/' },
+      { text: 'Install', link: '/guide/install' },
+      { text: 'Quick start', link: '/guide/quick-start' },
+      { text: 'TypeScript', link: '/guide/typescript' },
+    ],
+  },
+  {
+    text: 'Frameworks',
+    items: [
+      { text: 'Plain HTML', link: '/guide/frameworks/html' },
+      { text: 'React and Next.js', link: '/guide/frameworks/react' },
+      { text: 'Vue', link: '/guide/frameworks/vue' },
+      { text: 'Angular', link: '/guide/frameworks/angular' },
+      { text: 'Svelte', link: '/guide/frameworks/svelte' },
+    ],
+  },
+  {
+    text: 'Connect a model',
+    items: [
+      { text: 'Overview', link: '/models/' },
+      { text: 'OpenAI-compatible', link: '/models/openai' },
+      { text: 'Anthropic', link: '/models/anthropic' },
+      { text: 'Your own backend', link: '/models/your-backend' },
+      { text: 'Finish reason and usage', link: '/models/finish-and-usage' },
+    ],
+  },
+];
+
 export default defineConfig({
   title: 'ai-chat-element',
   description:
@@ -58,27 +92,8 @@ export default defineConfig({
       { text: '0.7.0', link: 'https://github.com/MahmoudSr/ai-chat-element/blob/main/CHANGELOG.md' },
     ],
     sidebar: {
-      '/guide/': [
-        {
-          text: 'Get started',
-          items: [
-            { text: 'Introduction', link: '/guide/' },
-            { text: 'Install', link: '/guide/install' },
-            { text: 'Quick start', link: '/guide/quick-start' },
-            { text: 'TypeScript', link: '/guide/typescript' },
-          ],
-        },
-        {
-          text: 'Frameworks',
-          items: [
-            { text: 'Plain HTML', link: '/guide/frameworks/html' },
-            { text: 'React and Next.js', link: '/guide/frameworks/react' },
-            { text: 'Vue', link: '/guide/frameworks/vue' },
-            { text: 'Angular', link: '/guide/frameworks/angular' },
-            { text: 'Svelte', link: '/guide/frameworks/svelte' },
-          ],
-        },
-      ],
+      '/guide/': docsSidebar,
+      '/models/': docsSidebar,
     },
     socialLinks: [{ icon: 'github', link: 'https://github.com/MahmoudSr/ai-chat-element' }],
     search: { provider: 'local' },
