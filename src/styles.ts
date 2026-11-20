@@ -150,7 +150,7 @@ export const chatStyles = css`
        from a var so it can be squared off with the rest via --ai-chat-radius. */
     --ai-chat-jump-size: 36px;
     --ai-chat-jump-radius: 50%;
-    --ai-chat-messages-padding: 20px 16px;
+    --ai-chat-messages-padding: 20px 16px 12px;
     /* stable reserves the scrollbar's width so the centered column never shifts
        when a scrollbar appears; auto gives the space back when nothing scrolls. */
     --ai-chat-messages-scrollbar-gutter: stable;
@@ -491,6 +491,9 @@ export const chatStyles = css`
     animation: fade-in 0.18s ease;
   }
   .message--user { flex-direction: row-reverse; }
+  /* The gap goes BETWEEN messages. After the last one it stacked on the list's
+     bottom padding and left a wide empty band above the input box. */
+  .message:nth-last-child(1 of .message) { margin-bottom: 0; }
 
   /* Avatars are opt-in: the column is hidden unless a *-avatar slot has
      content. --ai-chat-show-avatars can force-hide them ('none') even when a

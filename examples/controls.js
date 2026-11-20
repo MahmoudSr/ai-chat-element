@@ -222,7 +222,7 @@ export const CONTROLS = [
   // ---------- Spacing ----------
   { g: 'Spacing', kind: 'var', key: '--ai-chat-bubble-padding', type: 'text', def: '4px 14px', label: 'bubble-padding' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-input-padding', type: 'text', def: '8px 14px 2px', label: 'input-padding' },
-  { g: 'Spacing', kind: 'var', key: '--ai-chat-messages-padding', type: 'text', def: '20px 16px', label: 'messages-padding' },
+  { g: 'Spacing', kind: 'var', key: '--ai-chat-messages-padding', type: 'text', def: '20px 16px 12px', label: 'messages-padding' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-messages-scrollbar-gutter', type: 'text', def: 'stable', label: 'messages-scrollbar-gutter' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-composer-padding', type: 'text', def: '12px 16px 16px', label: 'composer-padding' },
   { g: 'Spacing', kind: 'var', key: '--ai-chat-header-padding', type: 'text', def: '10px 16px', label: 'header-padding' },

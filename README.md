@@ -1309,7 +1309,7 @@ column alignment (`|--:|` right-aligns a number column).
 | `--ai-chat-bubble-inset-x`   | `14px`           | Horizontal text inset; the name/time label aligns to it |
 | `--ai-chat-bubble-padding`   | `6px = inset-x`  | Inside message bubbles (horizontal derives from `bubble-inset-x`) |
 | `--ai-chat-input-padding`    | `8px 14px 2px`   | Inside the textarea     |
-| `--ai-chat-messages-padding` | `20px 16px`      | Around the message list |
+| `--ai-chat-messages-padding` | `20px 16px 12px` | Around the message list |
 | `--ai-chat-messages-scrollbar-gutter` | `stable` | Reserve the scrollbar's width in the message list (`auto` gives it back when nothing scrolls) |
 | `--ai-chat-composer-padding` | `12px 16px 16px` | Around the composer     |
 | `--ai-chat-header-padding`   | `10px 16px`      | Inside the header bar   |

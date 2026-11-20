@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/) and the format is based on
 
 ## [Unreleased]
 
+### Changed
+
+- **Less empty space under a finished reply.** The gap between messages
+  (`--ai-chat-gap`) was also added after the LAST message, on top of the list's
+  bottom padding, leaving about 85px between a reply and the input box. The gap
+  now applies only between messages, and `--ai-chat-messages-padding` defaults
+  to `20px 16px 12px` (was `20px 16px`). Set it back to `20px 16px` for the old
+  bottom padding.
+
 ## [0.7.0] - 2026-11-20
 
 Reasoning and tool calls (issue #8), a dependency and security update, and four
