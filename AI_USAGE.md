@@ -6,7 +6,7 @@
 > component up correctly, without guessing.
 
 **Live playground** (every option, with a code export you can paste):
-https://mahmoudsr.github.io/ai-chat-element/examples/playground.html — useful for
+https://mahmoudsr.github.io/ai-chat-element/playground/ — useful for
 picking values to put in the CSS variables and attributes described below.
 
 ---

@@ -7,7 +7,7 @@
 
 A reusable, framework-agnostic **AI chat UI** as a Web Component. Drop `<ai-chat>` into **React, Angular, Vue, Svelte, or plain HTML** — it's a standard custom element, so it works everywhere.
 
-### ▶︎ [Try it in the playground](https://mahmoudsr.github.io/ai-chat-element/examples/playground.html)
+### ▶︎ [Try it in the playground](https://mahmoudsr.github.io/ai-chat-element/playground/)
 
 Every attribute, all 66 CSS variables, every label and slot — live. Pick a preset,
 tweak it, and copy the generated code straight into your app.

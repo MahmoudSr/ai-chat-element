@@ -1,14 +1,16 @@
-name: Deploy playground
+name: Deploy site
 
 # Every action is pinned to a full commit SHA (version in the comment). A tag
 # can be moved to point at different code; a SHA can't. Dependabot keeps the
 # pins current (.github/dependabot.yml).
 
-# Publishes the examples to GitHub Pages:
-# https://mahmoudsr.github.io/ai-chat-element/
+# Publishes the docs site and the playground to GitHub Pages:
+#   https://mahmoudsr.github.io/ai-chat-element/             the docs
+#   https://mahmoudsr.github.io/ai-chat-element/playground/  the playground
+# (the old /examples/playground.html redirects to /playground/).
 #
-# The playground imports src/ directly, so it has to be built (vite.config.site.ts)
-# rather than served as-is. Pages then hosts the static output.
+# Both import src/ directly, so they are built (npm run build:pages) rather
+# than served as-is. Pages then hosts the static output.
 
 on:
   push:
@@ -46,18 +48,22 @@ jobs:
 
       - run: npm ci
 
-      # Gate the deploy on the suite: a broken playground is worse than a stale
-      # one, and this is the same browser the tests expect.
+      # Gate the deploy on the suite: a broken site is worse than a stale one,
+      # and this is the same browser the tests expect.
       - run: npx playwright install --with-deps chromium
       - run: npm test
 
-      - run: npm run build:site
+      - run: npm run build:pages
+
+      # The home page must be one clean screen at every common window size
+      # (no scroll, no covered strip name, no cut-off text).
+      - run: npm run verify:home
 
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
 
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
-          path: dist-site
+          path: site/.vitepress/dist
 
   deploy:
     needs: build

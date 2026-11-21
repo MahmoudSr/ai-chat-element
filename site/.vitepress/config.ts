@@ -189,7 +189,7 @@ function writeLlmsTxt(srcDir: string, outDir: string) {
     '',
     '## Optional',
     '',
-    `- [Playground](${SITE}examples/playground.html): every option live, with a code export.`,
+    `- [Playground](${SITE}playground/): every option live, with a code export.`,
     `- [Changelog](${REPO}/blob/main/CHANGELOG.md): what changed in each release.`,
     `- [Source on GitHub](${REPO})`,
     `- [Package on npm](https://www.npmjs.com/package/ai-chat-element)`,
@@ -275,7 +275,9 @@ export default defineConfig({
       { text: 'Features', link: '/features/streaming', activeMatch: '/features/' },
       { text: 'Customize', link: '/customize/', activeMatch: '/customize/' },
       { text: 'Reference', link: '/reference/attributes', activeMatch: '/reference/' },
-      { text: 'Playground', link: 'https://mahmoudsr.github.io/ai-chat-element/examples/playground.html' },
+      // Not a VitePress page: built separately and placed at /playground/
+      // (npm run build:pages), so it is linked by full address.
+      { text: 'Playground', link: SITE + 'playground/' },
       { text: '0.7.0', link: 'https://github.com/MahmoudSr/ai-chat-element/blob/main/CHANGELOG.md' },
     ],
     sidebar: {

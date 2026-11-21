@@ -45,7 +45,8 @@
     "docs:dev": "vitepress dev site",
     "docs:build": "vitepress build site",
     "docs:preview": "vitepress preview site",
-    "verify:home": "node scripts/verify-home-fit.mjs"
+    "verify:home": "node scripts/verify-home-fit.mjs",
+    "build:pages": "vitepress build site && vite build --config vite.config.site.ts && node scripts/assemble-pages.mjs"
   },
   "keywords": [
     "ai",

@@ -2,7 +2,8 @@ import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 
 /**
- * Builds the examples into a static site for GitHub Pages.
+ * Builds the playground for GitHub Pages. scripts/assemble-pages.mjs then puts
+ * it at /playground/ inside the docs site (npm run build:pages).
  *
  * Separate from vite.config.ts (the library build) so the two can never
  * interfere: that one emits a package into dist/, this one emits a website into
@@ -20,9 +21,10 @@ export default defineConfig({
   build: {
     outDir: 'dist-site',
     emptyOutDir: true,
+    // Its own folder, so it can't collide with the docs site's assets/.
+    assetsDir: 'playground/assets',
     rollupOptions: {
       input: {
-        index: resolve(import.meta.dirname, 'index.html'),
         playground: resolve(import.meta.dirname, 'examples/playground.html'),
       },
     },
