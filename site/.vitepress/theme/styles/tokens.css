@@ -191,6 +191,14 @@ html {
   border-top: 0;
   margin-top: 48px;
 }
+/* The docs column: VitePress caps it at 43rem, which left wide empty
+   margins around the code blocks and tables. 50rem; still only a maximum,
+   so it shrinks on smaller screens. .VPContent outranks VitePress's own rule,
+   which carries a scoped [data-v-…] attribute. */
+.VPContent .VPDoc.has-aside .content-container {
+  max-width: 50rem;
+}
+
 /* About 75 characters a line in Archivo. */
 .vp-doc p,
 .vp-doc li {
