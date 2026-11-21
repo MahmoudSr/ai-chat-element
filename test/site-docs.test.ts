@@ -18,6 +18,7 @@ import {
   eventDescriptions,
 } from '../site/reference/descriptions.ts';
 import { extractApi } from '../site/reference/extract.ts';
+import { cssVarGroups } from '../site/reference/groups.ts';
 import { DEFAULT_LABELS } from '../src/labels.ts';
 
 /**
@@ -155,6 +156,16 @@ describe('the docs site only names real API', () => {
         .map((v) => `${v.name} = ${v.value}`);
       expect(bad).toEqual([]);
       expect(api.cssVars.find((v) => v.name === '--ai-chat-focus-width')?.value).toBe('2px');
+    });
+
+    // The CSS variables page shows them by group, so a variable missing from
+    // the groups would vanish from the page, and one in two groups would show twice.
+    it('every CSS variable is in exactly one group on the reference page', () => {
+      const placed = Object.values(cssVarGroups).flat().map((v) => `--ai-chat-${v}`);
+      const real = api.cssVars.map((v) => v.name);
+      expect(real.filter((n) => !placed.includes(n)), 'not in any group').toEqual([]);
+      expect(placed.filter((n) => !real.includes(n)), 'grouped but not a real variable').toEqual([]);
+      expect(placed.filter((n, i) => placed.indexOf(n) !== i), 'in two groups').toEqual([]);
     });
 
     const check = (label: string, names: string[], described: Record<string, unknown>) => {

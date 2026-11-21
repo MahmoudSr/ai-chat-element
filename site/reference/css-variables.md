@@ -3,39 +3,110 @@ description: "A searchable list of every ai-chat CSS variable with its default v
 ---
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { data } from './api.data'
 import { cssVarDescriptions as d } from './descriptions'
-import { fmt, words } from './fmt'
+import { varFilter } from './groups'
 
-const q = ref('')
-const rows = computed(() => {
-  const s = q.value.trim().toLowerCase()
-  return s
-    ? data.cssVars.filter((v) => v.name.includes(s) || (d[v.name] ?? '').toLowerCase().includes(s))
-    : data.cssVars
+const shown = computed(() => {
+  const q = varFilter.value.trim().toLowerCase()
+  return q
+    ? data.cssVars.filter((v) => v.name.includes(q) || (d[v.name] ?? '').toLowerCase().includes(q)).length
+    : data.cssVars.length
 })
 </script>
 
 # CSS variables
 
-Generated from the source: {{ data.cssVars.length }} variables, with their
-defaults. Most default to another variable, so changing a parent moves its
-children with it: every corner follows `--ai-chat-radius`, every user bubble
-follows `--ai-chat-accent`. See [Theming](/customize/) for how to use them.
+All {{ data.cssVars.length }} variables, grouped by what they change. Set them
+on `ai-chat` in your own CSS. Most of them follow another one, so you usually
+only need a few: change `--ai-chat-accent` and the Send button, your messages
+and links change with it; change `--ai-chat-radius` and every corner follows. [Theming](/customize/)
+shows how.
 
 <label class="fd-filter">
   <span>Filter</span>
-  <input v-model="q" type="search" placeholder="radius, accent, tool…" />
-  <output>{{ rows.length }} shown</output>
+  <input v-model="varFilter" type="search" placeholder="radius, accent, tool…" />
+  <output>{{ shown }} shown</output>
 </label>
 
-<table class="fd-ref">
-  <thead><tr><th>Variable and default</th><th>What it controls</th></tr></thead>
-  <tbody>
-    <tr v-for="v in rows" :key="v.name" :id="v.name.slice(2)">
-      <td><code>{{ v.name }}</code><span class="fd-sub">default <code class="fd-wrap" v-html="words(v.value)"></code></span></td>
-      <td v-html="fmt(d[v.name])"></td>
-    </tr>
-  </tbody>
-</table>
+## Colors
+
+The main colors. Start with `--ai-chat-accent`: the Send button, your
+messages, links and the focus ring all follow it.
+
+<VarTable group="colors" />
+
+## Text
+
+Fonts and text size.
+
+<VarTable group="text" />
+
+## Corners
+
+How round things are. Every corner follows `--ai-chat-radius`, so one line
+changes them all; the rest let you change one corner on its own.
+
+<VarTable group="corners" />
+
+## Borders
+
+How thick the lines are. They all follow `--ai-chat-border-width`.
+
+<VarTable group="borders" />
+
+## Layout and spacing
+
+How wide the chat is and how much room is around things.
+
+<VarTable group="layout" />
+
+## Messages
+
+The message bubbles and the avatars next to them.
+
+<VarTable group="messages" />
+
+## Formatted replies
+
+How the AI's replies look: links, bold text, headings, lists, quotes, code and
+tables.
+
+<VarTable group="replies" />
+
+## Input box
+
+The box you type in, its Send button and the files you attach.
+
+<VarTable group="input" />
+
+## Message buttons
+
+The Copy and Edit buttons under each message.
+
+<VarTable group="actions" />
+
+## Images
+
+Images in messages, and the full-size view when you click one.
+
+<VarTable group="images" />
+
+## Header and sidebar
+
+The bar at the top, the New chat button and the history sidebar.
+
+<VarTable group="chrome" />
+
+## Thinking and tools
+
+The "Thought for 12s" panel and the rows for tool calls.
+
+<VarTable group="steps" />
+
+## Keyboard focus
+
+The ring that shows which control has keyboard focus.
+
+<VarTable group="focus" />

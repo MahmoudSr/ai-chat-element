@@ -473,3 +473,9 @@ html {
 .VPNavBar .VPNavBarMenuLink:hover {
   color: var(--fd-ink);
 }
+
+/* A grouped reference table with nothing matching the filter. */
+.vp-doc .fd-none {
+  color: var(--fd-ink-3);
+  font-size: 14px;
+}
