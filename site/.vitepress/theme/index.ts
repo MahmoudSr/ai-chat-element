@@ -12,6 +12,7 @@ import FanDeck from './components/FanDeck.vue';
 import LiveDemo from './components/LiveDemo.vue';
 import ThemeLab from './components/ThemeLab.vue';
 import VarTable from './components/VarTable.vue';
+import RefGroup from './components/RefGroup.vue';
 
 export default {
   extends: DefaultTheme,
@@ -20,6 +21,7 @@ export default {
     app.component('LiveDemo', LiveDemo);
     app.component('ThemeLab', ThemeLab);
     app.component('VarTable', VarTable);
+    app.component('RefGroup', RefGroup);
     // Registering <ai-chat> calls customElements.define, which only exists in
     // the browser, so the component loads on the client only, never during
     // the static (SSR) build.

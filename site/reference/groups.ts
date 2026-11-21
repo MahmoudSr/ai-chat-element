@@ -37,3 +37,58 @@ export const cssVarGroups: Record<string, string[]> = {
 
 /** The page's filter text, shared by every group's table. */
 export const varFilter = ref('');
+
+/** The Attributes page, grouped the same way. Each attribute in exactly one group. */
+export const attributeGroups: Record<string, string[]> = {
+  look: ['theme', 'assistant-bubble', 'show-names', 'show-timestamps', 'assistant-avatar-src', 'user-avatar-src'],
+  words: ['placeholder', 'empty-heading', 'empty-body'],
+  conversation: ['system-prompt', 'conversation-id', 'abort-on-switch', 'has-earlier', 'load-earlier', 'disabled'],
+  buttons: ['show-header', 'show-clear', 'show-retry', 'show-copy', 'show-edit'],
+  sidebar: ['show-aside', 'aside-breakpoint', 'aside-open', 'hide-aside-toggle', 'aside-side'],
+  attachments: ['allow-attachments', 'hide-attach-button', 'accept', 'max-attachments', 'max-attachment-size'],
+  images: ['allow-images', 'image-hosts'],
+  steps: ['reasoning', 'tools'],
+};
+
+/** The Parts page: every ::part() name, by the area of the chat it's in. */
+export const partGroups: Record<string, string[]> = {
+  frame: ['root', 'layout', 'messages'],
+  header: ['header', 'header-title', 'header-slot', 'clear-button', 'aside-toggle'],
+  sidebar: ['aside', 'aside-list', 'aside-scrim'],
+  empty: ['empty', 'empty-icon', 'empty-heading', 'empty-body'],
+  messages: [
+    'message', 'message-user', 'message-assistant', 'message-system', 'avatar', 'meta', 'name', 'time', 'bubble',
+    'empty-response', 'error', 'retry-button', 'jump-button', 'load-earlier-row', 'load-earlier',
+  ],
+  actions: [
+    'message-actions', 'action-button', 'copy-button', 'edit-button', 'custom-action', 'message-edit', 'edit-input',
+    'edit-actions', 'edit-cancel-button', 'edit-save-button',
+  ],
+  input: [
+    'composer', 'composer-box', 'input', 'composer-actions', 'composer-actions-start', 'composer-actions-end',
+    'attach-button', 'stop-button', 'send-button',
+  ],
+  files: [
+    'composer-attachments', 'attachment-chip', 'attachment-remove', 'message-attachments', 'message-attachment',
+    'file-card', 'file-card-name', 'file-card-detail', 'preview', 'preview-image', 'preview-close',
+  ],
+  steps: [
+    'reasoning', 'reasoning-trigger', 'reasoning-content', 'tool', 'tool-header', 'tool-status', 'tool-name',
+    'tool-error', 'tool-body', 'tool-input', 'tool-output',
+  ],
+};
+
+/** The Labels page: every label key, by where the words appear. */
+export const labelGroups: Record<string, string[]> = {
+  names: ['userName', 'assistantName'],
+  empty: ['emptyHeading', 'emptyBody'],
+  chrome: ['headerTitle', 'clearChat', 'openAside', 'closeAside'],
+  input: ['inputLabel', 'send', 'stop', 'attach', 'removeAttachment', 'attachTooLarge', 'attachWrongType', 'attachTooMany'],
+  messages: ['typing', 'messagesRegion', 'jumpToLatest', 'emptyResponse', 'retry', 'loadEarlier', 'loadingEarlier'],
+  actions: ['copy', 'copied', 'copyMessage', 'edit', 'saveEdit', 'cancelEdit'],
+  files: ['previewImage', 'openFile', 'preparingFile', 'closePreview'],
+  steps: [
+    'thinking', 'thoughtFor', 'thoughtProcess', 'toolPending', 'toolRunning', 'toolSuccess', 'toolError',
+    'toolIncomplete', 'toolNotRun', 'toolInput', 'toolOutput', 'moreCharacters',
+  ],
+};

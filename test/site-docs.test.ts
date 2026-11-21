@@ -18,7 +18,7 @@ import {
   eventDescriptions,
 } from '../site/reference/descriptions.ts';
 import { extractApi } from '../site/reference/extract.ts';
-import { cssVarGroups } from '../site/reference/groups.ts';
+import { attributeGroups, cssVarGroups, labelGroups, partGroups } from '../site/reference/groups.ts';
 import { DEFAULT_LABELS } from '../src/labels.ts';
 
 /**
@@ -167,6 +167,17 @@ describe('the docs site only names real API', () => {
       expect(placed.filter((n) => !real.includes(n)), 'grouped but not a real variable').toEqual([]);
       expect(placed.filter((n, i) => placed.indexOf(n) !== i), 'in two groups').toEqual([]);
     });
+
+    // Same for the other grouped pages: a name in no group would vanish.
+    const exactlyOnce = (groups: Record<string, string[]>, real: string[]) => {
+      const placed = Object.values(groups).flat();
+      expect(real.filter((n) => !placed.includes(n)), 'not in any group').toEqual([]);
+      expect(placed.filter((n) => !real.includes(n)), 'grouped but not real').toEqual([]);
+      expect(placed.filter((n, i) => placed.indexOf(n) !== i), 'in two groups').toEqual([]);
+    };
+    it('every attribute is in exactly one group', () => exactlyOnce(attributeGroups, api.attributes.map((a) => a.name)));
+    it('every part is in exactly one group', () => exactlyOnce(partGroups, api.parts));
+    it('every label is in exactly one group', () => exactlyOnce(labelGroups, api.labels.map((l) => l.key)));
 
     const check = (label: string, names: string[], described: Record<string, unknown>) => {
       const have = new Set(Object.keys(described));

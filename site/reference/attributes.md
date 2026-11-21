@@ -4,8 +4,6 @@ description: "Every ai-chat attribute with its property name, default value and 
 
 <script setup>
 import { data } from './api.data'
-import { attributeDescriptions as d } from './descriptions'
-import { fmt, words } from './fmt'
 </script>
 
 # Attributes
@@ -14,15 +12,53 @@ Set these in HTML, or as properties from JavaScript (the property name is under 
 attribute). To turn a boolean off, set it to `"false"`:
 `show-timestamps="false"`.
 
-Generated from the source: {{ data.attributes.length }} attributes.
+All {{ data.attributes.length }} attributes, grouped by what they do.
 
-<table class="fd-ref">
-  <thead><tr><th>Attribute</th><th>Type and default</th><th>What it does</th></tr></thead>
-  <tbody>
-    <tr v-for="a in data.attributes" :key="a.name" :id="a.name">
-      <td><code>{{ a.name }}</code><span class="fd-sub"><code>.{{ a.property }}</code></span></td>
-      <td><code class="fd-wrap" v-html="words(a.type)"></code><span v-if="a.default" class="fd-sub">default <code>{{ a.default }}</code></span></td>
-      <td v-html="fmt(d[a.name])"></td>
-    </tr>
-  </tbody>
-</table>
+## Look
+
+Light or dark, bubbles, names, times and avatars.
+
+<RefGroup kind="attributes" group="look" />
+
+## Words on screen
+
+The input's placeholder and what an empty chat says.
+
+<RefGroup kind="attributes" group="words" />
+
+## Conversation
+
+The system prompt, which conversation is open, loading older messages, and
+turning the chat off.
+
+<RefGroup kind="attributes" group="conversation" />
+
+## Buttons
+
+Which built-in buttons show: the header, New chat, Retry, Copy and Edit.
+
+<RefGroup kind="attributes" group="buttons" />
+
+## Sidebar
+
+The history sidebar and when it turns into a drawer.
+
+<RefGroup kind="attributes" group="sidebar" />
+
+## Attachments
+
+Letting people attach files, and which ones.
+
+<RefGroup kind="attributes" group="attachments" />
+
+## Images in replies
+
+Whether a reply may show images, and from where.
+
+<RefGroup kind="attributes" group="images" />
+
+## Thinking and tools
+
+Showing the model's reasoning and its tool calls.
+
+<RefGroup kind="attributes" group="steps" />

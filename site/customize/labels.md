@@ -40,12 +40,38 @@ left. Set `dir="rtl"` on the element, or on any parent:
 
 ## All {{ data.labels.length }} labels
 
-<table class="fd-ref">
-  <thead><tr><th>Key</th><th>Default</th></tr></thead>
-  <tbody>
-    <tr v-for="l in data.labels" :key="l.key">
-      <td><code>{{ l.key }}</code></td>
-      <td>{{ l.text }}</td>
-    </tr>
-  </tbody>
-</table>
+Grouped by where the words appear.
+
+### Names
+
+<RefGroup kind="labels" group="names" />
+
+### Empty chat
+
+<RefGroup kind="labels" group="empty" />
+
+### Header and sidebar
+
+<RefGroup kind="labels" group="chrome" />
+
+### Input box
+
+Including the messages shown when a file can't be attached.
+
+<RefGroup kind="labels" group="input" />
+
+### Messages
+
+<RefGroup kind="labels" group="messages" />
+
+### Message buttons
+
+<RefGroup kind="labels" group="actions" />
+
+### Files and images
+
+<RefGroup kind="labels" group="files" />
+
+### Thinking and tools
+
+<RefGroup kind="labels" group="steps" />

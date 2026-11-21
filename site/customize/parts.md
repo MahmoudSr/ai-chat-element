@@ -34,6 +34,44 @@ inner layout changes; a part rule depends on that element's current styles.
 
 ## All {{ data.parts.length }} parts
 
-<p class="fd-chips">
-  <code v-for="p in data.parts" :key="p">{{ p }}</code>
-</p>
+Grouped by the area of the chat they're in.
+
+### The frame
+
+<RefGroup kind="parts" group="frame" />
+
+### Header
+
+<RefGroup kind="parts" group="header" />
+
+### Sidebar
+
+<RefGroup kind="parts" group="sidebar" />
+
+### Empty chat
+
+<RefGroup kind="parts" group="empty" />
+
+### Messages
+
+<RefGroup kind="parts" group="messages" />
+
+### Message buttons
+
+Copy, Edit and your own buttons, and the box that opens when you edit.
+
+<RefGroup kind="parts" group="actions" />
+
+### Input box
+
+<RefGroup kind="parts" group="input" />
+
+### Files and images
+
+Attached files, and the full-size image view.
+
+<RefGroup kind="parts" group="files" />
+
+### Thinking and tools
+
+<RefGroup kind="parts" group="steps" />
